@@ -1,0 +1,13 @@
+/AGENTS.md
+/CLAUDE.md
+/.env
+/.env.*
+!.env.example
+/build/
+.ruff_cache/
+__pycache__/
+*.o
+*.ppu
+*.a
+*.compiled
+.DS_Store

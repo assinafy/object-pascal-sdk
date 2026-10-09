@@ -1,0 +1,35 @@
+name: SDK checks
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Free Pascal and native libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fp-compiler fp-units-fcl fp-units-net libcurl4-openssl-dev libssl-dev
+      - name: Install Free Pascal and native libraries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install fpc openssl@3
+          echo "DYLD_LIBRARY_PATH=$(brew --prefix openssl@3)/lib" >> "$GITHUB_ENV"
+      - name: Check stable compiler
+        run: test "$(fpc -iV)" = "3.2.2"
+      - name: Compile, test and verify generated contracts
+        run: make check
