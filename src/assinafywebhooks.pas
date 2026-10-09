@@ -1,6 +1,7 @@
 unit AssinafyWebhooks;
 
-{$mode objfpc}{$H+}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$B-}
 
 interface
 
@@ -15,7 +16,7 @@ function VerifyWebhookHeaders(const Secret: string; Headers: TStrings;
 implementation
 
 uses
-  SysUtils, DateUtils, base64, AssinafyCrypto, AssinafyHttp;
+  SysUtils, DateUtils, AssinafyCrypto, AssinafyHttp;
 
 function VerifyWebhook(const Secret, MessageID, Timestamp, Signatures: string;
   const RawBody: RawByteString; NowUnix: Int64; ToleranceSeconds: Integer): Boolean;
@@ -30,7 +31,7 @@ begin
   Result := False;
   if (Copy(Secret, 1, 6) <> 'whsec_') or (MessageID = '') or
     (Timestamp = '') or (Signatures = '') or (ToleranceSeconds < 0) or (NowUnix < 0) then Exit;
-  for C in Timestamp do if not (C in ['0'..'9']) then Exit;
+  for C in Timestamp do if not CharInSet(C, ['0'..'9']) then Exit;
   if not TryStrToInt64(Timestamp, Sent) or (Sent < 0) then Exit;
   if (Sent > NowUnix) then
   begin
@@ -49,7 +50,7 @@ begin
   Move(Prefix[1], SignedBody[1], Length(Prefix));
   if RawBody <> '' then Move(RawBody[1], SignedBody[Length(Prefix) + 1], Length(RawBody));
   Digest := HMACSHA256(Key, SignedBody);
-  Expected := 'v1,' + EncodeStringBase64(Digest);
+  Expected := 'v1,' + Base64Encode(Digest);
   Entries := TStringList.Create;
   try
     Entries.StrictDelimiter := True;
@@ -83,11 +84,12 @@ begin
     if Split = 0 then Continue;
     Name := LowerCase(Trim(Copy(Headers[I], 1, Split - 1)));
     Value := Trim(Copy(Headers[I], Split + 1, MaxInt));
-    case Name of
-      'webhook-id': begin if HasID then Exit(False); HasID := True; ID := Value; end;
-      'webhook-timestamp': begin if HasTimestamp then Exit(False); HasTimestamp := True; Timestamp := Value; end;
-      'webhook-signature': begin if Signatures <> '' then Signatures := Signatures + ' '; Signatures := Signatures + Value; end;
-    end;
+    if Name = 'webhook-id' then
+    begin if HasID then Exit(False); HasID := True; ID := Value; end
+    else if Name = 'webhook-timestamp' then
+    begin if HasTimestamp then Exit(False); HasTimestamp := True; Timestamp := Value; end
+    else if Name = 'webhook-signature' then
+    begin if Signatures <> '' then Signatures := Signatures + ' '; Signatures := Signatures + Value; end;
   end;
   Result := VerifyWebhook(Secret, ID, Timestamp, Signatures, RawBody,
     DateTimeToUnix(Now, False), ToleranceSeconds);

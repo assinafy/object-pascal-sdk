@@ -9,7 +9,7 @@
   Check(Fake.LastMethod = 'PUT', 'UpdateAccount verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account', 'UpdateAccount URL');
   Check(Fake.LastAuth = 'bearer', 'UpdateAccount authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'UpdateAccount body');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateAccount body');
   Check(Fake.LastContentType = 'application/json', 'UpdateAccount content type');
 
   Response := Client.DeleteAccount('', TestBody);
@@ -17,7 +17,7 @@
   Check(Fake.LastMethod = 'DELETE', 'DeleteAccount verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account', 'DeleteAccount URL');
   Check(Fake.LastAuth = 'bearer', 'DeleteAccount authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'DeleteAccount body');
+  Check(Fake.LastBody = JSONText(TestBody), 'DeleteAccount body');
   Check(Fake.LastContentType = 'application/json', 'DeleteAccount content type');
 
   Response := Client.GetAccountTheme('');
@@ -58,7 +58,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateAccount verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts', 'CreateAccount URL');
   Check(Fake.LastAuth = 'bearer', 'CreateAccount authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateAccount body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateAccount body');
   Check(Fake.LastContentType = 'application/json', 'CreateAccount content type');
 
   Response := Client.ListDocumentActivities('DocumentId');
@@ -81,7 +81,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateAssignment verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments', 'CreateAssignment URL');
   Check(Fake.LastAuth = 'bearer', 'CreateAssignment authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateAssignment body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateAssignment body');
   Check(Fake.LastContentType = 'application/json', 'CreateAssignment content type');
 
   Response := Client.EstimateAssignmentCost('DocumentId', TestBody);
@@ -89,7 +89,7 @@
   Check(Fake.LastMethod = 'POST', 'EstimateAssignmentCost verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/estimate-cost', 'EstimateAssignmentCost URL');
   Check(Fake.LastAuth = 'bearer', 'EstimateAssignmentCost authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'EstimateAssignmentCost body');
+  Check(Fake.LastBody = JSONText(TestBody), 'EstimateAssignmentCost body');
   Check(Fake.LastContentType = 'application/json', 'EstimateAssignmentCost content type');
 
   Response := Client.ResendSignatureRequest('DocumentId', 'AssignmentId', 'SignerId');
@@ -109,7 +109,7 @@
   Check(Fake.LastMethod = 'PUT', 'ResetAssignmentExpiration verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/AssignmentId/reset-expiration', 'ResetAssignmentExpiration URL');
   Check(Fake.LastAuth = 'bearer', 'ResetAssignmentExpiration authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ResetAssignmentExpiration body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ResetAssignmentExpiration body');
   Check(Fake.LastContentType = 'application/json', 'ResetAssignmentExpiration content type');
 
   Response := Client.Login(TestBody);
@@ -117,7 +117,7 @@
   Check(Fake.LastMethod = 'POST', 'Login verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/login', 'Login URL');
   Check(Fake.LastAuth = 'public', 'Login authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'Login body');
+  Check(Fake.LastBody = JSONText(TestBody), 'Login body');
   Check(Fake.LastContentType = 'application/json', 'Login content type');
 
   Response := Client.RequestPasswordReset(TestBody);
@@ -125,7 +125,7 @@
   Check(Fake.LastMethod = 'PUT', 'RequestPasswordReset verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/authentication/request-password-reset', 'RequestPasswordReset URL');
   Check(Fake.LastAuth = 'public', 'RequestPasswordReset authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'RequestPasswordReset body');
+  Check(Fake.LastBody = JSONText(TestBody), 'RequestPasswordReset body');
   Check(Fake.LastContentType = 'application/json', 'RequestPasswordReset content type');
 
   Response := Client.ResetPassword(TestBody);
@@ -133,7 +133,7 @@
   Check(Fake.LastMethod = 'PUT', 'ResetPassword verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/authentication/reset-password', 'ResetPassword URL');
   Check(Fake.LastAuth = 'public', 'ResetPassword authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ResetPassword body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ResetPassword body');
   Check(Fake.LastContentType = 'application/json', 'ResetPassword content type');
 
   Response := Client.ChangePassword(TestBody);
@@ -141,7 +141,7 @@
   Check(Fake.LastMethod = 'PUT', 'ChangePassword verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/authentication/change-password', 'ChangePassword URL');
   Check(Fake.LastAuth = 'bearer', 'ChangePassword authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ChangePassword body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ChangePassword body');
   Check(Fake.LastContentType = 'application/json', 'ChangePassword content type');
 
   Response := Client.CompleteATwoFactorLogin(TestBody);
@@ -149,7 +149,7 @@
   Check(Fake.LastMethod = 'POST', 'CompleteATwoFactorLogin verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/authentication/mfa/verify', 'CompleteATwoFactorLogin URL');
   Check(Fake.LastAuth = 'public', 'CompleteATwoFactorLogin authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CompleteATwoFactorLogin body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CompleteATwoFactorLogin body');
   Check(Fake.LastContentType = 'application/json', 'CompleteATwoFactorLogin content type');
 
   TestQuery.Clear;
@@ -209,7 +209,7 @@
   Check(Fake.LastMethod = 'PATCH', 'RenameDocument verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId', 'RenameDocument URL');
   Check(Fake.LastAuth = 'bearer', 'RenameDocument authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'RenameDocument body');
+  Check(Fake.LastBody = JSONText(TestBody), 'RenameDocument body');
   Check(Fake.LastContentType = 'application/json', 'RenameDocument content type');
 
   Response := Client.DownloadDocumentArtifact('DocumentId', 'ArtifactName');
@@ -235,7 +235,7 @@
   Check(Fake.LastMethod = 'PUT', 'ReplaceDocumentTags verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/tags', 'ReplaceDocumentTags URL');
   Check(Fake.LastAuth = 'bearer', 'ReplaceDocumentTags authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ReplaceDocumentTags body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ReplaceDocumentTags body');
   Check(Fake.LastContentType = 'application/json', 'ReplaceDocumentTags content type');
 
   Response := Client.AttachDocumentTags('', 'DocumentId', TestBody);
@@ -243,7 +243,7 @@
   Check(Fake.LastMethod = 'POST', 'AttachDocumentTags verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/tags', 'AttachDocumentTags URL');
   Check(Fake.LastAuth = 'bearer', 'AttachDocumentTags authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'AttachDocumentTags body');
+  Check(Fake.LastBody = JSONText(TestBody), 'AttachDocumentTags body');
   Check(Fake.LastContentType = 'application/json', 'AttachDocumentTags content type');
 
   Response := Client.DetachDocumentTag('', 'DocumentId', 'TagId');
@@ -266,7 +266,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateField verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/fields', 'CreateField URL');
   Check(Fake.LastAuth = 'bearer', 'CreateField authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateField body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateField body');
   Check(Fake.LastContentType = 'application/json', 'CreateField content type');
 
   Response := Client.GetField('', 'FieldId');
@@ -280,7 +280,7 @@
   Check(Fake.LastMethod = 'PUT', 'UpdateField verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/fields/FieldId', 'UpdateField URL');
   Check(Fake.LastAuth = 'bearer', 'UpdateField authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'UpdateField body');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateField body');
   Check(Fake.LastContentType = 'application/json', 'UpdateField content type');
 
   Response := Client.DeleteField('', 'FieldId');
@@ -294,7 +294,7 @@
   Check(Fake.LastMethod = 'POST', 'ValidateFieldValue verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/fields/FieldId/validate', 'ValidateFieldValue URL');
   Check(Fake.LastAuth = 'bearer', 'ValidateFieldValue authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ValidateFieldValue body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ValidateFieldValue body');
   Check(Fake.LastContentType = 'application/json', 'ValidateFieldValue content type');
 
   Response := Client.ValidateMultipleFieldValues('', TestBody);
@@ -302,7 +302,7 @@
   Check(Fake.LastMethod = 'POST', 'ValidateMultipleFieldValues verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/fields/validate-multiple', 'ValidateMultipleFieldValues URL');
   Check(Fake.LastAuth = 'bearer', 'ValidateMultipleFieldValues authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ValidateMultipleFieldValues body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ValidateMultipleFieldValues body');
   Check(Fake.LastContentType = 'application/json', 'ValidateMultipleFieldValues content type');
 
   Response := Client.ListFieldTypes;
@@ -322,7 +322,7 @@
   Check(Fake.LastMethod = 'POST', 'StartAuthenticatorEnrollment verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/self/mfa/totp', 'StartAuthenticatorEnrollment URL');
   Check(Fake.LastAuth = 'bearer', 'StartAuthenticatorEnrollment authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'StartAuthenticatorEnrollment body');
+  Check(Fake.LastBody = JSONText(TestBody), 'StartAuthenticatorEnrollment body');
   Check(Fake.LastContentType = 'application/json', 'StartAuthenticatorEnrollment content type');
 
   Response := Client.ConfirmAuthenticatorEnrollment(TestBody);
@@ -330,7 +330,7 @@
   Check(Fake.LastMethod = 'PUT', 'ConfirmAuthenticatorEnrollment verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/self/mfa/totp/confirm', 'ConfirmAuthenticatorEnrollment URL');
   Check(Fake.LastAuth = 'bearer', 'ConfirmAuthenticatorEnrollment authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ConfirmAuthenticatorEnrollment body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ConfirmAuthenticatorEnrollment body');
   Check(Fake.LastContentType = 'application/json', 'ConfirmAuthenticatorEnrollment content type');
 
   Response := Client.RegenerateRecoveryCodes(TestBody);
@@ -338,7 +338,7 @@
   Check(Fake.LastMethod = 'POST', 'RegenerateRecoveryCodes verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/self/mfa/recovery-codes', 'RegenerateRecoveryCodes URL');
   Check(Fake.LastAuth = 'bearer', 'RegenerateRecoveryCodes authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'RegenerateRecoveryCodes body');
+  Check(Fake.LastBody = JSONText(TestBody), 'RegenerateRecoveryCodes body');
   Check(Fake.LastContentType = 'application/json', 'RegenerateRecoveryCodes content type');
 
   Response := Client.RemoveATwoFactorMethod('CustomId', TestBody);
@@ -346,7 +346,7 @@
   Check(Fake.LastMethod = 'DELETE', 'RemoveATwoFactorMethod verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/self/mfa/CustomId', 'RemoveATwoFactorMethod URL');
   Check(Fake.LastAuth = 'bearer', 'RemoveATwoFactorMethod authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'RemoveATwoFactorMethod body');
+  Check(Fake.LastBody = JSONText(TestBody), 'RemoveATwoFactorMethod body');
   Check(Fake.LastContentType = 'application/json', 'RemoveATwoFactorMethod content type');
 
   Response := Client.GetMyNotificationPreferences;
@@ -360,7 +360,7 @@
   Check(Fake.LastMethod = 'PUT', 'UpdateMyNotificationPreferences verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/self/notification-preferences', 'UpdateMyNotificationPreferences URL');
   Check(Fake.LastAuth = 'bearer', 'UpdateMyNotificationPreferences authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'UpdateMyNotificationPreferences body');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateMyNotificationPreferences body');
   Check(Fake.LastContentType = 'application/json', 'UpdateMyNotificationPreferences content type');
 
   Response := Client.ExchangeOAuthToken(TestBody);
@@ -368,7 +368,7 @@
   Check(Fake.LastMethod = 'POST', 'ExchangeOAuthToken verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/oauth/token', 'ExchangeOAuthToken URL');
   Check(Fake.LastAuth = 'public', 'ExchangeOAuthToken authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ExchangeOAuthToken body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ExchangeOAuthToken body');
   Check(Fake.LastContentType = 'application/json', 'ExchangeOAuthToken content type');
 
   Response := Client.RevokeOAuthToken(TestBody);
@@ -376,7 +376,7 @@
   Check(Fake.LastMethod = 'POST', 'RevokeOAuthToken verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/oauth/revoke', 'RevokeOAuthToken URL');
   Check(Fake.LastAuth = 'public', 'RevokeOAuthToken authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'RevokeOAuthToken body');
+  Check(Fake.LastBody = JSONText(TestBody), 'RevokeOAuthToken body');
   Check(Fake.LastContentType = 'application/json', 'RevokeOAuthToken content type');
 
   Response := Client.GetOAuthUserInfo;
@@ -408,7 +408,7 @@
   Check(Fake.LastMethod = 'PUT', 'SendAccessTokenForPublicDocument verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/public/documents/DocumentId/send-token', 'SendAccessTokenForPublicDocument URL');
   Check(Fake.LastAuth = 'public', 'SendAccessTokenForPublicDocument authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'SendAccessTokenForPublicDocument body');
+  Check(Fake.LastBody = JSONText(TestBody), 'SendAccessTokenForPublicDocument body');
   Check(Fake.LastContentType = 'application/json', 'SendAccessTokenForPublicDocument content type');
 
   TestQuery.Clear;
@@ -426,7 +426,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateSigner verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/signers', 'CreateSigner URL');
   Check(Fake.LastAuth = 'bearer', 'CreateSigner authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateSigner body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateSigner body');
   Check(Fake.LastContentType = 'application/json', 'CreateSigner content type');
 
   Response := Client.GetSigner('', 'SignerId');
@@ -440,7 +440,7 @@
   Check(Fake.LastMethod = 'PUT', 'UpdateSigner verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/signers/SignerId', 'UpdateSigner URL');
   Check(Fake.LastAuth = 'bearer', 'UpdateSigner authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'UpdateSigner body');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateSigner body');
   Check(Fake.LastContentType = 'application/json', 'UpdateSigner content type');
 
   Response := Client.DeleteSigner('', 'SignerId');
@@ -474,7 +474,7 @@
   Check(Fake.LastMethod = 'POST', 'SignAssignmentItems verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/AssignmentId?signer-access-code=SignerAccessCode', 'SignAssignmentItems URL');
   Check(Fake.LastAuth = 'signer', 'SignAssignmentItems authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'SignAssignmentItems body');
+  Check(Fake.LastBody = JSONText(TestBody), 'SignAssignmentItems body');
   Check(Fake.LastContentType = 'application/json', 'SignAssignmentItems content type');
 
   Response := Client.RejectAssignment('DocumentId', 'AssignmentId', 'SignerAccessCode', TestBody);
@@ -482,7 +482,7 @@
   Check(Fake.LastMethod = 'PUT', 'RejectAssignment verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/AssignmentId/reject?signer-access-code=SignerAccessCode', 'RejectAssignment URL');
   Check(Fake.LastAuth = 'signer', 'RejectAssignment authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'RejectAssignment body');
+  Check(Fake.LastBody = JSONText(TestBody), 'RejectAssignment body');
   Check(Fake.LastContentType = 'application/json', 'RejectAssignment content type');
 
   Response := Client.SignMultipleDocuments('SignerAccessCode', TestBody);
@@ -490,7 +490,7 @@
   Check(Fake.LastMethod = 'PUT', 'SignMultipleDocuments verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/documents/sign-multiple?signer-access-code=SignerAccessCode', 'SignMultipleDocuments URL');
   Check(Fake.LastAuth = 'signer', 'SignMultipleDocuments authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'SignMultipleDocuments body');
+  Check(Fake.LastBody = JSONText(TestBody), 'SignMultipleDocuments body');
   Check(Fake.LastContentType = 'application/json', 'SignMultipleDocuments content type');
 
   Response := Client.DeclineMultipleDocuments('SignerAccessCode', TestBody);
@@ -498,7 +498,7 @@
   Check(Fake.LastMethod = 'PUT', 'DeclineMultipleDocuments verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/documents/decline-multiple?signer-access-code=SignerAccessCode', 'DeclineMultipleDocuments URL');
   Check(Fake.LastAuth = 'signer', 'DeclineMultipleDocuments authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'DeclineMultipleDocuments body');
+  Check(Fake.LastBody = JSONText(TestBody), 'DeclineMultipleDocuments body');
   Check(Fake.LastContentType = 'application/json', 'DeclineMultipleDocuments content type');
 
   Response := Client.VerifySignerCode('SignerAccessCode', TestBody);
@@ -506,7 +506,7 @@
   Check(Fake.LastMethod = 'POST', 'VerifySignerCode verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/verify?signer-access-code=SignerAccessCode', 'VerifySignerCode URL');
   Check(Fake.LastAuth = 'signer', 'VerifySignerCode authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'VerifySignerCode body');
+  Check(Fake.LastBody = JSONText(TestBody), 'VerifySignerCode body');
   Check(Fake.LastContentType = 'application/json', 'VerifySignerCode content type');
 
   Response := Client.ConfirmSignerData('DocumentId', 'SignerAccessCode', TestBody);
@@ -514,7 +514,7 @@
   Check(Fake.LastMethod = 'PUT', 'ConfirmSignerData verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/signers/confirm-data?signer-access-code=SignerAccessCode', 'ConfirmSignerData URL');
   Check(Fake.LastAuth = 'signer', 'ConfirmSignerData authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'ConfirmSignerData body');
+  Check(Fake.LastBody = JSONText(TestBody), 'ConfirmSignerData body');
   Check(Fake.LastContentType = 'application/json', 'ConfirmSignerData content type');
 
   Response := Client.AcceptTerms('SignerAccessCode');
@@ -569,7 +569,7 @@
   Check(Fake.LastMethod = 'POST', 'SocialLogin verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/authentication/social-login', 'SocialLogin URL');
   Check(Fake.LastAuth = 'public', 'SocialLogin authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'SocialLogin body');
+  Check(Fake.LastBody = JSONText(TestBody), 'SocialLogin body');
   Check(Fake.LastContentType = 'application/json', 'SocialLogin content type');
 
   Response := Client.LinkSocialLogin(TestBody);
@@ -577,7 +577,7 @@
   Check(Fake.LastMethod = 'POST', 'LinkSocialLogin verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/auth/link-social-login', 'LinkSocialLogin URL');
   Check(Fake.LastAuth = 'bearer', 'LinkSocialLogin authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'LinkSocialLogin body');
+  Check(Fake.LastBody = JSONText(TestBody), 'LinkSocialLogin body');
   Check(Fake.LastContentType = 'application/json', 'LinkSocialLogin content type');
 
   TestQuery.Clear;
@@ -611,7 +611,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateTag verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/tags', 'CreateTag URL');
   Check(Fake.LastAuth = 'bearer', 'CreateTag authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateTag body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateTag body');
   Check(Fake.LastContentType = 'application/json', 'CreateTag content type');
 
   Response := Client.UpdateTag('', 'TagId', TestBody);
@@ -619,7 +619,7 @@
   Check(Fake.LastMethod = 'PUT', 'UpdateTag verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/tags/TagId', 'UpdateTag URL');
   Check(Fake.LastAuth = 'bearer', 'UpdateTag authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'UpdateTag body');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateTag body');
   Check(Fake.LastContentType = 'application/json', 'UpdateTag content type');
 
   TestQuery.Clear;
@@ -645,7 +645,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateDocumentFromTemplate verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/templates/TemplateId/documents', 'CreateDocumentFromTemplate URL');
   Check(Fake.LastAuth = 'bearer', 'CreateDocumentFromTemplate authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateDocumentFromTemplate body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateDocumentFromTemplate body');
   Check(Fake.LastContentType = 'application/json', 'CreateDocumentFromTemplate content type');
 
   Response := Client.EstimateDocumentFromTemplateCost('', 'TemplateId', TestBody);
@@ -653,7 +653,7 @@
   Check(Fake.LastMethod = 'POST', 'EstimateDocumentFromTemplateCost verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/templates/TemplateId/documents/estimate-cost', 'EstimateDocumentFromTemplateCost URL');
   Check(Fake.LastAuth = 'bearer', 'EstimateDocumentFromTemplateCost authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'EstimateDocumentFromTemplateCost body');
+  Check(Fake.LastBody = JSONText(TestBody), 'EstimateDocumentFromTemplateCost body');
   Check(Fake.LastContentType = 'application/json', 'EstimateDocumentFromTemplateCost content type');
 
   Response := Client.GetUser;
@@ -673,7 +673,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateAPIKey verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/api-keys', 'CreateAPIKey URL');
   Check(Fake.LastAuth = 'bearer', 'CreateAPIKey authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateAPIKey body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateAPIKey body');
   Check(Fake.LastContentType = 'application/json', 'CreateAPIKey content type');
 
   Response := Client.DeleteAPIKey;
@@ -693,7 +693,7 @@
   Check(Fake.LastMethod = 'PUT', 'UpdateWebhookSubscription verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/subscriptions', 'UpdateWebhookSubscription URL');
   Check(Fake.LastAuth = 'bearer', 'UpdateWebhookSubscription authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'UpdateWebhookSubscription body');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateWebhookSubscription body');
   Check(Fake.LastContentType = 'application/json', 'UpdateWebhookSubscription content type');
 
   Response := Client.InactivateWebhookSubscription('');
@@ -739,7 +739,7 @@
   Check(Fake.LastMethod = 'POST', 'CreateWebhookEndpoint verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints', 'CreateWebhookEndpoint URL');
   Check(Fake.LastAuth = 'bearer', 'CreateWebhookEndpoint authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'CreateWebhookEndpoint body');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateWebhookEndpoint body');
   Check(Fake.LastContentType = 'application/json', 'CreateWebhookEndpoint content type');
 
   Response := Client.GetWebhookEndpoint('', 'EndpointId');
@@ -753,7 +753,7 @@
   Check(Fake.LastMethod = 'PUT', 'UpdateWebhookEndpoint verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints/EndpointId', 'UpdateWebhookEndpoint URL');
   Check(Fake.LastAuth = 'bearer', 'UpdateWebhookEndpoint authentication');
-  Check(Fake.LastBody = TestBody.AsJSON, 'UpdateWebhookEndpoint body');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateWebhookEndpoint body');
   Check(Fake.LastContentType = 'application/json', 'UpdateWebhookEndpoint content type');
 
   Response := Client.DeleteWebhookEndpoint('', 'EndpointId');

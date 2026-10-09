@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-10-09
+
+- Add experimental Delphi 12+ Windows source integration and runtime-package projects, sharing all 106 resource methods with Free Pascal.
+- Add native JSON aliases and shared construction/access helpers with strict cross-compiler JSON validation.
+- Add a Windows HTTP transport with OS certificate verification, bounded uploads and overall-transfer cancellation.
+- Provide Windows build commands and shared JSON, HTTP/TLS and example checks.
+- Limit JSON response nesting to 512 containers and reject duplicate object-constructor names before allocating the rejected value.
+- Preserve status and bytes when Delphi cancellation leaves response completion indeterminate; verify encoded response lengths without automatic decompression.
+- Reject negative native-transport timeouts, malformed HTTP headers and out-of-range URI ports; preserve zero as unlimited for direct transport calls.
+
 ## 0.2.1 — 2026-10-09
 
 - Use Free Pascal's native Unicode manager on macOS to preserve legacy code-page text during UTF-8 conversion.

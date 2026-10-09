@@ -19,7 +19,7 @@ Este guia acompanha um documento do envio do PDF até a assinatura e o download 
 
 ## Requisitos e instalação
 
-- **Free Pascal 3.2.2**, a [versão estável oficial atual](https://www.freepascal.org/download.html). O Free Pascal publica versões estáveis e não possui um canal LTS separado. Projetos Lazarus que usam esse compilador podem incluir as unidades do SDK. O pacote utiliza a FCL do Free Pascal e não é um pacote Delphi.
+- **Free Pascal 3.2.2**, a [versão estável oficial atual](https://www.freepascal.org/download.html). O Free Pascal publica versões estáveis e não possui um canal LTS separado. Projetos Lazarus que usam esse compilador podem incluir as unidades do SDK. Essa configuração utiliza a FCL do Free Pascal.
 - Unidades JSON/base64 da FCL e as interfaces `libcurl` do Free Pascal.
 - **libcurl 7.56 ou superior**, com HTTPS habilitado, certificados de autoridades certificadoras confiáveis e TLS 1.2 ou superior.
 - **OpenSSL 3 libcrypto** para PKCE, geração aleatória de estado e assinaturas de webhooks. O TLS das requisições HTTP usa a implementação configurada na libcurl. Instale versões mantidas dessas bibliotecas pelo gerenciador de pacotes do sistema operacional.
@@ -52,6 +52,31 @@ export DYLD_LIBRARY_PATH="$(brew --prefix openssl@3)/lib"
 O processo da aplicação precisa localizar `libcrypto.3.dylib` para utilizar OAuth e verificar assinaturas de webhooks. Com o OpenSSL instalado pelo Homebrew, configure `DYLD_LIBRARY_PATH` antes de iniciar a aplicação, inclusive quando ela for executada fora do terminal.
 
 A integração contínua executa os testes em Linux e macOS. No Windows, são necessárias unidades Free Pascal compatíveis, biblioteca de importação e runtime da libcurl, certificados de autoridades confiáveis e runtime OpenSSL 3 com a mesma arquitetura do executável. As compilações Windows ainda não foram validadas neste projeto.
+
+### Delphi no Windows
+
+A implementação Delphi é **experimental**: os alvos previstos são Delphi 12 ou superior, Win32 e Win64, e a compilação e os testes nesse compilador ainda precisam ser executados. O mesmo código mantém as 106 operações e utiliza `System.JSON` e `System.Net.HttpClient`; Delphi não depende de libcurl. O TLS usa o armazenamento de certificados do Windows, com TLS 1.2/1.3 e redirecionamentos desabilitados.
+
+O [Delphi Community Edition](https://www.embarcadero.com/products/delphi/starter) fornece o compilador para usuários elegíveis. Consulte os [requisitos de licença](https://www.embarcadero.com/products/delphi/starter/faq). A instalação requer Windows; Free Pascal em modo Delphi não substitui essa ferramenta para validar compatibilidade.
+
+Para consumir os fontes:
+
+1. Adicione a pasta `src` aos caminhos **Search path** e **Include file search path** do projeto, ou ao **Library path** em **Tools → Options → Language → Delphi**. Mantenha os caminhos de compilação Win32 e Win64 separados.
+2. Para fontes UTF-8 sem BOM, defina [**Delphi Compiler → Compiling → Code page**](https://docwiki.embarcadero.com/RADStudio/Athens/en/Compiling) como `65001` ou use `--codepage:65001` na linha de comando. O pacote e o comando de verificação já usam essa configuração.
+3. Inclua `Assinafy`, `AssinafyHttp` e `AssinafyJson`. Os exemplos deste guia usam os auxiliares JSON compartilhados. Aplicações Free Pascal existentes podem continuar usando `fpjson`; aplicações Delphi também podem fornecer valores nativos de `System.JSON`.
+4. Para OAuth e webhooks, coloque o OpenSSL 3 e suas DLLs dependentes ao lado do executável: `libcrypto-3.dll` em Win32 ou `libcrypto-3-x64.dll` em Win64. A arquitetura precisa corresponder à aplicação. A chave de API não exige operações criptográficas locais.
+5. Compile [delphi/AssinafySDK.dproj](delphi/AssinafySDK.dproj) quando precisar de um pacote de runtime. O uso direto dos fontes não exige instalar um pacote no IDE.
+
+`CAFile` permanece disponível no transporte Free Pascal. No transporte Delphi, um valor não vazio gera `EAssinafyInputError`: configure as autoridades confiáveis no Windows. O SDK preserva a validação de cadeia e hostname do sistema operacional.
+
+Para executar a verificação Delphi em uma máquina Windows isolada, abra o terminal configurado pelo RAD Studio, instale Python e disponibilize o executável `openssl`. Execute, ajustando a pasta do runtime e a plataforma:
+
+```powershell
+.\delphi\check.ps1 -Platform Win32 -CryptoDirectory C:\OpenSSL-Win32\bin -TrustTestCertificate
+.\delphi\check.ps1 -Platform Win64 -CryptoDirectory C:\OpenSSL-Win64\bin -TrustTestCertificate
+```
+
+O comando reconstrói o pacote, os testes e os exemplos; confere as 106 operações; executa os testes de JSON, autenticação, OAuth, webhooks, HTTP e TLS; e compila os trechos Pascal do README. `-TrustTestCertificate` permite confiar temporariamente no certificado local gerado para o teste de TLS, no armazenamento **CurrentUser → Root**. O comando remove esse certificado ao concluir, inclusive quando um teste falha. Um segundo certificado permanece não confiável para verificar a rejeição; o teste também verifica hostname incorreto, redirecionamentos e timeout durante uma resposta contínua. Não execute esse teste interrompendo o processo durante a alteração temporária do armazenamento.
 
 ## Ambientes e configuração
 
@@ -97,12 +122,12 @@ Crie uma chave de API nas configurações da conta e anote o ID do espaço de tr
 ```pascal
 program ConsultarConta;
 
-{$mode objfpc}{$H+}
-{$codepage utf8}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$IFDEF FPC}{$codepage utf8}{$ENDIF}
 
 uses
   {$ifdef unix}cthreads,{$endif}
-  SysUtils, Assinafy, AssinafyHttp;
+  SysUtils, AssinafyJson, Assinafy, AssinafyHttp;
 
 var
   Client: TAssinafyClient;
@@ -117,7 +142,7 @@ begin
   try
     Response := Client.GetAccount(AccountID);
     try
-      WriteLn(Response.Data.AsJSON);
+      WriteLn(JSONText(Response.Data));
     finally
       Response.Free;
     end;
@@ -138,7 +163,7 @@ Client := TAssinafyClient.Create('', '', AssinafySandboxURL);
 Client.AccessToken := SavedAccessToken;
 Response := Client.ListMyAccounts;
 try
-  AccountID := TJSONArray(Response.Data).Items[0].FindPath('id').AsString;
+  AccountID := JSONString(JSONFind(TJSONArray(Response.Data).Items[0], 'id'));
 finally
   Response.Free;
 end;
@@ -161,7 +186,7 @@ Com `Client` autenticado e `AccountID` definido pelo modo escolhido, siga estas 
 4. Disponibilize as URLs aos respectivos signatários para que concluam a assinatura.
 5. Acompanhe a conclusão por webhook ou consulta de estado e baixe os arquivos finais.
 
-Os trechos abaixo usam as unidades `Classes`, `SysUtils`, `fpjson`, `Assinafy` e `AssinafyHttp`. Inclua também `AssinafyOAuth` para as funções OAuth e `AssinafyWebhooks` para verificar entregas. Os programas completos estão em [examples](examples).
+Os trechos abaixo usam as unidades `Classes`, `SysUtils`, `AssinafyJson`, `Assinafy` e `AssinafyHttp`. Inclua também `AssinafyOAuth` para as funções OAuth e `AssinafyWebhooks` para verificar entregas. Os programas completos estão em [examples](examples).
 
 ### 1. Enviar o PDF
 
@@ -169,7 +194,7 @@ Os trechos abaixo usam as unidades `Classes`, `SysUtils`, `fpjson`, `Assinafy` e
 Client.TimeoutMS := 180000;
 Response := Client.UploadDocument(AccountID, 'contrato.pdf');
 try
-  DocumentID := Response.Data.FindPath('id').AsString;
+  DocumentID := JSONString(JSONFind(Response.Data, 'id'));
 finally
   Response.Free;
 end;
@@ -186,14 +211,14 @@ O timeout padrão de 30 segundos limita a transferência inteira, incluindo a re
 ### 2. Criar ou reutilizar signatários
 
 ```pascal
-SignerBody := TJSONObject.Create([
+SignerBody := JSONObj([
   'full_name', 'Signatário de exemplo',
   'email', 'signer@example.com'
 ]);
 try
   Response := Client.CreateSigner(AccountID, SignerBody);
   try
-    SignerID := Response.Data.FindPath('id').AsString;
+    SignerID := JSONString(JSONFind(Response.Data, 'id'));
   finally
     Response.Free;
   end;
@@ -209,26 +234,26 @@ Use `ListSigners` com um parâmetro de busca para reutilizar um signatário exis
 Monte um único corpo de requisição para a estimativa e a criação:
 
 ```pascal
-AssignmentBody := TJSONObject.Create(['method', 'virtual']);
+AssignmentBody := JSONObj(['method', 'virtual']);
 try
   Signers := TJSONArray.Create;
-  AssignmentBody.Add('signers', Signers);
-  Signers.Add(TJSONObject.Create([
+  JSONAdd(AssignmentBody, 'signers', Signers);
+  JSONAdd(Signers, JSONObj([
     'id', SignerID,
     'verification_method', 'Email',
-    'notification_methods', TJSONArray.Create(['Email'])
+    'notification_methods', JSONArr(['Email'])
   ]));
-  AssignmentBody.Add('message', 'Por favor, revise e assine');
+  JSONAdd(AssignmentBody, 'message', 'Por favor, revise e assine');
   Response := Client.EstimateAssignmentCost(DocumentID, AssignmentBody);
   try
-    if not Response.Data.FindPath('has_sufficient_resources').AsBoolean then
+    if not JSONBoolean(JSONFind(Response.Data, 'has_sufficient_resources')) then
       raise Exception.Create('Recursos insuficientes para solicitar assinaturas');
   finally
     Response.Free;
   end;
   Response := Client.CreateAssignment(DocumentID, AssignmentBody);
   try
-    WriteLn(Response.Data.AsJSON);
+    WriteLn(JSONText(Response.Data));
   finally
     Response.Free;
   end;
@@ -276,7 +301,7 @@ SignerClient := TAssinafyClient.Create('', '', AssinafySandboxURL);
 try
   Response := SignerClient.GetCurrentSigner(SignerAccessCode);
   Response.Free;
-  VerificationBody := TJSONObject.Create(['verification-code', VerificationCode]);
+  VerificationBody := JSONObj(['verification-code', VerificationCode]);
   try
     Response := SignerClient.VerifySignerCode(SignerAccessCode, VerificationBody);
     Response.Free;
@@ -354,7 +379,7 @@ Code := ValidateOAuthCallback(CallbackQuery, SavedState, Config.Issuer);
 Response := ExchangeCode(OAuthClient, Config, Code, SavedVerifier);
 try
   // Salve a resposta com segurança antes de utilizar as credenciais.
-  OAuthClient.AccessToken := Response.Data.FindPath('access_token').AsString;
+  OAuthClient.AccessToken := JSONString(JSONFind(Response.Data, 'access_token'));
 finally
   Response.Free;
 end;
@@ -438,7 +463,7 @@ Para atualizar a imagem do espaço de trabalho, `UploadAccountLogo(AccountID, 'l
 
 Cada chamada retorna uma resposta que deve ser liberada pela aplicação. `Response.JSON` contém a resposta inteira, enquanto `Response.Data` referencia o campo `data` do envelope. Respostas OAuth sem envelope ficam disponíveis integralmente nas duas propriedades. Libere a resposta após consultar essas propriedades. Os corpos de requisição e listas de parâmetros também devem ser liberados pela aplicação. `TJSONObject.Add` e `TJSONArray.Add` assumem a responsabilidade de liberar os valores JSON filhos adicionados.
 
-Os bytes JSON recebidos precisam formar UTF-8 válido. Literais Pascal em arquivos UTF-8 devem usar `{$codepage utf8}`; os valores de texto do `fpjson` usam `UTF8String`. Preserve a codificação declarada das strings ao receber texto da aplicação para que consultas sejam convertidas corretamente para UTF-8.
+Os bytes JSON recebidos precisam formar UTF-8 válido. Em fontes compartilhados UTF-8, use `{$IFDEF FPC}{$codepage utf8}{$ENDIF}`. No Delphi, salve com BOM UTF-8 ou configure a página de código `65001` no compilador; os valores de texto do `fpjson` usam `UTF8String`, enquanto o Delphi usa `UnicodeString` em `System.JSON`. `AssinafyJson` serializa os corpos em UTF-8 em ambos os compiladores. Preserve a codificação declarada das strings ao receber texto da aplicação para que consultas sejam convertidas corretamente para UTF-8.
 
 Exemplo de resposta JSON:
 
@@ -462,7 +487,7 @@ try
   Query.Add('search=Exemplo');
   Response := Client.ListDocuments(AccountID, Query);
   try
-    WriteLn(Response.Data.AsJSON);
+    WriteLn(JSONText(Response.Data));
     WriteLn(Response.Header('X-Pagination-Page-Count'));
   finally
     Response.Free;

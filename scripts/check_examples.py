@@ -8,11 +8,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = '''program ReadmeExample;
-{$mode objfpc}{$H+}
-{$codepage utf8}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$IFDEF FPC}{$codepage utf8}{$ENDIF}
 uses
   {$ifdef unix}cthreads,{$endif}
-  Classes, SysUtils, fpjson, Assinafy, AssinafyHttp, AssinafyOAuth, AssinafyWebhooks;
+  Classes, SysUtils, AssinafyJson, Assinafy, AssinafyHttp, AssinafyOAuth, AssinafyWebhooks;
 var
   Client, OAuthClient, SignerClient: TAssinafyClient;
   Response: TAssinafyResponse;
@@ -40,27 +40,33 @@ begin
 
 
 def main():
-    build = ROOT / 'build'
-    build.mkdir(exist_ok=True)
+    delphi = '--delphi' in sys.argv
+    arguments = [arg for arg in sys.argv[1:] if arg != '--delphi']
+    build = ROOT / 'build' / 'delphi' if delphi else ROOT / 'build'
+    build.mkdir(parents=True, exist_ok=True)
     snippets = re.findall(r'```(pascal|json|sh)\n(.*?)\n```',
-                          (ROOT / 'README.md').read_text(), re.DOTALL)
+                          (ROOT / 'README.md').read_text(encoding='utf-8'), re.DOTALL)
     if not snippets:
         raise SystemExit('README must include usage examples')
     for index, (language, body) in enumerate(snippets):
         if language == 'pascal':
             source = body if body.startswith('program ') else PREFIX + body + '\nend.\n'
-            path = build / f'readme_{index}.pas'
-            path.write_text(source)
-            result = subprocess.run([*sys.argv[1:], str(path)], cwd=ROOT,
+            path = build / (f'readme_{index}.dpr' if delphi else f'readme_{index}.pas')
+            path.write_text(source, encoding='utf-8-sig' if delphi else 'utf-8')
+            result = subprocess.run([*arguments, str(path)], cwd=ROOT,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     text=True, check=False)
             if result.returncode != 0:
                 raise SystemExit(result.stdout)
         elif language == 'json':
             json.loads(body)
-        else:
+        elif not delphi:
             subprocess.run(['bash', '-n'], input=body, text=True, check=True)
-    print(f'PASS: {len(snippets)} README examples compile or have valid syntax')
+    if delphi:
+        count = sum(language == 'pascal' for language, _ in snippets)
+        print(f'PASS: {count} README Pascal examples compile; JSON syntax checked')
+    else:
+        print(f'PASS: {len(snippets)} README examples compile or have valid syntax')
 
 
 if __name__ == '__main__':

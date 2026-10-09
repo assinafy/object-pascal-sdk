@@ -1,6 +1,7 @@
 unit AssinafyOAuth;
 
-{$mode objfpc}{$H+}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$B-}
 
 interface
 
@@ -43,14 +44,14 @@ function RevokeToken(Client: TAssinafyClient; const Config: TAssinafyOAuthConfig
 implementation
 
 uses
-  SysUtils, fpjson, URIParser, AssinafyCrypto;
+  SysUtils, AssinafyJson, AssinafyURI, AssinafyCrypto;
 
 procedure RequireHTTPS(const Value, Name: string);
 var
-  URI: TURI;
+  URI: TAssinafyURI;
 begin
   RequireValue(Value, Name);
-  URI := ParseURI(Value);
+  URI := ParseAssinafyURI(Value);
   if (LowerCase(URI.Protocol) <> 'https') or (URI.Host = '') or
     (URI.UserName <> '') or (URI.Password <> '') or (URI.Bookmark <> '') then
     raise EAssinafyInputError.Create(Name + ' requires HTTPS without credentials or a fragment');
@@ -63,9 +64,9 @@ begin
   if (Length(Verifier) < 43) or (Length(Verifier) > 128) then
     raise EAssinafyInputError.Create('PKCE verifier must contain 43 to 128 characters');
   for C in Verifier do
-    if not (C in ['A'..'Z', 'a'..'z', '0'..'9', '-', '.', '_', '~']) then
+    if not CharInSet(C, ['A'..'Z', 'a'..'z', '0'..'9', '-', '.', '_', '~']) then
       raise EAssinafyInputError.Create('PKCE verifier contains an invalid character');
-  Result := Base64URL(SHA256(Verifier));
+  Result := Base64URL(SHA256(UTF8Encode(Verifier)));
 end;
 
 function GeneratePKCE: TAssinafyPKCE;
@@ -92,7 +93,7 @@ begin
   Issuer := Config.Issuer;
   if Issuer = '' then Issuer := AssinafyOAuthIssuer;
   RequireHTTPS(Issuer, 'Issuer');
-  if ParseURI(Issuer).Params <> '' then
+  if ParseAssinafyURI(Issuer).Params <> '' then
     raise EAssinafyInputError.Create('Issuer cannot contain a query');
   Params := TStringList.Create;
   try
@@ -115,6 +116,15 @@ begin
   end;
 end;
 
+{$IFNDEF FPC}
+function StateBytes(const Value: string): RawByteString;
+begin
+  Result := '';
+  SetLength(Result, Length(Value) * SizeOf(Char));
+  if Result <> '' then Move(Value[1], Result[1], Length(Result));
+end;
+{$ENDIF}
+
 function ValidateOAuthCallback(Query: TStrings; const ExpectedState, ExpectedIssuer: string): string;
 var
   I: Integer;
@@ -135,7 +145,11 @@ begin
       RequireValue(Key, 'OAuth callback parameter name');
       Seen.Add(Query[I]);
     end;
+    {$IFDEF FPC}
     if not ConstantTimeEqual(Seen.Values['state'], ExpectedState) then
+    {$ELSE}
+    if not ConstantTimeEqual(StateBytes(Seen.Values['state']), StateBytes(ExpectedState)) then
+    {$ENDIF}
       raise EAssinafyInputError.Create('OAuth callback state does not match');
     if Seen.Values['iss'] <> ExpectedIssuer then
       raise EAssinafyInputError.Create('OAuth callback issuer does not match');
@@ -158,16 +172,16 @@ begin
   if not (Response.JSON is TJSONObject) then
     raise EAssinafyProtocolError.Create('OAuth token response must be an object', Response);
   Obj := TJSONObject(Response.JSON);
-  Value := Obj.Find('access_token');
-  if (Value = nil) or (Value.JSONType <> jtString) or (Value.AsString = '') then
+  Value := JSONFind(Obj, 'access_token');
+  if (Value = nil) or (JSONKind(Value) <> jtString) or (JSONString(Value) = '') then
     raise EAssinafyProtocolError.Create('OAuth response is missing an access token', Response);
-  Value := Obj.Find('token_type');
-  if (Value = nil) or (Value.JSONType <> jtString) or not SameText(Value.AsString, 'Bearer') then
+  Value := JSONFind(Obj, 'token_type');
+  if (Value = nil) or (JSONKind(Value) <> jtString) or not SameText(JSONString(Value), 'Bearer') then
     raise EAssinafyProtocolError.Create('OAuth token type must be Bearer', Response);
   if RequireRefresh then
   begin
-    Value := Obj.Find('refresh_token');
-    if (Value = nil) or (Value.JSONType <> jtString) or (Value.AsString = '') then
+    Value := JSONFind(Obj, 'refresh_token');
+    if (Value = nil) or (JSONKind(Value) <> jtString) or (JSONString(Value) = '') then
       raise EAssinafyProtocolError.Create('OAuth refresh response is missing its replacement refresh token', Response);
   end;
 end;
@@ -175,21 +189,21 @@ end;
 function TokenBody(const Config: TAssinafyOAuthConfig): TJSONObject;
 begin
   RequireValue(Config.ClientID, 'Client ID');
-  Result := TJSONObject.Create(['client_id', Config.ClientID]);
-  if Config.ClientSecret <> '' then Result.Add('client_secret', Config.ClientSecret);
-  if Config.Resource <> '' then Result.Add('resource', Config.Resource);
+  Result := JSONObj(['client_id', Config.ClientID]);
+  if Config.ClientSecret <> '' then JSONAdd(Result, 'client_secret', Config.ClientSecret);
+  if Config.Resource <> '' then JSONAdd(Result, 'resource', Config.Resource);
 end;
 
 procedure ValidateEnvironment(Client: TAssinafyClient; const Config: TAssinafyOAuthConfig);
 var
-  API, Resource: TURI;
+  API, Resource: TAssinafyURI;
   Issuer: string;
 begin
-  API := ParseURI(Client.BaseURL);
+  API := ParseAssinafyURI(Client.BaseURL);
   if Config.Resource <> '' then
   begin
     RequireHTTPS(Config.Resource, 'Resource');
-    Resource := ParseURI(Config.Resource);
+    Resource := ParseAssinafyURI(Config.Resource);
     if API.Port = 0 then
       if SameText(API.Protocol, 'https') then API.Port := 443 else API.Port := 80;
     if Resource.Port = 0 then Resource.Port := 443;
@@ -215,10 +229,10 @@ begin
   PKCEChallenge(Verifier);
   Body := TokenBody(Config);
   try
-    Body.Add('grant_type', 'authorization_code');
-    Body.Add('code', Code);
-    Body.Add('code_verifier', Verifier);
-    Body.Add('redirect_uri', Config.RedirectURI);
+    JSONAdd(Body, 'grant_type', 'authorization_code');
+    JSONAdd(Body, 'code', Code);
+    JSONAdd(Body, 'code_verifier', Verifier);
+    JSONAdd(Body, 'redirect_uri', Config.RedirectURI);
     Result := Client.ExchangeOAuthToken(Body);
     try
       ValidateTokenResponse(Result, False);
@@ -241,8 +255,8 @@ begin
   RequireValue(Token, 'Refresh token');
   Body := TokenBody(Config);
   try
-    Body.Add('grant_type', 'refresh_token');
-    Body.Add('refresh_token', Token);
+    JSONAdd(Body, 'grant_type', 'refresh_token');
+    JSONAdd(Body, 'refresh_token', Token);
     Result := Client.ExchangeOAuthToken(Body);
     try
       ValidateTokenResponse(Result, True);
@@ -265,10 +279,10 @@ begin
   RequireValue(Token, 'Token');
   if (TokenTypeHint <> '') and (TokenTypeHint <> 'access_token') and (TokenTypeHint <> 'refresh_token') then
     raise EAssinafyInputError.Create('Invalid token type hint');
-  Body := TJSONObject.Create(['client_id', Config.ClientID, 'token', Token]);
+  Body := JSONObj(['client_id', Config.ClientID, 'token', Token]);
   try
-    if Config.ClientSecret <> '' then Body.Add('client_secret', Config.ClientSecret);
-    if TokenTypeHint <> '' then Body.Add('token_type_hint', TokenTypeHint);
+    if Config.ClientSecret <> '' then JSONAdd(Body, 'client_secret', Config.ClientSecret);
+    if TokenTypeHint <> '' then JSONAdd(Body, 'token_type_hint', TokenTypeHint);
     Result := Client.RevokeOAuthToken(Body);
   finally
     Body.Free;

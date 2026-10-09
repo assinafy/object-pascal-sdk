@@ -13,7 +13,7 @@ The [API reference](API.md) defines every resource method. This document defines
 | `BaseURL` | Read-only string | Complete API URL ending in `/v1`. |
 | `AccessToken` | Writable string, empty | Sends bearer authentication. Rejects a nonempty token if an API key is configured and rejects NUL/CR/LF in the token. |
 | `TimeoutMS` | Writable integer, `30000` | Positive connection and overall-transfer limit, including upload and server response time. Increase before large uploads on slow connections; a timeout does not prove the server rejected a mutation. |
-| `CAFile` | Writable string, empty | Optional trusted PEM CA bundle; verification stays enabled. |
+| `CAFile` | Writable string, empty | Optional trusted PEM CA bundle with libcurl. Delphi rejects nonempty values and uses the Windows certificate store. Verification stays enabled. |
 
 `Free` releases only the owned transport. Clients are synchronous; use one per worker and do not modify properties concurrently. `AssinafyVersion`, `AssinafyProductionURL` and `AssinafySandboxURL` are public string constants. `TAssinafyAuth` is the resource authentication enumeration: public, API, signer, signer-or-API and bearer-only.
 
@@ -25,14 +25,45 @@ The [API reference](API.md) defines every resource method. This document defines
 | --- | --- |
 | `StatusCode: Integer` | HTTP response status. |
 | `Headers: TStringList` | HTTP `name: value` lines. Names use `:` as the separator. |
-| `Body: RawByteString` | Entire wire body after libcurl decoding, preserving binary bytes. |
+| `Body: RawByteString` | Entire wire body after transport decoding, preserving binary bytes. |
 | `JSON: TJSONData` | Borrowed parsed root, or nil for empty/binary responses. |
 | `Data: TJSONData` | Borrowed envelope `data`, or JSON root for flat responses. |
-| `ParseJSON` | Parses one strict UTF-8 JSON value; replaces existing JSON; empty body produces nil. Rejects duplicate keys, trailing data and raw control characters. Invalid JSON raises `EAssinafyProtocolError`. Free Pascal 3.2.2 discards escaped NUL (`\u0000`), so the SDK rejects that escape instead of changing values; literal escaped backslashes are preserved. `Body` retains the original bytes. |
+| `ParseJSON` | Parses one strict UTF-8 JSON value; replaces existing JSON; empty body produces nil. Rejects duplicate keys, trailing data, raw control characters and nesting beyond 512 containers. Invalid JSON raises `EAssinafyProtocolError`. Free Pascal 3.2.2 discards escaped NUL (`\u0000`), so the SDK rejects that escape instead of changing values; literal escaped backslashes are preserved. `Body` retains the original bytes. |
 | `Header(Name): string` | Finds a header case-insensitively and trims surrounding whitespace. Missing headers yield an empty string. |
 | `SaveToStream(Destination)` | Writes exact body bytes at the stream’s current position. A nil destination is rejected. Does not close the stream. |
 
 `Data` can be null, an object, an array or the OAuth root. Check the documented schema before casting it. To retain JSON after freeing a response, call `Clone` on the desired node and own that clone.
+
+## JSON compatibility
+
+`AssinafyJson` aliases `TJSONData`, `TJSONObject` and `TJSONArray` to native `fpjson` classes with Free Pascal, and to `TJSONValue`, `TJSONObject` and `TJSONArray` from `System.JSON` with Delphi. It does not wrap JSON nodes or introduce a second ownership model. Existing Free Pascal callers can continue using native constructors and accessors. Shared applications import `AssinafyJson` and use the following helpers; Delphi callers may also use native `System.JSON` methods.
+
+| Helper | Request and result |
+| --- | --- |
+| `JSONObj(Values: array of const): TJSONObject` | Alternating string names and values; creates a caller-owned object. Converts strings using their declared code page. Supports strings, booleans, integers through Int64, floating-point values, nil as explicit null and native JSON children. Child nodes become owned by the object as they are added. Duplicate names are rejected before constructing or attaching the rejected value; that child stays caller-owned. Children already attached before any later constructor error are freed with the partial object. |
+| `JSONArr(Values: array of const): TJSONArray` | Creates a caller-owned array from the same scalar/JSON values. Child nodes become owned by the array. |
+| `JSONAdd(Obj: TJSONObject; Name: string; Value: TJSONData/string/Boolean)` | Adds one property, preserving empty strings. A JSON child becomes owned by the object after a successful addition. Duplicate names are rejected; an unattached child remains caller-owned on rejection. |
+| `JSONAdd(Arr: TJSONArray; Value: TJSONData)` | Adds a child and transfers ownership to the array. |
+| `JSONFind(Value: TJSONData; Path: string): TJSONData` | Returns a borrowed child for a dotted path, or nil for an absent path/root. Object property names in paths must not contain dots. |
+| `JSONText(Value: TJSONData): UTF8String` | Serializes a nonnil JSON value to UTF-8 text, preserving booleans, explicit nulls and native number representation. |
+| `JSONString(Value: TJSONData): UTF8String` | Returns string content; rejects non-string/nil values. Returns code-page-aware UTF-8 text on both compilers; retain `UTF8String` or convert explicitly to `UnicodeString` for a UI. |
+| `JSONInteger(Value: TJSONData): Int64` | Reads a JSON number as a signed 64-bit integer without conversion through floating point. Fractional or out-of-range values are invalid. |
+| `JSONBoolean(Value: TJSONData): Boolean` | Reads a JSON boolean; rejects other types/nil. |
+| `JSONKind(Value: TJSONData): TJSONType` | Returns `jtNumber`, `jtString`, `jtBoolean`, `jtNull`, `jtArray`, `jtObject`, or `jtUnknown` for nil/unknown values. |
+| `JSONGet(Obj: TJSONObject; Name, DefaultValue: string): UTF8String` | Returns the string at the named path or the supplied default when absent; rejects a present non-string value. |
+| `ParseJSONStrict(Bytes: RawByteString): TJSONData` | Returns a caller-owned native JSON tree, or nil for an empty body. Rejects invalid UTF-8, duplicate decoded names, trailing data, comments, trailing commas, malformed numbers/escapes and nesting beyond 512 containers. Raw NUL and active Unicode NUL escapes are rejected consistently across compilers. Encoding and active NUL-escape errors raise `EAssinafyJSONEncodingError` and `EAssinafyJSONNulError`, both derived from `EConvertError`. Other parser errors propagate to direct callers; `TAssinafyResponse.ParseJSON` converts them into protocol errors with response context. |
+
+Create integer/floating/null properties through `JSONObj` or the compiler's native JSON classes. `JSONAdd` overloads intentionally cover string, boolean and child nodes. All nonnil arguments to scalar/serialization helpers must have the documented type. Free only top-level owned objects; do not separately free children attached to their parent.
+
+## Delphi transport
+
+`TAssinafyDefaultTransport` names `TAssinafyCurlTransport` with Free Pascal and `TAssinafyNetTransport` with Delphi. The latter implementation targets Delphi 12+ on Windows Win32/Win64 and remains experimental until its Windows build and runtime checks pass.
+
+`TAssinafyNetTransport.Execute(Request): TAssinafyResponse` uses `THTTPClient` directly. It disables redirects/cookies, selects TLS 1.2/1.3 and preserves Windows certificate-chain/hostname verification. `CAFile` is rejected before transfer; install trusted authorities through the Windows certificate store. There is no certificate-validation bypass. A per-request deadline cancels the native request at `TimeoutMS`; native connection and response timeouts also use that value. Direct transport callers may set zero to disable the deadline and native timeouts; negative values are invalid. Client methods continue to require a positive timeout. Automatic content decompression is disabled, preserving encoded body bytes as on libcurl. The deadline includes the upload and response transfer after the file snapshot is loaded. A complete Content-Length response survives a cancellation race; a truncated body is rejected, including encoded bodies. If the deadline fires and completion cannot be established for chunked/close-delimited bodies, `EAssinafyProtocolError` retains HTTP status and received bytes for reconciliation instead of returning partial data as success. Deadline cancellation reports `HTTP transfer exceeded TimeoutMS`. Timeout outcomes remain indeterminate for mutations.
+
+Both transports use the same 25 MiB file snapshot loader. Delphi writes multipart framing and binary bytes to a memory stream, retaining the file-field name, filename and supplied MIME type; signature images use raw bytes. Budget up to 50 MiB per multipart upload, plus buffered responses. HTTP response bodies are copied from a memory stream without text decoding; response headers and non-2xx statuses reach the shared client error handling. Clients own default transports and borrow supplied ones on both compilers.
+
+The Delphi package project is [AssinafySDK.dproj](../delphi/AssinafySDK.dproj). [check.ps1](../delphi/check.ps1) rebuilds both test programs and examples and compiles README snippets. It requires a matching OpenSSL 3 runtime directory and explicit permission for the temporary local test certificate. The test certificate is removed in a finally block. Abrupt process termination during that test can require removing the generated certificate manually; use an isolated Windows test environment.
 
 ## Errors
 
@@ -46,16 +77,18 @@ The [API reference](API.md) defines every resource method. This document defines
 
 `TAssinafyCurlTransport.Execute` uses libcurl’s easy/MIME APIs, HTTPS verification, TLS 1.2 minimum, transfer timeouts, disabled redirects and optional CA files. Document/logo uploads use multipart `file`; signature images use raw PNG bytes. It reads each upload once into a bounded snapshot of at most 25 MiB; multipart bytes are copied into libcurl’s MIME storage. Budget up to 50 MiB of temporary upload memory per concurrent worker, in addition to buffered responses. The transmitted bytes remain unchanged if the source path is replaced after loading. HTTP results are returned to the client, which parses JSON and raises API errors. C callbacks handle stream failures without unwinding Pascal exceptions through C frames.
 
-`TAssinafyRequest` contains `Method`, `URL`, borrowed `Headers`, raw `Body`, upload `FileName`/`FileField`/`ContentType`, `TimeoutMS` and `CAFile`. Resource code builds this record; ordinary applications use named client methods.
+`TAssinafyRequest` contains `Method`, `URL`, borrowed `Headers`, raw `Body`, upload `FileName`/`FileField`/`ContentType`, `TimeoutMS` and `CAFile`. Both native transports validate header names as HTTP tokens and reject control characters in values/content types before transfer, permitting horizontal tabs and empty values. A nil header collection is rejected. Direct transport calls accept zero `TimeoutMS` for no timeout and reject negative values. Resource code builds this record; ordinary applications use named client methods with a positive timeout.
 
 `UploadAccountLogo(AccountID, FileName, ContentType = 'application/octet-stream')` accepts an optional file-part content type such as `image/png` or `image/jpeg`. Blank types and NUL/CR/LF are rejected before transport. The server validates the image bytes and workspace permissions.
 
-JSON response bytes are validated with a UTF-8 decode/encode round trip before strict parsing. Validation uses temporary decoding buffers; binary downloads are not decoded. macOS builds load Free Pascal's native `fpwidestring` Unicode manager and `cpall` code-page tables; other Unix builds use `cwstring`. These units are included with Free Pascal. Use `{$codepage utf8}` for UTF-8 Pascal source literals and keep Unicode text in `UTF8String`/`UnicodeString` until converting it for a UI. `fpjson` string values use `UTF8String`.
+JSON response bytes are validated with a UTF-8 decode/encode round trip before strict parsing. Validation uses temporary decoding buffers; binary downloads are not decoded. macOS builds load Free Pascal's native `fpwidestring` Unicode manager and `cpall` code-page tables; other Unix builds use `cwstring`. These units are included with Free Pascal and loaded by `AssinafyJson`. Use `{$IFDEF FPC}{$codepage utf8}{$ENDIF}` in shared UTF-8 sources. With Delphi, save sources with a UTF-8 BOM or set the compiler's Code page option to `65001` (`--codepage:65001`); the supplied package and verification command set this option. Keep Unicode text in `UTF8String`/`UnicodeString` until converting it for a UI. `fpjson` string values use `UTF8String`.
 
 - `RequireValue(Value, Name)` rejects blank required values and NUL/CR/LF control characters.
 - `PercentEncode(Value: UTF8String)` converts code-page-aware caller strings to UTF-8, then encodes bytes using RFC 3986 unreserved characters and uppercase percent escapes.
 - `EncodeQuery(Query)` encodes decoded `name=value` entries, retaining duplicates and empty values. Nil yields an empty query. Bare unnamed entries are invalid.
 - `TrimURLTrailingSlash(Value)` removes trailing `/` characters independently of the operating system; empty values stay empty. It does not parse or validate a URL.
+
+`AssinafyURI.ParseAssinafyURI(Value: string): TAssinafyURI` adapts the compiler's URI parser for client/OAuth validation. The record contains `Protocol`, `Host`, `UserName`, `Password`, `Params` (query), `Bookmark` (fragment), `Origin` (scheme, host and port, without credentials, path, query or fragment) and integer `Port`. It does not perform HTTPS, credentials or environment validation; client/OAuth methods apply those checks. Explicit numeric ports must contain decimal digits and be between 0 and 65535. Empty ports normalize to the scheme default, including bracketed IPv6 URLs; validation precedes native port conversion. Native URI parsing/conversion failures raise `EAssinafyInputError`; unrelated failures such as allocation errors propagate. Applications normally use the client constructor instead of this adapter.
 
 ## OAuth helpers
 
@@ -98,7 +131,10 @@ Use raw body bytes, verify first, deduplicate by the message ID, then enqueue pr
 - `HMACSHA256(Key, Value): RawByteString` returns a 32-byte keyed digest.
 - `SecureRandom(Count): RawByteString` returns 1–1024 securely generated bytes; other counts are rejected.
 - `ConstantTimeEqual(Left, Right): Boolean` compares equal-length buffers through `CRYPTO_memcmp`; unequal lengths return false.
+- `Base64Encode(Value: RawByteString): string` returns canonical standard base64 without line breaks.
 - `Base64URL(Value): string` produces unpadded URL-safe base64.
 - `StrictBase64Decode(Value): RawByteString` accepts canonical padded standard base64; malformed values raise `EAssinafyInputError`.
 
 Native crypto loading is synchronized. Linux loads `libcrypto.so.3`; macOS loads `libcrypto.3.dylib`; Windows loads the matching OpenSSL 3 DLL. Ensure the native library’s architecture matches the executable and configure the operating system’s library search path at deployment. With Homebrew’s keg-only OpenSSL on macOS, set `DYLD_LIBRARY_PATH` to `$(brew --prefix openssl@3)/lib` in the process environment before using OAuth or webhook verification; see the [installation commands](../README.md#requisitos-e-instalação).
+
+Delphi loads the matching OpenSSL DLL from the executable directory using `LoadLibraryEx` with the DLL directory and default system search directories for dependencies. Place its dependent DLLs beside it. Crypto uses explicit ANSI C pointers and native-width size types; loading is protected by `TCriticalSection`.

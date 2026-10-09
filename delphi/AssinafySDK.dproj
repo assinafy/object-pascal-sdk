@@ -1,0 +1,24 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{BA12AA01-77F6-46CD-A9BB-3BA37E9C42A4}</ProjectGuid>
+    <ProjectVersion>20.3</ProjectVersion>
+    <MainSource>AssinafySDK.dpk</MainSource>
+    <AppType>Package</AppType>
+    <FrameworkType>None</FrameworkType>
+    <Config Condition="'$(Config)'==''">Release</Config>
+    <Platform Condition="'$(Platform)'==''">Win32</Platform>
+    <DCC_UnitSearchPath>..\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+    <DCC_IncludePath>..\src;$(DCC_IncludePath)</DCC_IncludePath>
+    <DCC_CodePage>65001</DCC_CodePage>
+    <DCC_Namespace>System;Winapi;$(DCC_Namespace)</DCC_Namespace>
+    <DCC_DcuOutput>..\build\delphi\$(Platform)</DCC_DcuOutput>
+    <DCC_BplOutput>..\build\delphi\$(Platform)</DCC_BplOutput>
+    <DCC_DcpOutput>..\build\delphi\$(Platform)</DCC_DcpOutput>
+    <DCC_RangeChecking>true</DCC_RangeChecking>
+    <DCC_IntegerOverflowCheck>true</DCC_IntegerOverflowCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <DelphiCompile Include="$(MainSource)"><MainSource>MainSource</MainSource></DelphiCompile>
+  </ItemGroup>
+  <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" />
+</Project>

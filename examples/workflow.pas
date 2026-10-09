@@ -1,11 +1,12 @@
 program Workflow;
 
-{$mode objfpc}{$H+}
-{$codepage utf8}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$IFDEF FPC}{$codepage utf8}{$ENDIF}
+{$IFNDEF FPC}{$APPTYPE CONSOLE}{$ENDIF}
 
 uses
   {$ifdef unix}cthreads,{$endif}
-  SysUtils, fpjson, Assinafy, AssinafyHttp;
+  SysUtils, AssinafyJson, Assinafy, AssinafyHttp;
 
 var
   Client: TAssinafyClient;
@@ -35,30 +36,30 @@ begin
       try
         if not (Response.Data is TJSONArray) or (TJSONArray(Response.Data).Count <> 1) then
           raise EAssinafyProtocolError.Create('OAuth must return its authorized workspace');
-        AccountID := TJSONArray(Response.Data).Items[0].FindPath('id').AsString;
+        AccountID := JSONString(JSONFind(TJSONArray(Response.Data).Items[0], 'id'));
         RequireValue(AccountID, 'Authorized workspace ID');
       finally Response.Free; end;
     end;
     Response := Client.UploadDocument(AccountID, ParamStr(1));
-    try DocumentID := Response.Data.FindPath('id').AsString; finally Response.Free; end;
-    SignerBody := TJSONObject.Create(['full_name', 'Example Signer', 'email', ParamStr(2)]);
+    try DocumentID := JSONString(JSONFind(Response.Data, 'id')); finally Response.Free; end;
+    SignerBody := JSONObj(['full_name', 'Example Signer', 'email', ParamStr(2)]);
     try
       Response := Client.CreateSigner(AccountID, SignerBody);
-      try SignerID := Response.Data.FindPath('id').AsString; finally Response.Free; end;
+      try SignerID := JSONString(JSONFind(Response.Data, 'id')); finally Response.Free; end;
     finally SignerBody.Free; end;
-    AssignmentBody := TJSONObject.Create(['method', 'virtual']);
+    AssignmentBody := JSONObj(['method', 'virtual']);
     try
       Signers := TJSONArray.Create;
-      AssignmentBody.Add('signers', Signers);
-      Signers.Add(TJSONObject.Create(['id', SignerID, 'verification_method', 'Email']));
+      JSONAdd(AssignmentBody, 'signers', Signers);
+      JSONAdd(Signers, JSONObj(['id', SignerID, 'verification_method', 'Email']));
       Response := Client.EstimateAssignmentCost(DocumentID, AssignmentBody);
       try
-        WriteLn('Estimated cost: ', Response.Data.AsJSON);
-        if not Response.Data.FindPath('has_sufficient_resources').AsBoolean then
+        WriteLn('Estimated cost: ', JSONText(Response.Data));
+        if not JSONBoolean(JSONFind(Response.Data, 'has_sufficient_resources')) then
           raise EAssinafyInputError.Create('Insufficient resources to request signatures');
       finally Response.Free; end;
       Response := Client.CreateAssignment(DocumentID, AssignmentBody);
-      try WriteLn('Assignment: ', Response.Data.AsJSON); finally Response.Free; end;
+      try WriteLn('Assignment: ', JSONText(Response.Data)); finally Response.Free; end;
     finally AssignmentBody.Free; end;
     WriteLn('Document ID: ', DocumentID);
   finally Client.Free; end;

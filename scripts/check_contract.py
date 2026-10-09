@@ -39,17 +39,17 @@ def expected_auth(operation, path):
     return 'aaBearer' if path == '/v1/oauth/userinfo' else modes[frozenset(roles)]
 
 
-spec = json.loads((ROOT / 'docs/openapi.json').read_text())
+spec = json.loads((ROOT / 'docs/openapi.json').read_text(encoding='utf-8'))
 expected = {(verb.upper(), path) for path, item in spec['paths'].items()
             for verb in item if verb in {'get', 'post', 'put', 'patch', 'delete'}}
-declarations = (ROOT / 'src/resources.inc').read_text()
+declarations = (ROOT / 'src/resources.inc').read_text(encoding='utf-8')
 actual = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+);', declarations)
 require(len(actual) == len(set(actual)), 'Duplicate API operation')
 require(set(actual) == expected, 'Missing or extra API operations')
 names = re.findall(r'function (\w+)\(', declarations) + re.findall(r'function (\w+):', declarations)
 require(len(names) == len(actual) and len(names) == len(set(names)), 'Incorrect resource declarations')
-implementation = (ROOT / 'src/methods.inc').read_text()
-docs = (ROOT / 'docs/API.md').read_text()
+implementation = (ROOT / 'src/methods.inc').read_text(encoding='utf-8')
+docs = (ROOT / 'docs/API.md').read_text(encoding='utf-8')
 for name in names:
     require(implementation.count('TAssinafyClient.' + name + '(') + implementation.count('TAssinafyClient.' + name + ':') == 1, name)
     require('\n## ' + name + '\n' in docs, f'Missing documentation for {name}')
@@ -59,15 +59,15 @@ require(len(bindings) == len(actual) and set(auth_modes) == set(names), 'Incompl
 for verb, path, name in bindings:
     require(auth_modes.get(name) == expected_auth(spec['paths'][path][verb.lower()], path),
             f'Incorrect authentication for {name}')
-require((ROOT / 'VERSION').read_text().strip() in (ROOT / 'src/assinafy.pas').read_text(), 'Version mismatch')
+require((ROOT / 'VERSION').read_text(encoding='utf-8').strip() in (ROOT / 'src/assinafy.pas').read_text(encoding='utf-8'), 'Version mismatch')
 for filename in ['AGENTS.md', 'CLAUDE.md']:
-    require('/' + filename in (ROOT / '.gitignore').read_text(), f'{filename} must be ignored')
+    require('/' + filename in (ROOT / '.gitignore').read_text(encoding='utf-8'), f'{filename} must be ignored')
 for path in ROOT.rglob('*'):
     if not path.is_file() or any(part in {'.git', 'build', '__pycache__', '.ruff_cache'} for part in path.parts) or path.name in {'AGENTS.md', 'CLAUDE.md'}:
         continue
-    if path.suffix not in {'.md', '.json', '.pas', '.inc', '.py', '.yml', '.yaml', '.sh'} and path.name not in {'Makefile', 'VERSION', 'LICENSE', '.gitignore', '.env.example'}:
+    if path.suffix not in {'.md', '.json', '.pas', '.inc', '.py', '.yml', '.yaml', '.sh', '.ps1', '.dpk', '.dproj', '.dpr'} and path.name not in {'Makefile', 'VERSION', 'LICENSE', '.gitignore', '.env.example'}:
         continue
-    text = path.read_text()
+    text = path.read_text(encoding='utf-8')
     require(all(line.rstrip() == line for line in text.splitlines()), f'Trailing whitespace: {path}')
     if path.suffix in {'.md', '.json', '.pas', '.inc'}:
         for address in re.findall(r'[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,}', text):

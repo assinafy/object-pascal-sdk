@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import quote, urlencode
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = json.loads((ROOT / 'docs/openapi.json').read_text())
+SPEC = json.loads((ROOT / 'docs/openapi.json').read_text(encoding='utf-8'))
 METHODS = {'get', 'post', 'put', 'patch', 'delete'}
 SECURITY_MODES = {
     frozenset(): 'aaPublic',
@@ -215,7 +215,7 @@ def generate_methods(ops):
         expected_auth = 'signer' if op['signer'] else 'public' if op['auth'] == 'aaPublic' else 'bearer'
         checks += [f"  Response := Client.{op['name']}{call};", '  Response.Free;', f"  Check(Fake.LastMethod = '{op['verb']}', '{op['name']} verb');", f"  Check(Fake.LastURL = '{root + expected_path + suffix}', '{op['name']} URL');", f"  Check(Fake.LastAuth = '{expected_auth}', '{op['name']} authentication');"]
         if op['body']:
-            checks.append(f"  Check(Fake.LastBody = TestBody.AsJSON, '{op['name']} body');")
+            checks.append(f"  Check(Fake.LastBody = JSONText(TestBody), '{op['name']} body');")
         if op['file']:
             checks.append(f"  Check(Fake.LastFile = FixtureFile, '{op['name']} file');")
             checks.append(f"  Check(Fake.LastFileField = {field}, '{op['name']} file field');")
@@ -274,7 +274,7 @@ def code(value, language='json'):
 
 
 def generate_docs(ops):
-    lines = ['# API reference', '', 'Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).', '', f'The client exposes all {len(ops)} published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).', '', '## Ownership and payloads', '', 'Every call returns a caller-owned `TAssinafyResponse`; free it in `finally`. `Response.JSON` contains the entire wire response; `Response.Data` refers to the envelope’s `data`, or the entire flat OAuth response. Both are borrowed until `Response.Free`. Requests borrow `Body` and `Query`; the caller frees them. Empty account IDs use the client’s configured account. Other path parameters are required and percent-encoded.', '', '`Query` is a `TStrings` of decoded `name=value` pairs; use the exact API field names. The SDK percent-encodes names and values, preserving duplicates and empty values. Send JSON booleans, arrays, numbers and explicit nulls in their native `fpjson` forms. Binary response bytes remain in `Response.Body`; use `Response.SaveToStream` to write them after a successful request.', '', 'Payload examples show the documented fields, including optional fields. They illustrate shapes; follow each schema’s `required`, `enum`, constraints and descriptions when constructing an actual request. Placeholder values and mutually exclusive variants must be replaced with valid values. `{}` denotes an open object whose fields the API does not specify.', '', '## Operations', '', '| Method | HTTP operation |', '| --- | --- |']
+    lines = ['# API reference', '', 'Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).', '', f'The client exposes all {len(ops)} published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).', '', '## Ownership and payloads', '', 'Every call returns a caller-owned `TAssinafyResponse`; free it in `finally`. `Response.JSON` contains the entire wire response; `Response.Data` refers to the envelope’s `data`, or the entire flat OAuth response. Both are borrowed until `Response.Free`. Requests borrow `Body` and `Query`; the caller frees them. Empty account IDs use the client’s configured account. Other path parameters are required and percent-encoded.', '', '`Query` is a `TStrings` of decoded `name=value` pairs; use the exact API field names. The SDK percent-encodes names and values, preserving duplicates and empty values. Send JSON booleans, arrays, numbers and explicit nulls using `AssinafyJson` helpers or the compiler’s native JSON classes. Binary response bytes remain in `Response.Body`; use `Response.SaveToStream` to write them after a successful request.', '', 'Payload examples show the documented fields, including optional fields. They illustrate shapes; follow each schema’s `required`, `enum`, constraints and descriptions when constructing an actual request. Placeholder values and mutually exclusive variants must be replaced with valid values. `{}` denotes an open object whose fields the API does not specify.', '', '## Operations', '', '| Method | HTTP operation |', '| --- | --- |']
     lines += [f"| [{op['name']}](#{op['name'].lower()}) | `{op['verb']} {op['path']}` |" for op in ops]
     for op in ops:
         lines += ['', f"## {op['name']}", '', code(f"function {op['name']}{signature(op)}: TAssinafyResponse;", 'pascal'), f"`{op['verb']} {op['path']}`", '', op['op'].get('description', op['op']['summary']), '']
@@ -322,10 +322,10 @@ def main():
     for name, content in outputs.items():
         path = ROOT / name
         if args.check:
-            if not path.exists() or path.read_text() != content:
+            if not path.exists() or path.read_text(encoding='utf-8') != content:
                 stale.append(name)
         else:
-            path.write_text(content)
+            path.write_text(content, encoding='utf-8')
     if stale:
         raise SystemExit('Regenerate files: ' + ', '.join(stale))
     print(f'{len(ops)} API operations and complete payload references verified.')

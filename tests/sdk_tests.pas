@@ -1,12 +1,13 @@
 program SDKTests;
 
-{$mode objfpc}{$H+}{$ASSERTIONS ON}
-{$codepage utf8}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}{$ASSERTIONS ON}
+{$IFDEF FPC}{$codepage utf8}{$ENDIF}
+{$IFNDEF FPC}{$APPTYPE CONSOLE}{$ENDIF}
 
 uses
   {$ifdef unix}cthreads,{$endif}
-  Classes, SysUtils, DateUtils, fpjson, base64, Assinafy, AssinafyHttp,
-  AssinafyCrypto, AssinafyOAuth, AssinafyWebhooks;
+  Classes, SysUtils, {$IFNDEF FPC}System.IOUtils,{$ENDIF} DateUtils, {$IFDEF FPC}fpjson,{$ENDIF} AssinafyJson, Assinafy, AssinafyHttp,
+  AssinafyCrypto, AssinafyOAuth, AssinafyWebhooks, AssinafyURI;
 
 type
   TFakeTransport = class(TAssinafyTransport)
@@ -14,7 +15,8 @@ type
     LastMethod, LastURL, LastAuth, LastFile, LastFileField, LastContentType: string;
     LastBody: RawByteString;
     NextStatus, Calls: Integer;
-    NextBody, NextContentType: string;
+    NextBody: RawByteString;
+    NextContentType: string;
     function Execute(const Request: TAssinafyRequest): TAssinafyResponse; override;
   end;
 
@@ -102,31 +104,53 @@ begin
   Client.TimeoutMS := 30000;
 end;
 
+function RawBytes(const Values: array of Byte): RawByteString;
+var I: Integer;
+begin
+  Result := '';
+  SetLength(Result, Length(Values));
+  for I := 0 to High(Values) do Result[I + 1] := AnsiChar(Values[I]);
+end;
+
 procedure TestResponses;
 const
   StatusCodes: array[0..6] of Integer = (400, 401, 403, 404, 415, 429, 500);
-  InvalidBodies: array[0..15] of string = ('invalid json', '{"data":1}garbage',
-    '{"data":1}{"data":2}', '   ', '{"data":1,"data":2}',
-    '{"data":1}' + #0 + 'garbage',
-    '{"data":"' + #$FF + '"}', '{"data":"' + #$80 + '"}',
-    '{"data":"' + #$C0#$AF + '"}', '{"data":"' + #$E0#$80#$AF + '"}',
-    '{"data":"' + #$F0#$80#$80#$AF + '"}', '{"data":"' + #$ED#$A0#$80 + '"}',
-    '{"data":"' + #$F4#$90#$80#$80 + '"}', '{"data":"' + #$F5#$80#$80#$80 + '"}',
-    '{"data":"' + #$E2#$82 + '"}', '{"data":"' + #$C2 + '"}');
+  InvalidBodies: array[0..5] of RawByteString = ('invalid json', '{"data":1}garbage',
+    '{"data":1}{"data":2}', '   ', '{"data":1,"data":2}', '{"data":1}' + #0 + 'garbage');
 var
   Stream: TMemoryStream;
   OldClient: TAssinafyClient;
   Code: Integer;
-  InvalidBody: string;
+  InvalidBody: RawByteString;
   ExpectedText: RawByteString;
+  procedure RejectBody(const Bytes: RawByteString; const ExpectedMessage: string = 'The API returned invalid JSON');
+  begin
+    Fake.NextBody := Bytes;
+    try
+      Response := Client.GetUser;
+      Response.Free;
+      raise Exception.Create('Expected protocol error');
+    except
+      on E: EAssinafyProtocolError do
+      begin
+        Check(E.Message = ExpectedMessage, 'Protocol error message remains compatible');
+        Check(E.StatusCode = 200, 'Protocol error retains successful HTTP status');
+        Check(E.ResponseBody = Bytes, 'Protocol error retains original response bytes');
+      end;
+    end;
+  end;
+  procedure RejectUTF8(const Bytes: array of Byte);
+  begin
+    RejectBody('{"data":"' + RawBytes(Bytes) + '"}', 'The API returned invalid UTF-8');
+  end;
 begin
   Fake.NextBody := '{"status":200,"message":"ok","data":{"nullable":null,"enabled":false,"value":9007199254740993,"extra":"kept"}}';
   Response := Client.GetAccount('');
   try
-    Check(Response.Data.FindPath('enabled').AsBoolean = False, 'JSON boolean preserved');
-    Check(Response.Data.FindPath('nullable').JSONType = jtNull, 'JSON null preserved');
-    Check(Response.Data.FindPath('value').AsInt64 = 9007199254740993, '64-bit integer preserved');
-    Check(Response.Data.FindPath('extra').AsString = 'kept', 'Unknown response fields preserved');
+    Check(JSONBoolean(JSONFind(Response.Data, 'enabled')) = False, 'JSON boolean preserved');
+    Check(JSONKind(JSONFind(Response.Data, 'nullable')) = jtNull, 'JSON null preserved');
+    Check(JSONInteger(JSONFind(Response.Data, 'value')) = 9007199254740993, '64-bit integer preserved');
+    Check(JSONString(JSONFind(Response.Data, 'extra')) = 'kept', 'Unknown response fields preserved');
     Check(Response.Header('x-pagination-total-count') = '150', 'Pagination headers exposed');
   finally
     Response.Free;
@@ -167,21 +191,17 @@ begin
     raise Exception.Create('Expected API error');
   except on E: EAssinafyAPIError do Check(E.StatusCode = 503, 'Wrongly typed error fields preserve HTTP status'); end;
   Fake.NextStatus := 200;
-  for InvalidBody in InvalidBodies do
-  begin
-    Fake.NextBody := InvalidBody;
-    try
-      Response := Client.GetUser;
-      Response.Free;
-      raise Exception.Create('Expected protocol error');
-    except
-      on E: EAssinafyProtocolError do
-      begin
-        Check(E.StatusCode = 200, 'Protocol error retains successful HTTP status');
-        Check(E.ResponseBody = Fake.NextBody, 'Protocol error retains original response bytes');
-      end;
-    end;
-  end;
+  for InvalidBody in InvalidBodies do RejectBody(InvalidBody);
+  RejectUTF8([$FF]);
+  RejectUTF8([$80]);
+  RejectUTF8([$C0, $AF]);
+  RejectUTF8([$E0, $80, $AF]);
+  RejectUTF8([$F0, $80, $80, $AF]);
+  RejectUTF8([$ED, $A0, $80]);
+  RejectUTF8([$F4, $90, $80, $80]);
+  RejectUTF8([$F5, $80, $80, $80]);
+  RejectUTF8([$E2, $82]);
+  RejectUTF8([$C2]);
   for Code := 0 to 31 do
   begin
     Fake.NextBody := '{"data":"raw' + Chr(Code) + 'control"}';
@@ -199,26 +219,27 @@ begin
   except
     on E: EAssinafyProtocolError do
     begin
+      Check(E.Message = 'Escaped NUL is unsupported by the JSON parser', 'Escaped NUL protocol message remains compatible');
       Check(E.StatusCode = 200, 'Successful mutation status survives escaped NUL error');
       Check(E.ResponseBody = Fake.NextBody, 'Successful mutation payload survives escaped NUL error');
     end;
   end;
   Fake.NextBody := '{"data":"literal\\u0000"}';
   Response := Client.GetUser;
-  try Check(Response.Data.AsString = 'literal\u0000', 'Literal Unicode escape text preserved'); finally Response.Free; end;
-  Fake.NextBody := '{"data":"Jo' + #$C3#$A3 + 'o ' + #$F0#$9F#$98#$80 + '"}';
-  ExpectedText := 'Jo' + #$C3#$A3 + 'o ' + #$F0#$9F#$98#$80;
+  try Check(JSONString(Response.Data) = 'literal\u0000', 'Literal Unicode escape text preserved'); finally Response.Free; end;
+  ExpectedText := 'Jo' + RawBytes([$C3, $A3]) + 'o ' + RawBytes([$F0, $9F, $98, $80]);
+  Fake.NextBody := '{"data":"' + ExpectedText + '"}';
   Response := Client.GetUser;
-  try Check(RawByteString(Response.Data.AsString) = ExpectedText, 'Accented and supplementary UTF-8 preserved'); finally Response.Free; end;
+  try Check(UTF8Encode(UnicodeString(JSONString(Response.Data))) = ExpectedText, 'Accented and supplementary UTF-8 preserved'); finally Response.Free; end;
   Fake.NextContentType := 'application/pdf';
-  Fake.NextBody := '%PDF-' + #0 + #255 + 'binary';
+  Fake.NextBody := '%PDF-' + RawBytes([0, 255]) + 'binary';
   Response := Client.DownloadDocumentArtifact('doc', 'original');
   Stream := TMemoryStream.Create;
   try
     Check(Response.JSON = nil, 'PDF is not parsed as JSON');
     Response.SaveToStream(Stream);
     Check(Stream.Size = Length(Fake.NextBody), 'Binary bytes saved without truncation');
-    Check(CompareByte(Stream.Memory^, Fake.NextBody[1], Stream.Size) = 0, 'Binary bytes unchanged');
+    Check(CompareMem(Stream.Memory, Pointer(Fake.NextBody), Stream.Size), 'Binary bytes unchanged');
   finally Stream.Free; Response.Free; end;
   Fake.NextStatus := 204;
   Fake.NextBody := '';
@@ -286,24 +307,31 @@ procedure TestUploadLimits;
 const
   Fields: array[0..2] of string = ('file', 'attachment', '');
 var
-  Transport: TAssinafyCurlTransport;
+  Transport: TAssinafyDefaultTransport;
   Request: TAssinafyRequest;
   Headers: TStringList;
   FileName, Field: string;
   FileStream: TFileStream;
 begin
-  FileName := GetTempFileName;
+  {$IFDEF FPC}FileName := GetTempFileName;{$ELSE}
+  FileName := System.IOUtils.TPath.GetTempFileName;{$ENDIF}
   FileStream := TFileStream.Create(FileName, fmCreate);
   try FileStream.Size := 25 * 1024 * 1024 + 1; finally FileStream.Free; end;
   Headers := TStringList.Create;
-  Transport := TAssinafyCurlTransport.Create;
+  Transport := TAssinafyDefaultTransport.Create;
   try
     Request := Default(TAssinafyRequest);
     Request.Method := 'POST';
     Request.URL := 'http://127.0.0.1:9/v1/upload';
     Request.Headers := Headers;
-    Request.FileName := FileName;
     Request.ContentType := 'application/octet-stream';
+    Request.TimeoutMS := -1;
+    try
+      Response := Transport.Execute(Request);
+      Response.Free;
+      raise Exception.Create('Negative transport timeout accepted');
+    except on E: EAssinafyInputError do Check(True, 'Direct transport rejects negative timeout'); end;
+    Request.FileName := FileName;
     Request.TimeoutMS := 1000;
     for Field in Fields do
     begin
@@ -317,6 +345,52 @@ begin
   finally Transport.Free; Headers.Free; DeleteFile(FileName); end;
 end;
 
+procedure TestTransportHeaders;
+const
+  Invalid: array[0..7] of string = ('X-Test: ok' + #13#10 + 'Injected: value',
+    'X-Test: before' + #0 + 'after', 'X-Test: ' + #1, 'X-Test: ' + #127,
+    'Bad Name: value', ': value', 'NoSeparator', 'X-Á: value');
+var
+  Transport: TAssinafyDefaultTransport;
+  Request: TAssinafyRequest;
+  Headers: TStringList;
+  Line: string;
+begin
+  Transport := TAssinafyDefaultTransport.Create;
+  Headers := TStringList.Create;
+  try
+    Request := Default(TAssinafyRequest);
+    Request.Method := 'GET';
+    Request.URL := 'http://127.0.0.1:9/v1/unused';
+    Request.TimeoutMS := 1000;
+    Request.Headers := Headers;
+    for Line in Invalid do
+    begin
+      Headers.Clear;
+      Headers.Add(Line);
+      try
+        Response := Transport.Execute(Request);
+        Response.Free;
+        raise Exception.Create('Invalid direct HTTP header accepted');
+      except on E: EAssinafyInputError do Check(True, 'Direct transport validates HTTP headers before transfer'); end;
+    end;
+    Headers.Clear;
+    Request.ContentType := 'application/json' + #13#10 + 'Injected: value';
+    try
+      Response := Transport.Execute(Request);
+      Response.Free;
+      raise Exception.Create('Invalid direct content type accepted');
+    except on E: EAssinafyInputError do Check(True, 'Direct transport rejects content-type injection'); end;
+    Request.ContentType := '';
+    Request.Headers := nil;
+    try
+      Response := Transport.Execute(Request);
+      Response.Free;
+      raise Exception.Create('Missing direct headers accepted');
+    except on E: EAssinafyInputError do Check(True, 'Direct transport rejects missing header collection'); end;
+  finally Headers.Free; Transport.Free; end;
+end;
+
 procedure TestOAuth;
 const
   InvalidRefreshBodies: array[0..2] of string = (
@@ -328,6 +402,7 @@ var
   Config: TAssinafyOAuthConfig;
   Callback: TStringList;
   URL: string;
+  UnicodeVerifier: UnicodeString;
   InvalidBody: string;
   PriorCalls: Integer;
 begin
@@ -364,6 +439,16 @@ begin
     Callback.Values['iss'] := AssinafyOAuthIssuer;
     try ValidateOAuthCallback(Callback, 'other-state'); raise Exception.Create('Wrong state accepted');
     except on E: EAssinafyInputError do Check(True, 'Wrong state rejected'); end;
+    Callback.Values['state'] := 'João 😀';
+    Check(ValidateOAuthCallback(Callback, 'João 😀') = 'code-value', 'Unicode OAuth state matches exactly');
+    try ValidateOAuthCallback(Callback, 'Joao 😀'); raise Exception.Create('Different Unicode state accepted');
+    except on E: EAssinafyInputError do Check(True, 'Different Unicode OAuth state rejected'); end;
+    {$IFNDEF FPC}
+    Callback.Values['state'] := 'state' + Char($D800);
+    try ValidateOAuthCallback(Callback, 'state' + Char($D801)); raise Exception.Create('Distinct surrogate states accepted');
+    except on E: EAssinafyInputError do Check(True, 'OAuth state compares exact Unicode code units'); end;
+    {$ENDIF}
+    Callback.Values['state'] := 'state';
     Callback.Add('error=access_denied');
     try ValidateOAuthCallback(Callback, 'state'); raise Exception.Create('Code and error accepted');
     except on E: EAssinafyInputError do Check(True, 'Ambiguous callback rejected'); end;
@@ -406,6 +491,9 @@ begin
     Response.Free;
     raise Exception.Create('Invalid token type accepted');
   except on E: EAssinafyProtocolError do Check(True, 'Invalid token type rejected'); end;
+  UnicodeVerifier := UnicodeString(StringOfChar('A', 42)) + WideChar($0141);
+  try PKCEChallenge(string(UnicodeVerifier)); raise Exception.Create('Non-ASCII PKCE verifier accepted');
+  except on E: EAssinafyInputError do Check(True, 'PKCE rejects Unicode characters sharing ASCII low bytes'); end;
   try PKCEChallenge('short'); raise Exception.Create('Short verifier accepted');
   except on E: EAssinafyInputError do Check(True, 'Short verifier rejected'); end;
 end;
@@ -414,28 +502,50 @@ procedure TestTextEncoding;
 type
   TLatinText = type AnsiString(1252);
 var
-  OldCodePage: TSystemCodePage;
+  {$IFDEF FPC}OldCodePage: TSystemCodePage;{$ENDIF}
   Name: TLatinText;
+  UTF8Name: UTF8String;
+  Obj: TJSONObject;
+  Arr: TJSONArray;
   Body: RawByteString;
   Query: TStringList;
 begin
-  OldCodePage := DefaultSystemCodePage;
+  {$IFDEF FPC}OldCodePage := DefaultSystemCodePage;{$ENDIF}
   Query := TStringList.Create;
   try
-    DefaultSystemCodePage := 1252;
+    {$IFDEF FPC}DefaultSystemCodePage := 1252;{$ENDIF}
     Name := 'João';
     Check((StringCodePage(Name) = 1252) and (Length(Name) = 4) and (Ord(Name[3]) = $E3),
       'Legacy text fixture preserves its declared code page and bytes');
+    UTF8Name := 'João 😀';
+    Obj := JSONObj(['utf8', UTF8Name, 'legacy', Name]);
+    try
+      Check(JSONString(JSONFind(Obj, 'utf8')) = UTF8Name, 'JSON constructor retains UTF-8 string code page');
+      Check(JSONString(JSONFind(Obj, 'legacy')) = UTF8String('João'), 'JSON constructor converts declared legacy code page');
+    finally Obj.Free; end;
+    Arr := JSONArr([UTF8Name, Name]);
+    try
+      Check(JSONString(Arr.Items[0]) = UTF8Name, 'JSON array retains UTF-8 string code page');
+      Check(JSONString(Arr.Items[1]) = UTF8String('João'), 'JSON array converts declared legacy code page');
+    finally Arr.Free; end;
     Check(PercentEncode(Name) = 'Jo%C3%A3o', 'Legacy code page converts query text to UTF-8');
     Query.Add('search=' + Name);
     Check(EncodeQuery(Query) = 'search=Jo%C3%A3o', 'Legacy query values use UTF-8 on the wire');
-    Body := '%PDF-' + #0#$FF + 'fixture';
-    SetCodePage(Body, CP_UTF8, False);
+    Response := TAssinafyResponse.Create;
+    try
+      Response.Body := RawBytes([$7B, $22, $74, $65, $78, $74, $22, $3A, $22,
+        $F0, $9F, $98, $80, $22, $7D]);
+      Response.ParseJSON;
+      Check(JSONString(JSONFind(Response.JSON, 'text')) = UTF8String('😀'),
+        'JSON string helper retains UTF-8 outside the legacy code page');
+    finally Response.Free; end;
+    Body := '%PDF-' + RawBytes([0, 255]) + 'fixture';
+    {$IFDEF FPC}SetCodePage(Body, CP_UTF8, False);{$ENDIF}
     Check(VerifyWebhook('whsec_c2VjcmV0', Name, '1700000000',
       'v1,V95AJ5O7LD3URtN97mJ8JxW7e3LweqtrXHysLXqkKWM=', Body, 1700000000),
       'Webhook text uses UTF-8 while raw body bytes are unchanged');
   finally
-    DefaultSystemCodePage := OldCodePage;
+    {$IFDEF FPC}DefaultSystemCodePage := OldCodePage;{$ENDIF}
     Query.Free;
   end;
 end;
@@ -490,10 +600,10 @@ var
   Headers: TStringList;
   CurrentTimestamp: string;
 begin
-  Check(EncodeStringBase64(SHA256('abc')) = 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=', 'SHA256 known vector');
-  Check(EncodeStringBase64(HMACSHA256('key', 'The quick brown fox jumps over the lazy dog')) =
+  Check(Base64Encode(SHA256('abc')) = 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=', 'SHA256 known vector');
+  Check(Base64Encode(HMACSHA256('key', 'The quick brown fox jumps over the lazy dog')) =
     '97yD9DBThCSxMpjmqm+xQ+9NWaFJRhdZl0edvC0aPNg=', 'HMAC-SHA256 known vector');
-  Signature := 'v1,' + EncodeStringBase64(HMACSHA256('secret', 'msg_1.' + Timestamp + '.' + Body));
+  Signature := 'v1,' + Base64Encode(HMACSHA256('secret', 'msg_1.' + Timestamp + '.' + Body));
   Check(VerifyWebhook(Secret, 'msg_1', Timestamp, Signature, Body, 1700000000), 'Valid webhook');
   Check(VerifyWebhook(Secret, 'msg_1', Timestamp, 'v2,ignored v1,wrong ' + Signature, Body, 1700000000), 'Multiple signatures');
   Check(not VerifyWebhook(Secret, 'msg_1', Timestamp, Signature, Body + ' ', 1700000000), 'Tampered body rejected');
@@ -509,7 +619,7 @@ begin
   Headers := TStringList.Create;
   try
     CurrentTimestamp := IntToStr(DateTimeToUnix(Now, False));
-    Signature := 'v1,' + EncodeStringBase64(HMACSHA256('secret', 'msg_1.' + CurrentTimestamp + '.' + Body));
+    Signature := 'v1,' + Base64Encode(HMACSHA256('secret', 'msg_1.' + CurrentTimestamp + '.' + Body));
     Headers.Add('Webhook-ID: msg_1');
     Headers.Add('WEBHOOK-TIMESTAMP: ' + CurrentTimestamp);
     Headers.Add('webhook-signature: v2,ignored');
@@ -523,7 +633,7 @@ begin
     Headers.Add('webhook-timestamp=' + CurrentTimestamp);
     Headers.Add('webhook-signature=' + Signature);
     Check(VerifyWebhookHeaders(Secret, Headers, Body), 'Name=value webhook headers');
-    Signature := 'v1,' + EncodeStringBase64(HMACSHA256('secret', 'msg:1=2.' + CurrentTimestamp + '.' + Body));
+    Signature := 'v1,' + Base64Encode(HMACSHA256('secret', 'msg:1=2.' + CurrentTimestamp + '.' + Body));
     Headers[0] := 'webhook-id=msg:1=2';
     Headers[2] := 'webhook-signature=' + Signature;
     Check(VerifyWebhookHeaders(Secret, Headers, Body), 'Name=value header retains colon in value');
@@ -539,6 +649,134 @@ begin
   finally Headers.Free; end;
 end;
 
+procedure TestURIOrigins;
+const
+  Invalid: array[0..9] of string = ('https://api.example.com:99999/v1',
+    'https://api.example.com:65536/v1', 'https://api.example.com:18446744073709551616/v1',
+    'https://api.example.com:-1/v1', 'https://api.example.com:+443/v1',
+    'https://api.example.com:abc/v1', 'https://api.example.com:1e3/v1',
+    'https://[::1]:70000/v1', 'https://[::1]:abc/v1', 'https://[::1/v1');
+var URI: TAssinafyURI; Value: string;
+begin
+  URI := ParseAssinafyURI('https://user:password@api.example.com:8443/v1?type=original#fragment');
+  Check(TrimURLTrailingSlash(URI.Origin) = 'https://api.example.com:8443', 'URI origin contains only scheme, host and port');
+  Check((URI.UserName = 'user') and (URI.Password = 'password'), 'URI validation retains original credentials');
+  Check((URI.Params = 'type=original') and (URI.Bookmark = 'fragment'), 'URI validation retains original query and fragment');
+  URI := ParseAssinafyURI('https://api.example.com:65535/v1');
+  Check(URI.Port = 65535, 'Maximum URI port preserved');
+  URI := ParseAssinafyURI('https://api.example.com:0/v1');
+  Check(URI.Port = 0, 'Zero URI port remains representable');
+  URI := ParseAssinafyURI('https://api.example.com:/v1');
+  Check(URI.Host = 'api.example.com', 'Empty URI port normalizes to the default');
+  URI := ParseAssinafyURI('https://[::1]:/v1');
+  Check((URI.Host = '[::1]') or (URI.Host = '::1'), 'Empty IPv6 URI port normalizes to the default');
+  URI := ParseAssinafyURI('https://[::1]:443/v1');
+  Check(URI.Port = 443, 'Bracketed IPv6 port preserved');
+  URI := ParseAssinafyURI('https://user:99999@api.example.com/path?next=:99999#fragment');
+  Check(URI.Host = 'api.example.com', 'Credentials and query text are not parsed as ports');
+  for Value in Invalid do
+    try
+      URI := ParseAssinafyURI(Value);
+      raise Exception.Create('Invalid URI port accepted');
+    except on E: EAssinafyInputError do Check(True, 'Invalid URI ports have a consistent input error'); end;
+end;
+
+procedure TestJSONCompatibility;
+const
+  Invalid: array[0..15] of string = ('[1,]', '{"a":1,}', '[,1]',
+    '01', '-01', '1.', '1e', '1e+', '+1', 'NaN', '/*comment*/1',
+    '{"a":"\x00"}', '{"a":"\u00xz"}', '{"a":1,"\u0061":2}',
+    '{"nested":{"a":1,"a":2}}', '[{"a":1,"a":2}]');
+var Obj, CopyObj, Child: TJSONObject; Arr: TJSONArray; Value: TJSONData; Text: string; Rejected: Boolean;
+begin
+  Obj := JSONObj(['empty', '', 'null', nil, 'enabled', False,
+    'large', Int64(9007199254740993), 'text', 'João 😀']);
+  try
+    Arr := JSONArr(['Email', 3, True]);
+    JSONAdd(Obj, 'list', Arr);
+    JSONAdd(Arr, JSONObj(['id', 'child']));
+    JSONAdd(Obj, '', 'empty name');
+    Child := JSONObj(['value', 'retained']);
+    try
+      Rejected := False;
+      try JSONAdd(Obj, 'empty', Child); except on E: Exception do Rejected := True; end;
+      Check(Rejected, 'Duplicate JSON property rejected');
+      Check(JSONGet(Child, 'value', '') = 'retained', 'Rejected JSON child remains caller-owned');
+    finally Child.Free; end;
+    Check(Obj.Count = 7, 'Empty JSON property name retained');
+    Value := ParseJSONStrict(JSONText(Obj));
+    try
+      CopyObj := TJSONObject(Value);
+      Check(JSONGet(CopyObj, 'empty', 'fallback') = '', 'Empty JSON strings retained');
+      Check(JSONKind(JSONFind(Value, 'null')) = jtNull, 'Explicit JSON null retained');
+      Check(not JSONBoolean(JSONFind(Value, 'enabled')), 'JSON false retained');
+      Check(JSONInteger(JSONFind(Value, 'large')) = 9007199254740993, 'JSON integer keeps precision');
+      Check(UTF8Encode(UnicodeString(JSONString(JSONFind(Value, 'text')))) = UTF8String('João 😀'), 'JSON Unicode constructor round trip');
+      Check(JSONString(TJSONArray(JSONFind(Value, 'list')).Items[0]) = 'Email', 'JSON array values retained');
+      Check(JSONGet(CopyObj, 'missing', 'fallback') = 'fallback', 'Missing JSON string default');
+    finally Value.Free; end;
+  finally Obj.Free; end;
+  Rejected := False;
+  try
+    Obj := JSONObj(['duplicate', 1, 'duplicate', 2]);
+    Obj.Free;
+  except on E: Exception do Rejected := True; end;
+  Check(Rejected, 'JSON constructor rejects duplicate scalar properties');
+  Child := JSONObj(['value', 'retained']);
+  try
+    Rejected := False;
+    try
+      Obj := JSONObj(['duplicate', 1, 'duplicate', Child]);
+      Obj.Free;
+    except on E: Exception do Rejected := True; end;
+    Check(Rejected, 'JSON constructor rejects duplicate child properties');
+    Check(JSONGet(Child, 'value', '') = 'retained', 'Rejected constructor child remains caller-owned');
+  finally Child.Free; end;
+  Value := ParseJSONStrict('1.5');
+  try
+    try
+      JSONInteger(Value);
+      raise Exception.Create('Fractional integer accepted');
+    except on E: EConvertError do Check(True, 'Integer helper rejects fractional numbers'); end;
+  finally Value.Free; end;
+  Value := ParseJSONStrict(StringOfChar('[', 512) + StringOfChar(']', 512));
+  try Check(Value is TJSONArray, 'Maximum JSON nesting accepted'); finally Value.Free; end;
+  try
+    Value := ParseJSONStrict(StringOfChar('[', 513) + StringOfChar(']', 513));
+    Value.Free;
+    raise Exception.Create('Excessive JSON nesting accepted');
+  except on E: EConvertError do Check(True, 'Excessive JSON nesting rejected'); end;
+  for Text in Invalid do
+    try
+      Value := ParseJSONStrict(UTF8Encode(UnicodeString(Text)));
+      Value.Free;
+      raise Exception.Create('Invalid JSON syntax accepted: ' + Text);
+    except
+      on E: Exception do
+      begin
+        if Pos('Invalid JSON syntax accepted:', E.Message) = 1 then raise;
+        Check(True, 'Invalid JSON rejected');
+      end;
+    end;
+end;
+
+{$IFDEF FPC}
+procedure TestNativeFPCCompatibility;
+var Body: fpjson.TJSONObject; Root: fpjson.TJSONData;
+begin
+  Body := fpjson.TJSONObject.Create(['name', 'legacy']);
+  try
+    Fake.NextBody := '{"data":{"name":"legacy"}}';
+    Response := Client.RenameDocument('document', Body);
+    try
+      Root := Response.JSON;
+      Check(Root.FindPath('data.name').AsString = 'legacy', 'Native fpjson response access remains compatible');
+      Check(Fake.LastBody = Body.AsJSON, 'Native fpjson request bodies remain compatible');
+    finally Response.Free; end;
+  finally Body.Free; end;
+end;
+{$ENDIF}
+
 procedure TestSigningMethods;
 const
   Methods: array[0..2] of string = ('Email', 'Whatsapp', 'DigitalCertificate');
@@ -552,25 +790,25 @@ begin
   begin
     Channel := 'Email';
     if Method = 'Whatsapp' then Channel := 'Whatsapp';
-    Body := TJSONObject.Create(['method', 'virtual']);
+    Body := JSONObj(['method', 'virtual']);
     try
       Signers := TJSONArray.Create;
-      Body.Add('signers', Signers);
-      Signers.Add(TJSONObject.Create(['id', 'signer', 'verification_method', Method,
-        'notification_methods', TJSONArray.Create([Channel]), 'step', 1]));
+      JSONAdd(Body, 'signers', Signers);
+      JSONAdd(Signers, JSONObj(['id', 'signer', 'verification_method', Method,
+        'notification_methods', JSONArr([Channel]), 'step', 1]));
       Response := Client.EstimateAssignmentCost('document', Body);
       Response.Free;
-      Check(Fake.LastBody = Body.AsJSON, Method + ' estimation payload retained');
+      Check(Fake.LastBody = JSONText(Body), Method + ' estimation payload retained');
       Response := Client.CreateAssignment('document', Body);
       Response.Free;
-      Check(Fake.LastBody = Body.AsJSON, Method + ' assignment payload retained');
+      Check(Fake.LastBody = JSONText(Body), Method + ' assignment payload retained');
     finally Body.Free; end;
   end;
-  Body := TJSONObject.Create(['verification-code', '123456']);
+  Body := JSONObj(['verification-code', '123456']);
   try
     Response := Client.VerifySignerCode('signer-code', Body);
     Response.Free;
-    Check(Fake.LastBody = Body.AsJSON, 'OTP field spelling preserved');
+    Check(Fake.LastBody = JSONText(Body), 'OTP field spelling preserved');
     Check(Fake.LastAuth = 'signer', 'OTP uses signer authentication');
   finally Body.Free; end;
 end;
@@ -579,6 +817,7 @@ var
   Fixture: TFileStream;
   I: Integer;
 begin
+  {$IFDEF FPC}HaltOnNotReleased := True;{$ENDIF}
   FixtureFile := GetTempFileName;
   Fixture := TFileStream.Create(FixtureFile, fmCreate);
   try Fixture.WriteBuffer('test', 4); finally Fixture.Free; end;
@@ -588,7 +827,7 @@ begin
   Fake.NextContentType := 'application/json';
   Client := TAssinafyClient.Create('', 'default-account', AssinafySandboxURL, Fake);
   Client.AccessToken := 'test-bearer';
-  TestBody := TJSONObject.Create(['enabled', False, 'email', 'developer@example.com']);
+  TestBody := JSONObj(['enabled', False, 'email', 'developer@example.com']);
   TestQuery := TStringList.Create;
   TestQuery.Add('search=Ana & Joao');
   try
@@ -600,10 +839,14 @@ begin
     TestResponses;
     TestAuthenticationAndURLs;
     TestUploadLimits;
+    TestTransportHeaders;
     TestOAuth;
     TestOAuthEnvironments;
     TestTextEncoding;
     TestWebhooks;
+    TestURIOrigins;
+    TestJSONCompatibility;
+    {$IFDEF FPC}TestNativeFPCCompatibility;{$ENDIF}
     TestSigningMethods;
     WriteLn('PASS: ', Checks, ' checks across all 106 API methods, responses, OAuth and webhooks');
   finally

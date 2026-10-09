@@ -1,0 +1,19 @@
+package AssinafySDK;
+
+{$RANGECHECKS ON}
+{$OVERFLOWCHECKS ON}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl;
+
+contains
+  Assinafy in '../src/assinafy.pas',
+  AssinafyJson in '../src/assinafyjson.pas',
+  AssinafyURI in '../src/assinafyuri.pas',
+  AssinafyHttp in '../src/assinafyhttp.pas',
+  AssinafyCrypto in '../src/assinafycrypto.pas',
+  AssinafyOAuth in '../src/assinafyoauth.pas',
+  AssinafyWebhooks in '../src/assinafywebhooks.pas';
+
+end.

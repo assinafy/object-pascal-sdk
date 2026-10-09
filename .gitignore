@@ -11,3 +11,15 @@ __pycache__/
 *.a
 *.compiled
 .DS_Store
+*.dcu
+*.dcp
+*.bpl
+*.exe
+*.dll
+*.res
+*.dproj.local
+*.identcache
+*.tvsconfig
+*.dsk
+/__history/
+/__recovery/

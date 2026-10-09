@@ -1,10 +1,10 @@
 program LiveTests;
 
-{$mode objfpc}{$H+}{$ASSERTIONS ON}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}{$ASSERTIONS ON}
 
 uses
   {$ifdef unix}cthreads,{$endif}
-  Classes, SysUtils, fpjson, Assinafy, AssinafyHttp;
+  Classes, SysUtils, AssinafyJson, Assinafy, AssinafyHttp;
 
 var
   Client: TAssinafyClient;
@@ -73,7 +73,7 @@ begin
     Passed(Client.ListWebhookEndpoints(''), 'Webhook endpoints');
     Passed(Client.ListWebhookDeliveries('', Query), 'Webhook deliveries');
     Passed(Client.GetOAuthResourceMetadata, 'OAuth resource discovery');
-    Body := TJSONObject.Create(['client_id', 'object-pascal-invalid-client', 'grant_type', 'authorization_code',
+    Body := JSONObj(['client_id', 'object-pascal-invalid-client', 'grant_type', 'authorization_code',
       'code', 'invalid-code', 'code_verifier', StringOfChar('a', 43), 'redirect_uri', 'https://app.example.com/callback']);
     try
       try
@@ -97,33 +97,33 @@ begin
       DocumentID := ''; SignerID := ''; TagID := '';
       try
         Response := Client.UploadDocument('', FixtureFile);
-        try DocumentID := Response.Data.FindPath('id').AsString; finally Passed(Response, 'Upload document'); end;
+        try DocumentID := JSONString(JSONFind(Response.Data, 'id')); finally Passed(Response, 'Upload document'); end;
         Passed(Client.GetDocument(DocumentID), 'Retrieve uploaded document');
         Response := Client.DownloadDocumentArtifact(DocumentID, 'original');
         try
           Assert(Copy(Response.Body, 1, 5) = '%PDF-', 'Original PDF bytes');
           Inc(Calls); WriteLn('PASS: Download original PDF');
         finally Response.Free; end;
-        Body := TJSONObject.Create(['name', TestName + '.pdf']);
+        Body := JSONObj(['name', TestName + '.pdf']);
         try Passed(Client.RenameDocument(DocumentID, Body), 'Rename document'); finally Body.Free; end;
-        Body := TJSONObject.Create(['full_name', TestName, 'email', 'sdk-' + FormatDateTime('yyyymmddhhnnsszzz', Now) + '@example.com']);
+        Body := JSONObj(['full_name', TestName, 'email', 'sdk-' + FormatDateTime('yyyymmddhhnnsszzz', Now) + '@example.com']);
         try
           Response := Client.CreateSigner('', Body);
-          try SignerID := Response.Data.FindPath('id').AsString; finally Passed(Response, 'Create isolated signer'); end;
+          try SignerID := JSONString(JSONFind(Response.Data, 'id')); finally Passed(Response, 'Create isolated signer'); end;
         finally Body.Free; end;
         Passed(Client.GetSigner('', SignerID), 'Retrieve signer');
-        Body := TJSONObject.Create(['full_name', TestName + ' updated']);
+        Body := JSONObj(['full_name', TestName + ' updated']);
         try Passed(Client.UpdateSigner('', SignerID, Body), 'Update signer'); finally Body.Free; end;
-        Body := TJSONObject.Create(['method', 'virtual']);
-        Body.Add('signers', TJSONArray.Create([TJSONObject.Create(['id', SignerID, 'verification_method', 'Email'])]));
+        Body := JSONObj(['method', 'virtual']);
+        JSONAdd(Body, 'signers', JSONArr([JSONObj(['id', SignerID, 'verification_method', 'Email'])]));
         try Passed(Client.EstimateAssignmentCost(DocumentID, Body), 'Email assignment cost'); finally Body.Free; end;
-        Body := TJSONObject.Create(['name', TestName, 'color', '#314159']);
+        Body := JSONObj(['name', TestName, 'color', '#314159']);
         try
           Response := Client.CreateTag('', Body);
-          try TagID := Response.Data.FindPath('id').AsString; finally Passed(Response, 'Create isolated tag'); end;
+          try TagID := JSONString(JSONFind(Response.Data, 'id')); finally Passed(Response, 'Create isolated tag'); end;
         finally Body.Free; end;
         Body := TJSONObject.Create;
-        Body.Add('tags', TJSONArray.Create([TagID]));
+        JSONAdd(Body, 'tags', JSONArr([TagID]));
         try Passed(Client.AttachDocumentTags('', DocumentID, Body), 'Attach tag'); finally Body.Free; end;
         Passed(Client.ListDocumentTags('', DocumentID), 'Document tags');
         Passed(Client.DetachDocumentTag('', DocumentID, TagID), 'Detach tag');

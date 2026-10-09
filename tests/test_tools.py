@@ -1,13 +1,16 @@
 """Check contract failures independently of generated operation expectations."""
 
+import contextlib
 import copy
 import importlib.util
+import io
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,7 +100,7 @@ class GateTests(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory(prefix='assinafy-tools-')
         self.addCleanup(self.folder.cleanup)
         self.root = Path(self.folder.name)
-        for name in ['src', 'docs', 'scripts', 'examples']:
+        for name in ['src', 'docs', 'scripts', 'examples', 'delphi']:
             shutil.copytree(ROOT / name, self.root / name,
                             ignore=shutil.ignore_patterns('__pycache__'))
         for name in ['README.md', '.gitignore', '.env.example', 'VERSION', 'LICENSE']:
@@ -109,14 +112,14 @@ class GateTests(unittest.TestCase):
 
     def test_missing_operation_fails_with_optimization(self):
         path = self.root / 'src/resources.inc'
-        path.write_text('\n'.join(path.read_text().splitlines()[2:]) + '\n')
+        path.write_text('\n'.join(path.read_text(encoding='utf-8').splitlines()[2:]) + '\n', encoding='utf-8')
         result = self.run_gate()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Missing or extra API operations', result.stderr)
 
     def test_authentication_is_checked_independently(self):
         path = self.root / 'src/methods.inc'
-        path.write_text(path.read_text().replace("'/users/self', aaAPI", "'/users/self', aaPublic"))
+        path.write_text(path.read_text(encoding='utf-8').replace("'/users/self', aaAPI", "'/users/self', aaPublic"), encoding='utf-8')
         result = self.run_gate()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('authentication', result.stderr)
@@ -128,10 +131,37 @@ class GateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_readme_examples_fail_with_optimization(self):
-        (self.root / 'README.md').write_text('No snippets.\n')
+        (self.root / 'README.md').write_text('No snippets.\n', encoding='utf-8')
         result = self.run_gate('check_examples.py')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('README must include usage examples', result.stderr)
+
+
+class ReadmeCompilerTests(unittest.TestCase):
+    def test_delphi_uses_utf8_dpr_sources_and_preserves_compiler_arguments(self):
+        loader = importlib.util.spec_from_file_location('check_examples', ROOT / 'scripts/check_examples.py')
+        examples = importlib.util.module_from_spec(loader)
+        loader.loader.exec_module(examples)
+        with tempfile.TemporaryDirectory(prefix='assinafy-readme-') as folder:
+            root = Path(folder)
+            (root / 'README.md').write_text(
+                "```pascal\nWriteLn('João 😀');\n```\n```sh\ntrue\n```\n", encoding='utf-8')
+            calls = []
+
+            def compiler(arguments, **kwargs):
+                calls.append(arguments)
+                self.assertEqual(arguments[:2], ['dcc32.exe', '-Udirectory with spaces'])
+                source = Path(arguments[-1])
+                self.assertEqual(source.suffix, '.dpr')
+                self.assertTrue(source.read_bytes().startswith(b'\xef\xbb\xbf'))
+                self.assertIn("WriteLn('João 😀')", source.read_text(encoding='utf-8-sig'))
+                return SimpleNamespace(returncode=0, stdout='')
+
+            with patch.object(examples, 'ROOT', root), patch.object(examples.subprocess, 'run', compiler), \
+                    patch.object(sys, 'argv', ['check_examples.py', '--delphi', 'dcc32.exe', '-Udirectory with spaces']), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                examples.main()
+            self.assertEqual(len(calls), 1)
 
 
 if __name__ == '__main__':

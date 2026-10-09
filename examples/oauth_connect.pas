@@ -1,11 +1,12 @@
 program OAuthConnect;
 
-{$mode objfpc}{$H+}
-{$codepage utf8}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$IFDEF FPC}{$codepage utf8}{$ENDIF}
+{$IFNDEF FPC}{$APPTYPE CONSOLE}{$ENDIF}
 
 uses
   {$ifdef unix}cthreads,{$endif}
-  Classes, SysUtils, fpjson, Assinafy, AssinafyHttp, AssinafyOAuth;
+  Classes, SysUtils, AssinafyJson, Assinafy, AssinafyHttp, AssinafyOAuth;
 
 var
   Config: TAssinafyOAuthConfig;
@@ -42,11 +43,11 @@ begin
     Code := ValidateOAuthCallback(Callback, State, Config.Issuer);
     Response := ExchangeCode(Client, Config, Code, PKCE.Verifier);
     try
-      Client.AccessToken := Response.Data.FindPath('access_token').AsString;
-      WriteLn('Connected. Returned scope: ', TJSONObject(Response.Data).Get('scope', ''));
+      Client.AccessToken := JSONString(JSONFind(Response.Data, 'access_token'));
+      WriteLn('Connected. Returned scope: ', JSONGet(TJSONObject(Response.Data), 'scope', ''));
     finally Response.Free; end;
     Response := Client.ListMyAccounts;
-    try WriteLn('Workspaces: ', Response.Data.AsJSON); finally Response.Free; end;
+    try WriteLn('Workspaces: ', JSONText(Response.Data)); finally Response.Free; end;
   finally
     Client.Free;
     Callback.Free;

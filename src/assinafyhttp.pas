@@ -1,12 +1,13 @@
 unit AssinafyHttp;
 
-{$mode objfpc}{$H+}
-{$linklib curl}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$B-}
+{$IFDEF FPC}{$linklib curl}{$ENDIF}
 
 interface
 
 uses
-  Classes, SysUtils, fpjson;
+  Classes, SysUtils, AssinafyJson;
 
 type
   EAssinafyError = class(Exception);
@@ -65,10 +66,19 @@ type
       virtual; abstract;
   end;
 
+  {$IFDEF FPC}
   TAssinafyCurlTransport = class(TAssinafyTransport)
   public
     function Execute(const Request: TAssinafyRequest): TAssinafyResponse; override;
   end;
+  TAssinafyDefaultTransport = TAssinafyCurlTransport;
+  {$ELSE}
+  TAssinafyNetTransport = class(TAssinafyTransport)
+  public
+    function Execute(const Request: TAssinafyRequest): TAssinafyResponse; override;
+  end;
+  TAssinafyDefaultTransport = TAssinafyNetTransport;
+  {$ENDIF}
 
 function PercentEncode(const Value: UTF8String): string;
 function EncodeQuery(Query: TStrings): string;
@@ -78,12 +88,14 @@ function TrimURLTrailingSlash(const Value: string): string;
 implementation
 
 uses
-  {$ifdef darwin}fpwidestring, cpall,{$else}
-  {$ifdef unix}cwstring,{$endif}{$endif}
-  ctypes, libcurl, jsonparser, jsonscanner;
+  {$IFDEF FPC}ctypes, libcurl{$ELSE}
+  System.Net.HttpClient, System.Net.URLClient, System.SyncObjs{$ENDIF};
 
 const
   MaxUploadBytes = 25 * 1024 * 1024;
+
+{$IFDEF FPC}
+const
   // Free Pascal 3.2.2 lacks these names; values follow libcurl's stable C ABI.
   CurlOptMimePost = CURLoption(10269);
   CurlSSLVersionTLS12 = clong(6);
@@ -95,6 +107,34 @@ function curl_mime_name(Part: Pointer; Name: PChar): CURLcode; cdecl; external '
 function curl_mime_data(Part: Pointer; Data: PChar; Size: csize_t): CURLcode; cdecl; external 'curl';
 function curl_mime_filename(Part: Pointer; FileName: PChar): CURLcode; cdecl; external 'curl';
 function curl_mime_type(Part: Pointer; MimeType: PChar): CURLcode; cdecl; external 'curl';
+
+{$ENDIF}
+
+procedure ValidateHeaderValue(const Value: string);
+var C: Char;
+begin
+  for C in Value do
+    if ((Ord(C) < 32) and (C <> #9)) or (Ord(C) = 127) then
+      raise EAssinafyInputError.Create('HTTP header contains a control character');
+end;
+
+procedure ValidateRequestHeaders(const Request: TAssinafyRequest);
+var I, J, Split: Integer; Line: string;
+begin
+  if Request.Headers = nil then raise EAssinafyInputError.Create('HTTP headers are required');
+  for I := 0 to Request.Headers.Count - 1 do
+  begin
+    Line := Request.Headers[I];
+    Split := Pos(':', Line);
+    if Split <= 1 then raise EAssinafyInputError.Create('Invalid HTTP header');
+    for J := 1 to Split - 1 do
+      if not CharInSet(Line[J], ['A'..'Z', 'a'..'z', '0'..'9', '!', '#', '$', '%',
+        '&', #39, '*', '+', '-', '.', '^', '_', '`', '|', '~']) then
+        raise EAssinafyInputError.Create('Invalid HTTP header name');
+    ValidateHeaderValue(Copy(Line, Split + 1, MaxInt));
+  end;
+  ValidateHeaderValue(Request.ContentType);
+end;
 
 procedure RequireValue(const Value, Name: string);
 begin
@@ -167,37 +207,15 @@ begin
 end;
 
 procedure TAssinafyResponse.ParseJSON;
-var
-  Parser: TJSONParser;
-  I: SizeInt;
 begin
   FreeAndNil(FJSON);
-  if Body = '' then Exit;
-  if Pos(#0, Body) > 0 then
-    raise EAssinafyProtocolError.Create('The API returned invalid JSON', Self);
-  if UTF8Encode(UTF8Decode(Body)) <> Body then
-    raise EAssinafyProtocolError.Create('The API returned invalid UTF-8', Self);
-  I := 1;
-  while I <= Length(Body) do
-  begin
-    if Body[I] = '\' then
-    begin
-      // FPC 3.2.2 drops escaped NUL; reject it rather than alter API values.
-      if Copy(Body, I, 6) = '\u0000' then
-        raise EAssinafyProtocolError.Create('Escaped NUL is unsupported by the JSON parser', Self);
-      Inc(I);
-    end;
-    Inc(I);
-  end;
   try
-    Parser := TJSONParser.Create(Body, [joUTF8, joStrict]);
-    try
-      FJSON := Parser.Parse;
-      if FJSON = nil then raise EAssinafyProtocolError.Create('Missing JSON value');
-    finally
-      Parser.Free;
-    end;
+    FJSON := ParseJSONStrict(Body);
   except
+    on E: EAssinafyJSONEncodingError do
+      raise EAssinafyProtocolError.Create('The API returned invalid UTF-8', Self);
+    on E: EAssinafyJSONNulError do
+      raise EAssinafyProtocolError.Create('Escaped NUL is unsupported by the JSON parser', Self);
     on E: Exception do
       raise EAssinafyProtocolError.Create('The API returned invalid JSON', Self);
   end;
@@ -206,8 +224,8 @@ end;
 function TAssinafyResponse.GetData: TJSONData;
 begin
   Result := FJSON;
-  if (FJSON is TJSONObject) and (TJSONObject(FJSON).Find('data') <> nil) then
-    Result := TJSONObject(FJSON).Find('data');
+  if (FJSON is TJSONObject) and (JSONFind(FJSON, 'data') <> nil) then
+    Result := JSONFind(FJSON, 'data');
 end;
 
 function TAssinafyResponse.Header(const Name: string): string;
@@ -231,8 +249,8 @@ var
   var
     Value: TJSONData;
   begin
-    Value := Obj.Find(Name);
-    if (Value <> nil) and (Value.JSONType = jtString) then Result := Value.AsString
+    Value := JSONFind(Obj, Name);
+    if (Value <> nil) and (JSONKind(Value) = jtString) then Result := JSONString(Value)
     else Result := '';
   end;
 begin
@@ -252,6 +270,21 @@ begin
   inherited Create(Format('Assinafy HTTP %d: %s', [StatusCode, Detail]));
 end;
 
+function ReadUploadBytes(const FileName: string): RawByteString;
+var Upload: TFileStream; Size: Int64;
+begin
+  Result := '';
+  Upload := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  try
+    Size := Upload.Size;
+    if (Size < 0) or (Size > MaxUploadBytes) then
+      raise EAssinafyInputError.Create('File exceeds 25 MiB');
+    SetLength(Result, Size);
+    if Size > 0 then Upload.ReadBuffer(Result[1], Length(Result));
+  finally Upload.Free; end;
+end;
+
+{$IFDEF FPC}
 procedure CheckCurl(Code: CURLcode);
 begin
   if Code <> CURLE_OK then
@@ -300,17 +333,16 @@ var
   I: Integer;
   Status: clong;
   Buffer: TStringStream;
-  Upload: TFileStream;
-  UploadSize: Int64;
   Payload, HeaderLine: RawByteString;
 begin
+  if Request.TimeoutMS < 0 then raise EAssinafyInputError.Create('TimeoutMS must not be negative');
+  ValidateRequestHeaders(Request);
   Handle := curl_easy_init;
   if Handle = nil then raise EAssinafyTransportError.Create('Cannot initialize libcurl');
   List := nil;
   Mime := nil;
   Result := nil;
   Buffer := nil;
-  Upload := nil;
   try
     try
       Result := TAssinafyResponse.Create;
@@ -341,13 +373,7 @@ begin
       Payload := Request.Body;
       if Request.FileName <> '' then
       begin
-        Upload := TFileStream.Create(Request.FileName, fmOpenRead or fmShareDenyWrite);
-        UploadSize := Upload.Size;
-        if (UploadSize < 0) or (UploadSize > MaxUploadBytes) then
-          raise EAssinafyInputError.Create('File exceeds 25 MiB');
-        SetLength(Payload, UploadSize);
-        if UploadSize > 0 then Upload.ReadBuffer(Payload[1], Length(Payload));
-        FreeAndNil(Upload);
+        Payload := ReadUploadBytes(Request.FileName);
         if Request.FileField <> '' then
         begin
           Mime := curl_mime_init(Handle);
@@ -382,7 +408,6 @@ begin
       raise;
     end;
   finally
-    Upload.Free;
     Buffer.Free;
     if Mime <> nil then curl_mime_free(Mime);
     curl_slist_free_all(List);
@@ -390,10 +415,17 @@ begin
   end;
 end;
 
+{$ELSE}
+{$I assinafynethttp.inc}
+{$ENDIF}
+
+{$IFDEF FPC}
 initialization
   CheckCurl(curl_global_init(CURL_GLOBAL_DEFAULT));
 
 finalization
   curl_global_cleanup;
+
+{$ENDIF}
 
 end.

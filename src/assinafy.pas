@@ -1,14 +1,15 @@
 unit Assinafy;
 
-{$mode objfpc}{$H+}
+{$IFDEF FPC}{$mode objfpc}{$H+}{$ENDIF}
+{$B-}
 
 interface
 
 uses
-  Classes, SysUtils, fpjson, AssinafyHttp;
+  Classes, SysUtils, AssinafyJson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.2.1';
+  AssinafyVersion = '0.3.0';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 
@@ -42,17 +43,17 @@ type
 implementation
 
 uses
-  URIParser;
+  AssinafyURI;
 
 constructor TAssinafyClient.Create(const AAPIKey, AAccountID, ABaseURL: string;
   Transport: TAssinafyTransport);
 var
-  URI: TURI;
+  URI: TAssinafyURI;
 begin
   inherited Create;
   RequireValue(ABaseURL, 'Base URL');
   FBaseURL := TrimURLTrailingSlash(ABaseURL);
-  URI := ParseURI(FBaseURL);
+  URI := ParseAssinafyURI(FBaseURL);
   if Copy(FBaseURL, Length(FBaseURL) - 2, 3) <> '/v1' then
     raise EAssinafyInputError.Create('Base URL must end with /v1');
   if (URI.UserName <> '') or (URI.Password <> '') or (URI.Params <> '') or
@@ -67,15 +68,13 @@ begin
     RequireValue(AAPIKey, 'API key');
     RequireValue(AAccountID, 'Workspace ID for API-key authentication');
   end;
-  URI.Path := '';
-  URI.Document := '';
-  FOrigin := TrimURLTrailingSlash(EncodeURI(URI));
+  FOrigin := TrimURLTrailingSlash(URI.Origin);
   FAPIKey := AAPIKey;
   FAccountID := AAccountID;
   FTimeoutMS := 30000;
   FTransport := Transport;
   FOwnsTransport := Transport = nil;
-  if FOwnsTransport then FTransport := TAssinafyCurlTransport.Create;
+  if FOwnsTransport then FTransport := TAssinafyDefaultTransport.Create;
 end;
 
 destructor TAssinafyClient.Destroy;
@@ -156,7 +155,7 @@ begin
       if Params <> '' then Request.URL := Request.URL + '?' + Params;
       Request.Headers := Headers;
       Request.Body := '';
-      if Body <> nil then Request.Body := Body.AsJSON;
+      if Body <> nil then Request.Body := JSONText(Body);
       Request.FileName := FileName;
       Request.FileField := FileField;
       Request.ContentType := ContentType;
