@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-10-09
+
+- Use Free Pascal's native Unicode manager on macOS to preserve legacy code-page text during UTF-8 conversion.
+
 ## 0.2.0 — 2026-10-09
 
 - Require a workspace ID with API-key authentication and reject combining an API key with an OAuth access token.

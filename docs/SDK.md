@@ -50,7 +50,7 @@ The [API reference](API.md) defines every resource method. This document defines
 
 `UploadAccountLogo(AccountID, FileName, ContentType = 'application/octet-stream')` accepts an optional file-part content type such as `image/png` or `image/jpeg`. Blank types and NUL/CR/LF are rejected before transport. The server validates the image bytes and workspace permissions.
 
-JSON response bytes are validated with a UTF-8 decode/encode round trip before strict parsing. Validation uses temporary decoding buffers; binary downloads are not decoded. Unix builds load the standard `cwstring` Unicode manager. Use `{$codepage utf8}` for UTF-8 Pascal source literals and keep Unicode text in `UTF8String`/`UnicodeString` until converting it for a UI. `fpjson` string values use `UTF8String`.
+JSON response bytes are validated with a UTF-8 decode/encode round trip before strict parsing. Validation uses temporary decoding buffers; binary downloads are not decoded. macOS builds load Free Pascal's native `fpwidestring` Unicode manager and `cpall` code-page tables; other Unix builds use `cwstring`. These units are included with Free Pascal. Use `{$codepage utf8}` for UTF-8 Pascal source literals and keep Unicode text in `UTF8String`/`UnicodeString` until converting it for a UI. `fpjson` string values use `UTF8String`.
 
 - `RequireValue(Value, Name)` rejects blank required values and NUL/CR/LF control characters.
 - `PercentEncode(Value: UTF8String)` converts code-page-aware caller strings to UTF-8, then encodes bytes using RFC 3986 unreserved characters and uppercase percent escapes.

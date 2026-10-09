@@ -78,7 +78,8 @@ function TrimURLTrailingSlash(const Value: string): string;
 implementation
 
 uses
-  {$ifdef unix}cwstring,{$endif}
+  {$ifdef darwin}fpwidestring, cpall,{$else}
+  {$ifdef unix}cwstring,{$endif}{$endif}
   ctypes, libcurl, jsonparser, jsonscanner;
 
 const

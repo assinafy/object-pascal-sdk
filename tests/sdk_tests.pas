@@ -1,6 +1,7 @@
 program SDKTests;
 
 {$mode objfpc}{$H+}{$ASSERTIONS ON}
+{$codepage utf8}
 
 uses
   {$ifdef unix}cthreads,{$endif}
@@ -422,7 +423,9 @@ begin
   Query := TStringList.Create;
   try
     DefaultSystemCodePage := 1252;
-    Name := 'Jo' + #$E3 + 'o';
+    Name := 'João';
+    Check((StringCodePage(Name) = 1252) and (Length(Name) = 4) and (Ord(Name[3]) = $E3),
+      'Legacy text fixture preserves its declared code page and bytes');
     Check(PercentEncode(Name) = 'Jo%C3%A3o', 'Legacy code page converts query text to UTF-8');
     Query.Add('search=' + Name);
     Check(EncodeQuery(Query) = 'search=Jo%C3%A3o', 'Legacy query values use UTF-8 on the wire');

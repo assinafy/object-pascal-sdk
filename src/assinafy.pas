@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, fpjson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.2.0';
+  AssinafyVersion = '0.2.1';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 
