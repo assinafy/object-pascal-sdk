@@ -1,6 +1,7 @@
 program HTTPTests;
 
 {$mode objfpc}{$H+}{$ASSERTIONS ON}
+{$codepage utf8}
 
 uses
   {$ifdef unix}cthreads,{$endif}
@@ -16,12 +17,17 @@ var
   Response: TAssinafyResponse;
   Body: TJSONObject;
   Query: TStringList;
+  Transport: TAssinafyCurlTransport;
+  Request: TAssinafyRequest;
+  Headers: TStringList;
   Codes: array[0..2] of string = ('redirect', 'rate-limit', 'html-error');
   Expected: array[0..2] of Integer = (302, 429, 503);
   I: Integer;
+  Media: string;
+  MediaTypes: array[0..1] of string = ('image/png', 'image/jpeg');
 begin
   Client := TAssinafyClient.Create('test-key', 'account', ParamStr(1));
-  Body := TJSONObject.Create(['name', 'name & space', 'enabled', False]);
+  Body := TJSONObject.Create(['name', 'João 😀 & space', 'enabled', False]);
   Query := TStringList.Create;
   try
     Response := Client.GetAccount('');
@@ -29,6 +35,9 @@ begin
       Check(Response.Data.FindPath('key').AsString = 'test-key', 'API key reaches HTTP server');
       Check(Response.Data.FindPath('method').AsString = 'GET', 'GET verb reaches HTTP server');
     finally Response.Free; end;
+    Client.Free;
+    Client := nil;
+    Client := TAssinafyClient.Create('', '', ParamStr(1));
     Client.AccessToken := 'test-bearer';
     Response := Client.GetUser;
     try
@@ -36,20 +45,59 @@ begin
       Check(Response.Data.FindPath('key').AsString = '', 'Bearer suppresses API key');
     finally Response.Free; end;
     Response := Client.RenameDocument('document', Body);
-    try Check(Response.Data.FindPath('body.name').AsString = 'name & space', 'PATCH JSON payload'); finally Response.Free; end;
+    try Check(Response.Data.FindPath('body.name').AsString = UTF8String('João 😀 & space'), 'PATCH Unicode JSON payload'); finally Response.Free; end;
     Query.Add('search=Ana & Joao');
     Query.Add('page=1');
-    Response := Client.ListDocuments('', Query);
+    Response := Client.ListDocuments('account', Query);
     try
       Check(Pos('search=Ana%20%26%20Joao', Response.Data.FindPath('path').AsString) > 0, 'Wire query encoding');
       Check(Response.Header('X-Pagination-Current-Page') = '1', 'Wire pagination header');
     finally Response.Free; end;
-    Response := Client.UploadDocument('', ParamStr(2));
+    Query.Values['search'] := 'João';
+    Response := Client.ListDocuments('account', Query);
+    try Check(Pos('search=Jo%C3%A3o', Response.Data.FindPath('path').AsString) > 0, 'Unicode query bytes reach server'); finally Response.Free; end;
+    Response := Client.UploadDocument('account', ParamStr(2));
     try
       Check(Response.Data.FindPath('file_field').AsString = 'file', 'Multipart field name');
       Check(Response.Data.FindPath('file_size').AsInteger = 15, 'Multipart binary file size');
       Check(Response.Data.FindPath('valid_file').AsBoolean, 'Multipart binary bytes');
+      Check(Response.Data.FindPath('file_name').AsString = 'fixture.pdf', 'Multipart filename retained');
+      Check(Response.Data.FindPath('file_media').AsString = 'application/pdf', 'Document part content type');
     finally Response.Free; end;
+    Response := Client.UploadAccountLogo('account', ParamStr(2));
+    try
+      Check(Response.Data.FindPath('file_field').AsString = 'file', 'Logo multipart field');
+      Check(Response.Data.FindPath('file_media').AsString = 'application/octet-stream', 'Logo part content type');
+      Check(Response.Data.FindPath('valid_file').AsBoolean, 'Logo upload bytes');
+    finally Response.Free; end;
+    for Media in MediaTypes do
+    begin
+      Response := Client.UploadAccountLogo('account', ParamStr(2), Media);
+      try
+        Check(Response.Data.FindPath('file_media').AsString = Media, 'Explicit logo part content type');
+        Check(Response.Data.FindPath('valid_file').AsBoolean, 'Explicit logo type preserves binary bytes');
+      finally Response.Free; end;
+    end;
+    Transport := TAssinafyCurlTransport.Create;
+    Headers := TStringList.Create;
+    try
+      Headers.Add('Expect: 100-continue');
+      Request := Default(TAssinafyRequest);
+      Request.Method := 'POST';
+      Request.URL := ParamStr(1) + '/snapshot';
+      Request.Headers := Headers;
+      Request.FileName := ParamStr(2);
+      Request.FileField := 'attachment';
+      Request.ContentType := 'application/pdf';
+      Request.TimeoutMS := 5000;
+      Response := Transport.Execute(Request);
+      try
+        Response.ParseJSON;
+        Check(Response.StatusCode = 200, 'Snapshot fixture HTTP success');
+        Check(Response.Data.FindPath('file_field').AsString = 'attachment', 'Custom multipart field');
+        Check(Response.Data.FindPath('valid_file').AsBoolean, 'Upload retains checked bytes after source replacement');
+      finally Response.Free; end;
+    finally Headers.Free; Transport.Free; end;
     Response := Client.UploadSignatureImage('signer-code', ParamStr(2));
     try
       Check(Response.Data.FindPath('raw_file_valid').AsBoolean, 'Raw signature bytes');
@@ -61,6 +109,17 @@ begin
     try Check(Response.Data.FindPath('access_token').AsString = 'test-access', 'Flat token response through HTTP'); finally Response.Free; end;
     Response := Client.GetOAuthResourceMetadata;
     try Check(Response.Data.FindPath('resource').AsString = 'mock-resource', 'Metadata uses host root'); finally Response.Free; end;
+    try
+      Response := Client.CreateAssignment('protocol-error', Body);
+      Response.Free;
+      raise Exception.Create('Malformed mutation response accepted');
+    except
+      on E: EAssinafyProtocolError do
+      begin
+        Check(E.StatusCode = 201, 'Successful mutation HTTP status survives decode failure');
+        Check(E.ResponseBody = '{"data":{"id":"created-id","name":"\u0000"}}', 'Raw mutation response survives response cleanup');
+      end;
+    end;
     for I := 0 to High(Codes) do
     begin
       try

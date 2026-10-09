@@ -12,7 +12,6 @@ type
   EAssinafyError = class(Exception);
   EAssinafyInputError = class(EAssinafyError);
   EAssinafyTransportError = class(EAssinafyError);
-  EAssinafyProtocolError = class(EAssinafyError);
 
   TAssinafyResponse = class
   private
@@ -29,6 +28,13 @@ type
     procedure SaveToStream(Destination: TStream);
     property JSON: TJSONData read FJSON;
     property Data: TJSONData read GetData;
+  end;
+
+  EAssinafyProtocolError = class(EAssinafyError)
+  public
+    StatusCode: Integer;
+    ResponseBody: RawByteString;
+    constructor Create(const MessageText: string; Response: TAssinafyResponse = nil);
   end;
 
   EAssinafyAPIError = class(EAssinafyError)
@@ -64,20 +70,29 @@ type
     function Execute(const Request: TAssinafyRequest): TAssinafyResponse; override;
   end;
 
-function PercentEncode(const Value: string): string;
+function PercentEncode(const Value: UTF8String): string;
 function EncodeQuery(Query: TStrings): string;
 procedure RequireValue(const Value, Name: string);
+function TrimURLTrailingSlash(const Value: string): string;
 
 implementation
 
 uses
-  ctypes, libcurl, jsonparser;
+  {$ifdef unix}cwstring,{$endif}
+  ctypes, libcurl, jsonparser, jsonscanner;
+
+const
+  MaxUploadBytes = 25 * 1024 * 1024;
+  // Free Pascal 3.2.2 lacks these names; values follow libcurl's stable C ABI.
+  CurlOptMimePost = CURLoption(10269);
+  CurlSSLVersionTLS12 = clong(6);
 
 function curl_mime_init(Handle: PCURL): Pointer; cdecl; external 'curl';
 procedure curl_mime_free(Mime: Pointer); cdecl; external 'curl';
 function curl_mime_addpart(Mime: Pointer): Pointer; cdecl; external 'curl';
 function curl_mime_name(Part: Pointer; Name: PChar): CURLcode; cdecl; external 'curl';
-function curl_mime_filedata(Part: Pointer; FileName: PChar): CURLcode; cdecl; external 'curl';
+function curl_mime_data(Part: Pointer; Data: PChar; Size: csize_t): CURLcode; cdecl; external 'curl';
+function curl_mime_filename(Part: Pointer; FileName: PChar): CURLcode; cdecl; external 'curl';
 function curl_mime_type(Part: Pointer; MimeType: PChar): CURLcode; cdecl; external 'curl';
 
 procedure RequireValue(const Value, Name: string);
@@ -88,7 +103,14 @@ begin
     raise EAssinafyInputError.Create(Name + ' contains a control character');
 end;
 
-function PercentEncode(const Value: string): string;
+function TrimURLTrailingSlash(const Value: string): string;
+begin
+  Result := Value;
+  while (Result <> '') and (Result[Length(Result)] = '/') do
+    Delete(Result, Length(Result), 1);
+end;
+
+function PercentEncode(const Value: UTF8String): string;
 const
   Hex = '0123456789ABCDEF';
 var
@@ -133,15 +155,50 @@ begin
   inherited Destroy;
 end;
 
+constructor EAssinafyProtocolError.Create(const MessageText: string; Response: TAssinafyResponse);
+begin
+  inherited Create(MessageText);
+  if Response <> nil then
+  begin
+    StatusCode := Response.StatusCode;
+    ResponseBody := Response.Body;
+  end;
+end;
+
 procedure TAssinafyResponse.ParseJSON;
+var
+  Parser: TJSONParser;
+  I: SizeInt;
 begin
   FreeAndNil(FJSON);
   if Body = '' then Exit;
+  if Pos(#0, Body) > 0 then
+    raise EAssinafyProtocolError.Create('The API returned invalid JSON', Self);
+  if UTF8Encode(UTF8Decode(Body)) <> Body then
+    raise EAssinafyProtocolError.Create('The API returned invalid UTF-8', Self);
+  I := 1;
+  while I <= Length(Body) do
+  begin
+    if Body[I] = '\' then
+    begin
+      // FPC 3.2.2 drops escaped NUL; reject it rather than alter API values.
+      if Copy(Body, I, 6) = '\u0000' then
+        raise EAssinafyProtocolError.Create('Escaped NUL is unsupported by the JSON parser', Self);
+      Inc(I);
+    end;
+    Inc(I);
+  end;
   try
-    FJSON := GetJSON(Body, True);
+    Parser := TJSONParser.Create(Body, [joUTF8, joStrict]);
+    try
+      FJSON := Parser.Parse;
+      if FJSON = nil then raise EAssinafyProtocolError.Create('Missing JSON value');
+    finally
+      Parser.Free;
+    end;
   except
     on E: Exception do
-      raise EAssinafyProtocolError.Create('The API returned invalid JSON');
+      raise EAssinafyProtocolError.Create('The API returned invalid JSON', Self);
   end;
 end;
 
@@ -243,6 +300,7 @@ var
   Status: clong;
   Buffer: TStringStream;
   Upload: TFileStream;
+  UploadSize: Int64;
   Payload, HeaderLine: RawByteString;
 begin
   Handle := curl_easy_init;
@@ -264,7 +322,7 @@ begin
       CheckCurl(curl_easy_setopt(Handle, CURLOPT_FOLLOWLOCATION, [clong(0)]));
       CheckCurl(curl_easy_setopt(Handle, CURLOPT_SSL_VERIFYPEER, [clong(1)]));
       CheckCurl(curl_easy_setopt(Handle, CURLOPT_SSL_VERIFYHOST, [clong(2)]));
-      CheckCurl(curl_easy_setopt(Handle, CURLOPT_SSLVERSION, [clong(6)]));
+      CheckCurl(curl_easy_setopt(Handle, CURLOPT_SSLVERSION, [CurlSSLVersionTLS12]));
       CheckCurl(curl_easy_setopt(Handle, CURLOPT_PROTOCOLS, [clong(CURLPROTO_HTTP or CURLPROTO_HTTPS)]));
       if Request.CAFile <> '' then
         CheckCurl(curl_easy_setopt(Handle, CURLOPT_CAINFO, [PChar(Request.CAFile)]));
@@ -283,8 +341,12 @@ begin
       if Request.FileName <> '' then
       begin
         Upload := TFileStream.Create(Request.FileName, fmOpenRead or fmShareDenyWrite);
-        if (Request.FileField = 'file') and (Upload.Size > 25 * 1024 * 1024) then
+        UploadSize := Upload.Size;
+        if (UploadSize < 0) or (UploadSize > MaxUploadBytes) then
           raise EAssinafyInputError.Create('File exceeds 25 MiB');
+        SetLength(Payload, UploadSize);
+        if UploadSize > 0 then Upload.ReadBuffer(Payload[1], Length(Payload));
+        FreeAndNil(Upload);
         if Request.FileField <> '' then
         begin
           Mime := curl_mime_init(Handle);
@@ -292,16 +354,11 @@ begin
           Part := curl_mime_addpart(Mime);
           if Part = nil then raise EAssinafyTransportError.Create('Cannot allocate multipart file');
           CheckCurl(curl_mime_name(Part, PChar(Request.FileField)));
-          CheckCurl(curl_mime_filedata(Part, PChar(Request.FileName)));
+          CheckCurl(curl_mime_data(Part, PChar(Payload), Length(Payload)));
+          CheckCurl(curl_mime_filename(Part, PChar(ExtractFileName(Request.FileName))));
           CheckCurl(curl_mime_type(Part, PChar(Request.ContentType)));
-          CheckCurl(curl_easy_setopt(Handle, CURLoption(10269), [Mime]));
-        end
-        else
-        begin
-          if Upload.Size > 25 * 1024 * 1024 then
-            raise EAssinafyInputError.Create('Image exceeds 25 MiB');
-          SetLength(Payload, Upload.Size);
-          if Upload.Size > 0 then Upload.ReadBuffer(Payload[1], Upload.Size);
+          CheckCurl(curl_easy_setopt(Handle, CurlOptMimePost, [Mime]));
+          Payload := '';
         end;
       end;
       if (Mime = nil) and ((Payload <> '') or (Request.ContentType <> '')) then

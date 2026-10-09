@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, fpjson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.1.0';
+  AssinafyVersion = '0.2.0';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 
@@ -17,11 +17,12 @@ type
 
   TAssinafyClient = class
   private
-    FAPIKey, FAccountID, FBaseURL, FAccessToken, FCAFile: string;
+    FAPIKey, FAccountID, FBaseURL, FOrigin, FAccessToken, FCAFile: string;
     FTransport: TAssinafyTransport;
     FOwnsTransport: Boolean;
     FTimeoutMS: LongInt;
     function PathValue(const Value, Name: string): string;
+    procedure SetAccessToken(const Value: string);
     function Call(const Method, Path: string; Auth: TAssinafyAuth;
       Query: TStrings; Body: TJSONData; const FileName, FileField, ContentType,
       SignerAccessCode: string): TAssinafyResponse;
@@ -32,7 +33,7 @@ type
     property APIKey: string read FAPIKey;
     property AccountID: string read FAccountID;
     property BaseURL: string read FBaseURL;
-    property AccessToken: string read FAccessToken write FAccessToken;
+    property AccessToken: string read FAccessToken write SetAccessToken;
     property TimeoutMS: LongInt read FTimeoutMS write FTimeoutMS;
     property CAFile: string read FCAFile write FCAFile;
     {$I resources.inc}
@@ -50,7 +51,7 @@ var
 begin
   inherited Create;
   RequireValue(ABaseURL, 'Base URL');
-  FBaseURL := ExcludeTrailingPathDelimiter(ABaseURL);
+  FBaseURL := TrimURLTrailingSlash(ABaseURL);
   URI := ParseURI(FBaseURL);
   if Copy(FBaseURL, Length(FBaseURL) - 2, 3) <> '/v1' then
     raise EAssinafyInputError.Create('Base URL must end with /v1');
@@ -61,7 +62,14 @@ begin
     ((LowerCase(URI.Protocol) = 'http') and
      ((URI.Host = '127.0.0.1') or (URI.Host = 'localhost') or (URI.Host = '[::1]') or (URI.Host = '::1'))) then
     raise EAssinafyInputError.Create('Base URL requires HTTPS (HTTP is allowed only on loopback)');
-  if (AAPIKey <> '') then RequireValue(AAPIKey, 'API key');
+  if AAPIKey <> '' then
+  begin
+    RequireValue(AAPIKey, 'API key');
+    RequireValue(AAccountID, 'Workspace ID for API-key authentication');
+  end;
+  URI.Path := '';
+  URI.Document := '';
+  FOrigin := TrimURLTrailingSlash(EncodeURI(URI));
   FAPIKey := AAPIKey;
   FAccountID := AAccountID;
   FTimeoutMS := 30000;
@@ -74,6 +82,17 @@ destructor TAssinafyClient.Destroy;
 begin
   if FOwnsTransport then FTransport.Free;
   inherited Destroy;
+end;
+
+procedure TAssinafyClient.SetAccessToken(const Value: string);
+begin
+  if Value <> '' then
+  begin
+    RequireValue(Value, 'Access token');
+    if FAPIKey <> '' then
+      raise EAssinafyInputError.Create('Choose API key plus workspace ID or OAuth; do not configure both');
+  end;
+  FAccessToken := Value;
 end;
 
 function TAssinafyClient.PathValue(const Value, Name: string): string;
@@ -132,7 +151,7 @@ begin
       end;
       Request.Method := Method;
       if Copy(Path, 1, 12) = '/.well-known' then
-        Request.URL := Copy(FBaseURL, 1, Length(FBaseURL) - 3) + Path
+        Request.URL := FOrigin + Path
       else Request.URL := FBaseURL + Path;
       if Params <> '' then Request.URL := Request.URL + '?' + Params;
       Request.Headers := Headers;

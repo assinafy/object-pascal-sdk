@@ -22,7 +22,8 @@ function VerifyWebhook(const Secret, MessageID, Timestamp, Signatures: string;
 var
   Sent: Int64;
   C: Char;
-  Key, Digest: RawByteString;
+  Key, Digest, SignedBody: RawByteString;
+  Prefix: UTF8String;
   Expected, Entry: string;
   Entries: TStringList;
 begin
@@ -42,7 +43,12 @@ begin
     on E: EAssinafyInputError do Exit;
   end;
   if Key = '' then Exit;
-  Digest := HMACSHA256(Key, MessageID + '.' + Timestamp + '.' + RawBody);
+  Prefix := UTF8Encode(MessageID) + '.' + UTF8Encode(Timestamp) + '.';
+  SignedBody := '';
+  SetLength(SignedBody, Length(Prefix) + Length(RawBody));
+  Move(Prefix[1], SignedBody[1], Length(Prefix));
+  if RawBody <> '' then Move(RawBody[1], SignedBody[Length(Prefix) + 1], Length(RawBody));
+  Digest := HMACSHA256(Key, SignedBody);
   Expected := 'v1,' + EncodeStringBase64(Digest);
   Entries := TStringList.Create;
   try
@@ -60,7 +66,7 @@ function VerifyWebhookHeaders(const Secret: string; Headers: TStrings;
   const RawBody: RawByteString; ToleranceSeconds: Integer): Boolean;
 var
   ID, Timestamp, Signatures, Name, Value: string;
-  I, Split: Integer;
+  I, Split, EqualsAt: Integer;
   HasID, HasTimestamp: Boolean;
 begin
   if Headers = nil then Exit(False);
@@ -72,7 +78,8 @@ begin
   for I := 0 to Headers.Count - 1 do
   begin
     Split := Pos(':', Headers[I]);
-    if Split = 0 then Split := Pos('=', Headers[I]);
+    EqualsAt := Pos('=', Headers[I]);
+    if (EqualsAt > 0) and ((Split = 0) or (EqualsAt < Split)) then Split := EqualsAt;
     if Split = 0 then Continue;
     Name := LowerCase(Trim(Copy(Headers[I], 1, Split - 1)));
     Value := Trim(Copy(Headers[I], Split + 1, MaxInt));

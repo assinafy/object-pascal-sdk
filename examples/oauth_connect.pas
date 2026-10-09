@@ -1,6 +1,7 @@
 program OAuthConnect;
 
 {$mode objfpc}{$H+}
+{$codepage utf8}
 
 uses
   {$ifdef unix}cthreads,{$endif}
@@ -21,7 +22,7 @@ begin
   Config.Resource := GetEnvironmentVariable('ASSINAFY_OAUTH_RESOURCE');
   Config.Scopes := 'account:read documents:read offline_access';
   BaseURL := GetEnvironmentVariable('ASSINAFY_BASE_URL');
-  if BaseURL = '' then BaseURL := AssinafyProductionURL;
+  if BaseURL = '' then BaseURL := AssinafySandboxURL;
   if Config.Issuer = '' then
   begin
     if BaseURL = AssinafySandboxURL then Config.Issuer := 'https://auth-sandbox.assinafy.com.br'

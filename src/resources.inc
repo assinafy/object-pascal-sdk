@@ -9,7 +9,7 @@
     // GET /v1/accounts/{accountId}/logo; payloads: docs/API.md#downloadaccountlogo
     function DownloadAccountLogo(const AAccountId: string): TAssinafyResponse;
     // POST /v1/accounts/{accountId}/logo; payloads: docs/API.md#uploadaccountlogo
-    function UploadAccountLogo(const AAccountId: string; const FileName: string): TAssinafyResponse;
+    function UploadAccountLogo(const AAccountId: string; const FileName: string; const ContentType: string = 'application/octet-stream'): TAssinafyResponse;
     // DELETE /v1/accounts/{accountId}/logo; payloads: docs/API.md#deleteaccountlogo
     function DeleteAccountLogo(const AAccountId: string): TAssinafyResponse;
     // GET /v1/accounts; payloads: docs/API.md#listmyaccounts

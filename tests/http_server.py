@@ -16,12 +16,44 @@ from urllib.parse import urlsplit
 FILE_BYTES = b'%PDF-\x00\xfffixture!'
 
 
+def check(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
     def log_message(self, *args):
         pass
 
     def dispatch(self):
+        try:
+            self.handle_request()
+        except (ValueError, KeyError, TypeError, OSError) as error:
+            self.respond(500, json.dumps({'message': str(error)}).encode())
+
+    def handle_expect_100(self):
+        if urlsplit(self.path).path == '/v1/snapshot':
+            fixture = self.server.fixture
+            replacement = fixture.with_suffix('.replacement')
+            replacement.write_bytes(b'X' * len(FILE_BYTES))
+            replacement.replace(fixture)
+        return super().handle_expect_100()
+
+    def respond(self, status, body, content_type='application/json', extra=None):
+        self.send_response(status)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('X-Pagination-Current-Page', '1')
+        for name, value in (extra or {}).items():
+            self.send_header(name, value)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_request(self):
         path = urlsplit(self.path).path
+        check(not self.headers.get('Transfer-Encoding'), 'Fixture requires Content-Length; chunked requests are unsupported')
         raw = self.rfile.read(int(self.headers.get('Content-Length', 0)))
         status = 200
         content_type = 'application/json'
@@ -42,46 +74,45 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/v1/documents/html-error':
             status = 503
             content_type = 'text/html'
-        elif path.endswith('/documents') and self.command == 'POST':
+        elif self.command == 'POST' and (path.endswith(('/documents', '/logo')) or path == '/v1/snapshot'):
             media = self.headers['Content-Type']
-            assert media.startswith('multipart/form-data; boundary=')
+            check(isinstance(media, str) and media.startswith('multipart/form-data; boundary='), 'Expected multipart body')
             message = BytesParser(policy=policy.default).parsebytes(
                 ('Content-Type: ' + media + '\r\n\r\n').encode() + raw)
             parts = list(message.iter_parts())
-            assert len(parts) == 1
+            check(len(parts) == 1, 'Expected one file part')
             part = parts[0]
             value = part.get_payload(decode=True)
             data.update(file_field=part.get_param('name', header='content-disposition'),
-                        file_size=len(value), valid_file=value == FILE_BYTES)
+                        file_size=len(value), valid_file=value == FILE_BYTES,
+                        file_name=part.get_filename(), file_media=part.get_content_type())
+            if path == '/v1/snapshot':
+                self.server.fixture.write_bytes(FILE_BYTES)
         elif path == '/v1/signature':
-            assert self.headers['Content-Type'] == 'image/png'
-            assert 'signer-access-code=signer-code' in self.path
+            check(self.headers['Content-Type'] == 'image/png', 'Expected raw PNG content type')
+            check('signer-access-code=signer-code' in self.path, 'Expected signer code')
             data['raw_file_valid'] = raw == FILE_BYTES
         elif self.command == 'PATCH':
-            assert self.headers['Content-Type'] == 'application/json'
+            check(self.headers['Content-Type'] == 'application/json', 'Expected JSON content type')
             data['body'] = json.loads(raw)
         if path == '/v1/documents/binary/download/original':
             content_type = 'application/pdf'
             body = FILE_BYTES
         elif path == '/v1/oauth/token':
-            assert not data['key'] and not data['authorization']
-            assert json.loads(raw)
+            check(not data['key'] and not data['authorization'], 'Token exchange must omit workspace credentials')
+            check(json.loads(raw), 'Token request must contain a JSON body')
             body = json.dumps({'access_token': 'test-access', 'token_type': 'Bearer'}).encode()
+        elif path == '/v1/documents/protocol-error/assignments':
+            status = 201
+            body = b'{"data":{"id":"created-id","name":"\\u0000"}}'
         elif path == '/.well-known/oauth-protected-resource':
-            assert not data['key'] and not data['authorization']
+            check(not data['key'] and not data['authorization'], 'Metadata must omit workspace credentials')
             body = json.dumps({'resource': 'mock-resource'}).encode()
         elif content_type == 'text/html':
             body = b'<html>unavailable</html>'
         else:
             body = json.dumps({'status': status, 'message': 'ok', 'data': data}).encode()
-        self.send_response(status)
-        self.send_header('Content-Type', content_type)
-        self.send_header('Content-Length', str(len(body)))
-        self.send_header('X-Pagination-Current-Page', '1')
-        for name, value in extra.items():
-            self.send_header(name, value)
-        self.end_headers()
-        self.wfile.write(body)
+        self.respond(status, body, content_type, extra)
 
     do_GET = dispatch
     do_POST = dispatch
@@ -107,6 +138,7 @@ def main():
         servers[1].socket = context.wrap_socket(servers[1].socket, server_side=True)
         for server in servers:
             server.redirect_followed = False
+            server.fixture = fixture
             threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
             port, tls_port = (server.server_port for server in servers)
@@ -114,7 +146,7 @@ def main():
             subprocess.run([sys.argv[1], f'http://127.0.0.1:{port}/v1', str(fixture),
                             f'https://localhost:{tls_port}/v1', str(certificate),
                             f'https://127.0.0.1:{tls_port}/v1'], check=True, env=environment, timeout=60)
-            assert not servers[0].redirect_followed, 'Credentials followed an HTTP redirect'
+            check(not servers[0].redirect_followed, 'Credentials followed an HTTP redirect')
         finally:
             for server in servers:
                 server.shutdown()

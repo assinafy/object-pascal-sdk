@@ -1,98 +1,121 @@
 # Assinafy Object Pascal SDK
 
-A native Object Pascal client for the [Assinafy API v1](https://api.assinafy.com.br/v1/docs), covering all 106 published REST operations. Use it from a Free Pascal service or a Lazarus application to manage documents, signers, signature requests, templates, fields, tags, workspaces and webhooks.
+Cliente nativo em Object Pascal para a [API Assinafy v1](https://api.assinafy.com.br/v1/docs), com suporte às 106 operações REST publicadas. Use o SDK em serviços Free Pascal ou aplicações Lazarus para gerenciar documentos, signatários, solicitações de assinatura, modelos, campos, etiquetas, espaços de trabalho e webhooks.
 
-The SDK supports API keys, bearer tokens, signer access codes, OAuth2 authorization code flow with mandatory S256 PKCE, and Standard Webhooks signature verification. JSON payloads retain the API’s field names, optional fields, nulls and future additions.
+Este guia acompanha um documento do envio do PDF até a assinatura e o download dos arquivos finais. A [referência da API](docs/API.md) documenta cada método com os esquemas completos de requisição e resposta, exemplos de estrutura, parâmetros, autenticação e erros. Os [esquemas de dados](docs/SCHEMAS.md) definem os modelos compartilhados; a [referência do SDK](docs/SDK.md) explica tipos, gerenciamento de memória, transportes e funções auxiliares. O [contrato OpenAPI](docs/openapi.json) está disponível para ferramentas e consulta offline.
 
-## Start here
+## Sumário
 
-The normal document flow is:
+- [Requisitos e instalação](#requisitos-e-instalação)
+- [Ambientes e configuração](#ambientes-e-configuração)
+- [Escolha da autenticação](#escolha-da-autenticação)
+- [Fluxo completo do documento](#fluxo-completo-do-documento)
+- [Aplicativos de marketplace e OAuth2](#aplicativos-de-marketplace-e-oauth2)
+- [Webhooks assinados](#webhooks-assinados)
+- [Modelos, campos e etiquetas](#modelos-campos-e-etiquetas)
+- [Respostas, paginação e erros](#respostas-paginação-e-erros)
+- [Testes e desenvolvimento](#testes-e-desenvolvimento)
+- [Licença](#licença)
 
-1. Choose the sandbox and authenticate your service, or connect a customer’s workspace with OAuth.
-2. Upload a PDF and save the document ID.
-3. Create or select the signers and save their IDs.
-4. Choose Email, WhatsApp or DigitalCertificate verification and estimate the cost.
-5. Request signatures and give signers their returned signing URLs.
-6. Receive signed webhook deliveries or retrieve document status.
-7. Download the completed document and its certificate or PAdES artifact.
+## Requisitos e instalação
 
-The sections below follow this flow. [API reference](docs/API.md) documents every SDK resource method with its full request/response schemas, payload shapes, parameters, authentication and error responses. [Payload schemas](docs/SCHEMAS.md) defines every shared response model. [SDK reference](docs/SDK.md) documents constructors, response ownership, transports and OAuth/crypto/webhook helpers. The [OpenAPI contract](docs/openapi.json) is included for tooling and offline use.
+- **Free Pascal 3.2.2**, a [versão estável oficial atual](https://www.freepascal.org/download.html). O Free Pascal publica versões estáveis e não possui um canal LTS separado. Projetos Lazarus que usam esse compilador podem incluir as unidades do SDK. O pacote utiliza a FCL do Free Pascal e não é um pacote Delphi.
+- Unidades JSON/base64 da FCL e as interfaces `libcurl` do Free Pascal.
+- **libcurl 7.56 ou superior**, com HTTPS habilitado, certificados de autoridades certificadoras confiáveis e TLS 1.2 ou superior.
+- **OpenSSL 3 libcrypto** para PKCE, geração aleatória de estado e assinaturas de webhooks. O TLS das requisições HTTP usa a implementação configurada na libcurl. Instale versões mantidas dessas bibliotecas pelo gerenciador de pacotes do sistema operacional.
+- Python 3.9 ou superior e a ferramenta de linha de comando do OpenSSL para executar as verificações de desenvolvimento.
 
-## Requirements and installation
-
-- **Free Pascal 3.2.2**, the [current official stable release](https://www.freepascal.org/download.html). Free Pascal publishes stable releases rather than an LTS channel. Lazarus projects using this compiler can include these units. This package uses Free Pascal’s FCL and is not a Delphi package.
-- FCL JSON/base64 units and the Free Pascal `libcurl` bindings.
-- **libcurl 7.56 or newer**, with HTTPS enabled, a trusted CA store, and TLS 1.2 or newer.
-- **OpenSSL 3 libcrypto** for PKCE, random state values and webhook signatures. HTTP TLS uses libcurl’s configured TLS backend. Install maintained releases of the native libraries through your operating system.
-- Python 3.9 or newer and OpenSSL’s command-line tool for development checks.
-
-Clone the repository and add `src` to your compiler’s unit and include paths:
+Clone o repositório e adicione `src` aos caminhos de unidades e arquivos de inclusão do compilador:
 
 ```sh
 git clone https://github.com/assinafy/object-pascal-sdk.git
 cd object-pascal-sdk
-fpc -Fu./src -Fi./src -FU./build -FE./build your_program.pas
+mkdir -p build
+fpc -Fu./src -Fi./src -FU./build -FE./build seu_programa.pas
 ```
 
-Create `build` first with `mkdir -p build`. In Lazarus, add `src` to **Project Options → Compiler Options → Paths → Other unit files** and **Include files**. Use `Assinafy` and `AssinafyHttp` in your application. Console programs on Unix should place `cthreads` first in `uses` when using threads.
+No Lazarus, adicione `src` em **Project Options → Compiler Options → Paths → Other unit files** e **Include files**. Inclua `Assinafy` e `AssinafyHttp` na aplicação. Programas de console em Unix que usam threads devem colocar `cthreads` primeiro na cláusula `uses`.
 
-On Ubuntu/Debian, install the compiler units and native development libraries:
+No Ubuntu/Debian, instale as unidades do compilador e as bibliotecas nativas de desenvolvimento:
 
 ```sh
 sudo apt-get install fp-compiler fp-units-fcl fp-units-net libcurl4-openssl-dev libssl-dev
 ```
 
-On macOS:
+No macOS:
 
 ```sh
 brew install fpc openssl@3
 export DYLD_LIBRARY_PATH="$(brew --prefix openssl@3)/lib"
 ```
 
-Linux and macOS are the CI targets. Windows requires matching Free Pascal units, a libcurl import library/runtime, a CA store and an OpenSSL 3 runtime matching the executable’s architecture; Windows builds have not been qualified by this project.
+O processo da aplicação precisa localizar `libcrypto.3.dylib` para utilizar OAuth e verificar assinaturas de webhooks. Com o OpenSSL instalado pelo Homebrew, configure `DYLD_LIBRARY_PATH` antes de iniciar a aplicação, inclusive quando ela for executada fora do terminal.
 
-## Configure an environment
+A integração contínua executa os testes em Linux e macOS. No Windows, são necessárias unidades Free Pascal compatíveis, biblioteca de importação e runtime da libcurl, certificados de autoridades confiáveis e runtime OpenSSL 3 com a mesma arquitetura do executável. As compilações Windows ainda não foram validadas neste projeto.
 
-| Setting | Sandbox | Production |
+## Ambientes e configuração
+
+| Configuração | Sandbox | Produção |
 | --- | --- | --- |
-| API base URL | `https://sandbox.assinafy.com.br/v1` | `https://api.assinafy.com.br/v1` |
-| Application | `https://app-sandbox.assinafy.com.br` | `https://app.assinafy.com.br` |
-| OAuth issuer | `https://auth-sandbox.assinafy.com.br` | `https://auth.assinafy.com.br` |
+| URL base da API | `https://sandbox.assinafy.com.br/v1` | `https://api.assinafy.com.br/v1` |
+| Aplicação | `https://app-sandbox.assinafy.com.br` | `https://app.assinafy.com.br` |
+| Emissor OAuth | `https://auth-sandbox.assinafy.com.br` | `https://auth.assinafy.com.br` |
 
-Create an API key in the application’s account settings and note the workspace ID. Keep API keys and confidential OAuth secrets on a server you control. For software shipped to customers, connect their workspace through OAuth and store tokens in the operating system’s secure credential storage or in your service’s encrypted credential store.
+Use credenciais próprias de cada ambiente. URLs da API exigem HTTPS e terminam em `/v1`. HTTP é aceito somente para testes locais em loopback. Mantenha a API, o emissor OAuth e a aplicação registrada no mesmo ambiente.
 
-The SDK takes credentials explicitly. The runnable examples read these environment variables; they do not load `.env` files automatically:
+O SDK recebe as credenciais explicitamente. Os exemplos executáveis leem as variáveis abaixo diretamente do ambiente; configure apenas as variáveis do modo de autenticação escolhido:
 
-| Variable | Purpose |
+| Variável | Finalidade |
 | --- | --- |
-| `ASSINAFY_API_KEY` | Workspace API key sent in `X-Api-Key`. |
-| `ASSINAFY_ACCOUNT_ID` | Default workspace ID for account-scoped calls. |
-| `ASSINAFY_BASE_URL` | Complete API URL ending in `/v1`. |
-| `ASSINAFY_ACCESS_TOKEN` | Access token sent in `Authorization: Bearer`. Takes precedence over the API key. |
-| `ASSINAFY_CLIENT_ID` | Registered OAuth application’s public identifier. |
-| `ASSINAFY_CLIENT_SECRET` | Confidential OAuth application secret; omit for public applications. |
-| `ASSINAFY_REDIRECT_URI` | Exactly registered HTTPS callback URL. |
-| `ASSINAFY_OAUTH_ISSUER` | Issuer from protected-resource discovery. |
-| `ASSINAFY_OAUTH_RESOURCE` | Optional resource indicator from discovery. |
+| `ASSINAFY_BASE_URL` | URL completa da API, terminada em `/v1`. |
+| `ASSINAFY_API_KEY` | Chave de API para integração direta. Use com `ASSINAFY_ACCOUNT_ID`. |
+| `ASSINAFY_ACCOUNT_ID` | Identificador do espaço de trabalho para integração direta. No fluxo OAuth, o exemplo obtém esse identificador pela API. |
+| `ASSINAFY_ACCESS_TOKEN` | Token de acesso obtido pelo OAuth. Use sem chave de API. |
+| `ASSINAFY_CLIENT_ID` | Identificador público da aplicação OAuth registrada. |
+| `ASSINAFY_CLIENT_SECRET` | Segredo da aplicação OAuth confidencial; omita em aplicações públicas. |
+| `ASSINAFY_REDIRECT_URI` | URL HTTPS de retorno, exatamente como registrada. |
+| `ASSINAFY_OAUTH_ISSUER` | Emissor obtido pela descoberta do recurso protegido. |
+| `ASSINAFY_OAUTH_RESOURCE` | Indicador opcional de recurso obtido pela descoberta. |
 
-[.env.example](.env.example) contains empty credential values and reserved example domains. Keep local credential files ignored. Secrets and personal contact details do not belong in source control or documentation.
+Consulte [.env.example](.env.example) para os nomes das configurações e URLs de exemplo. Os dois programas executáveis usam o sandbox quando `ASSINAFY_BASE_URL` não está definida. Armazene as credenciais em um cofre de segredos adequado ao ambiente da aplicação.
 
-## Authenticate and read a workspace
+## Escolha da autenticação
+
+Escolha **um** dos dois modos para a integração:
+
+| Modo | Configuração | Uso |
+| --- | --- | --- |
+| Chave de API + ID do espaço de trabalho | `AAPIKey` e `AAccountID` no construtor; cabeçalho `X-Api-Key`. | Automatizar o seu próprio espaço de trabalho em um serviço sob seu controle. |
+| OAuth2 | Cliente sem chave de API; `AccessToken` obtido após consentimento; cabeçalho `Authorization: Bearer`. | Conectar o espaço de trabalho de um cliente ao seu aplicativo com as permissões autorizadas por ele. |
+
+Uma chave de API exige o ID do espaço de trabalho. OAuth não exige chave de API: o usuário escolhe o espaço de trabalho durante o consentimento, e `ListMyAccounts` retorna seu identificador. Esse ID é usado nos caminhos das operações da conta. O SDK rejeita a configuração simultânea de chave de API e token Bearer; use clientes separados para conexões diferentes.
+
+### Integração direta
+
+Crie uma chave de API nas configurações da conta e anote o ID do espaço de trabalho:
 
 ```pascal
+program ConsultarConta;
+
+{$mode objfpc}{$H+}
+{$codepage utf8}
+
 uses
+  {$ifdef unix}cthreads,{$endif}
   SysUtils, Assinafy, AssinafyHttp;
 
 var
   Client: TAssinafyClient;
   Response: TAssinafyResponse;
+  AccountID: string;
 begin
+  AccountID := GetEnvironmentVariable('ASSINAFY_ACCOUNT_ID');
   Client := TAssinafyClient.Create(
     GetEnvironmentVariable('ASSINAFY_API_KEY'),
-    GetEnvironmentVariable('ASSINAFY_ACCOUNT_ID'),
+    AccountID,
     AssinafySandboxURL);
   try
-    Response := Client.GetAccount('');
+    Response := Client.GetAccount(AccountID);
     try
       WriteLn(Response.Data.AsJSON);
     finally
@@ -101,26 +124,50 @@ begin
   finally
     Client.Free;
   end;
+end.
 ```
 
-An empty account argument uses the constructor’s workspace ID. Every other path ID must be supplied. With a bearer token, set `Client.AccessToken`. Public methods omit workspace credentials; signer methods send only their signer access code. A client supplied with an external transport borrows that transport; otherwise it owns its default libcurl transport. Use one client per worker/thread and do not change its credentials concurrently.
+Um argumento de conta vazio, como em `Client.GetAccount('')`, usa o identificador informado ao construtor. Os demais identificadores de caminho são obrigatórios. Mantenha a chave de API em um servidor sob seu controle.
 
-Every call returns a response you own. `Response.JSON` contains the entire response, and `Response.Data` borrows the envelope’s `data`. Flat OAuth responses are returned intact through both properties. Free the response after reading either property. The SDK borrows request bodies and query lists; free them yourself. `TJSONObject.Add` and `TJSONArray.Add` take ownership of child JSON values.
+### Conexão OAuth2
 
-Typical JSON responses:
-
-```json
-{
-  "status": 200,
-  "message": "Success",
-  "data": {"id": "workspace-id", "name": "Example Workspace"}
-}
-```
-
-## Upload a document
+Após concluir o [consentimento OAuth](#aplicativos-de-marketplace-e-oauth2), utilize somente o token de acesso retornado:
 
 ```pascal
-Response := Client.UploadDocument('', 'contract.pdf');
+Client := TAssinafyClient.Create('', '', AssinafySandboxURL);
+Client.AccessToken := SavedAccessToken;
+Response := Client.ListMyAccounts;
+try
+  AccountID := TJSONArray(Response.Data).Items[0].FindPath('id').AsString;
+finally
+  Response.Free;
+end;
+// Salve AccountID junto dos tokens e use-o nas operações da conta.
+Response := Client.GetAccount(AccountID);
+Response.Free;
+```
+
+Cada token OAuth corresponde ao espaço de trabalho autorizado. Salve o ID retornado junto da conexão. O exemplo pressupõe a resposta documentada com o espaço de trabalho autorizado; trate respostas inesperadas na aplicação. Proteja os tokens no cofre de credenciais do sistema operacional ou em um armazenamento criptografado do serviço.
+
+Operações públicas e operações do signatário podem usar um cliente sem credenciais da conta. Métodos públicos não enviam chave de API ou token; métodos de signatário enviam apenas seu código de acesso. Os métodos de login e gerenciamento de sessão de usuário também permanecem disponíveis na [referência da API](docs/API.md), com autenticação e permissões próprias.
+
+## Fluxo completo do documento
+
+Com `Client` autenticado e `AccountID` definido pelo modo escolhido, siga estas etapas:
+
+1. Envie o PDF e salve o identificador do documento.
+2. Crie ou reutilize os signatários e salve seus identificadores.
+3. Escolha a verificação, estime o custo e solicite as assinaturas.
+4. Disponibilize as URLs aos respectivos signatários para que concluam a assinatura.
+5. Acompanhe a conclusão por webhook ou consulta de estado e baixe os arquivos finais.
+
+Os trechos abaixo usam as unidades `Classes`, `SysUtils`, `fpjson`, `Assinafy` e `AssinafyHttp`. Inclua também `AssinafyOAuth` para as funções OAuth e `AssinafyWebhooks` para verificar entregas. Os programas completos estão em [examples](examples).
+
+### 1. Enviar o PDF
+
+```pascal
+Client.TimeoutMS := 180000;
+Response := Client.UploadDocument(AccountID, 'contrato.pdf');
 try
   DocumentID := Response.Data.FindPath('id').AsString;
 finally
@@ -128,19 +175,23 @@ finally
 end;
 ```
 
-The API takes a multipart `file` containing PDF bytes; the SDK streams the file through libcurl’s MIME API. The published limits are 25 MB and 2,000 pages. Upload processing is asynchronous. A virtual signature request can be created in `uploaded`, `metadata_processing` or `metadata_ready`. A request collecting fields must wait until `metadata_ready`, because its placements reference processed pages. Check `GetDocument` or subscribe to `document_metadata_ready`; stop on processing failure rather than polling indefinitely.
+A API recebe os bytes do PDF no campo multipart `file`; o SDK envia o arquivo pela API MIME da libcurl. Os limites publicados são 25 MB e 2.000 páginas. O processamento é assíncrono. Uma solicitação de assinatura virtual pode ser criada nos estados `uploaded`, `metadata_processing` ou `metadata_ready`. Solicitações que coletam campos precisam aguardar `metadata_ready`, pois o posicionamento depende das páginas processadas. Consulte `GetDocument` ou assine o evento `document_metadata_ready`; interrompa a espera se o processamento falhar.
 
-The response’s document includes `id`, `name`, `status`, `pages`, `artifacts`, tags and timestamps. Full fields and nullability are in [Document](docs/SCHEMAS.md#document).
+O documento retornado inclui `id`, `name`, `status`, `pages`, `artifacts`, etiquetas e datas. Os campos completos e seus valores nulos permitidos estão em [Document](docs/SCHEMAS.md#document).
 
-## Create or select signers
+Cada arquivo de envio é lido uma única vez para um buffer limitado a 25 MiB. Os bytes enviados não mudam se o caminho do arquivo for substituído depois da leitura. Envios multipart podem utilizar até 50 MiB de memória temporária por processo de trabalho, além das respostas recebidas; dimensione a quantidade de envios simultâneos.
+
+O timeout padrão de 30 segundos limita a transferência inteira, incluindo a resposta do servidor. Ajuste `TimeoutMS` antes do envio conforme o tamanho do arquivo, a velocidade da conexão e o tempo de processamento; o exemplo permite três minutos. Um timeout não confirma que o envio falhou no servidor: consulte o estado antes de repetir uma operação de criação.
+
+### 2. Criar ou reutilizar signatários
 
 ```pascal
 SignerBody := TJSONObject.Create([
-  'full_name', 'Example Signer',
+  'full_name', 'Signatário de exemplo',
   'email', 'signer@example.com'
 ]);
 try
-  Response := Client.CreateSigner('', SignerBody);
+  Response := Client.CreateSigner(AccountID, SignerBody);
   try
     SignerID := Response.Data.FindPath('id').AsString;
   finally
@@ -151,11 +202,11 @@ finally
 end;
 ```
 
-Use `ListSigners` with a search query to reuse an existing signer. Additional signer fields include `whatsapp_phone_number` in E.164 format and `government_id` for CPF/CNPJ. `UpdateSigner` sends only your supplied fields. Signer IDs belong to their workspace; retain the workspace ID with each record.
+Use `ListSigners` com um parâmetro de busca para reutilizar um signatário existente. Os campos adicionais incluem `whatsapp_phone_number` no formato E.164 e `government_id` para CPF/CNPJ. `UpdateSigner` envia somente os campos fornecidos. Os identificadores de signatário pertencem ao respectivo espaço de trabalho; salve o identificador da conta junto de cada registro.
 
-## Estimate and request signatures
+### 3. Estimar o custo e solicitar assinaturas
 
-Build one assignment body and use it for estimation and creation:
+Monte um único corpo de requisição para a estimativa e a criação:
 
 ```pascal
 AssignmentBody := TJSONObject.Create(['method', 'virtual']);
@@ -164,12 +215,14 @@ try
   AssignmentBody.Add('signers', Signers);
   Signers.Add(TJSONObject.Create([
     'id', SignerID,
-    'verification_method', 'Email'
+    'verification_method', 'Email',
+    'notification_methods', TJSONArray.Create(['Email'])
   ]));
-  AssignmentBody.Add('message', 'Please review and sign');
+  AssignmentBody.Add('message', 'Por favor, revise e assine');
   Response := Client.EstimateAssignmentCost(DocumentID, AssignmentBody);
   try
-    WriteLn(Response.Data.AsJSON);
+    if not Response.Data.FindPath('has_sufficient_resources').AsBoolean then
+      raise Exception.Create('Recursos insuficientes para solicitar assinaturas');
   finally
     Response.Free;
   end;
@@ -184,21 +237,21 @@ finally
 end;
 ```
 
-The request uses `signers: [{"id": "signer-id"}]`. It can also include `entries`, `message`, `expires_at` and `copy_receivers`. Explicit expiration must be at least one hour ahead. `method: collect` places fields using page IDs, field IDs, signer IDs and display settings. See [CreateAssignment](docs/API.md#createassignment) for the complete request and [Assignment](docs/SCHEMAS.md#assignment) for the full response.
+A requisição usa `signers: [{"id": "signer-id"}]`. Também pode incluir `entries`, `message`, `expires_at` e `copy_receivers`. Uma expiração explícita deve estar pelo menos uma hora no futuro. `method: collect` posiciona campos usando identificadores de página, campo e signatário, além das configurações de exibição. Consulte [CreateAssignment](docs/API.md#createassignment) para a requisição completa e [Assignment](docs/SCHEMAS.md#assignment) para a resposta completa.
 
-The assignment response includes its ID, signers, summary, items and `signing_urls`. Send each returned URL only to its intended signer. `step` defines signing order: all signers must specify contiguous steps starting at 1 when you use sequencing; signers in a shared step work in parallel. Later steps receive invitations when the previous step finishes.
+A estimativa informa `has_sufficient_resources`, `blocking_reason`, saldo e detalhamento dos custos. Confirme os recursos antes da criação. A resposta da solicitação inclui seu identificador, signatários, resumo, itens e `signing_urls`. Envie cada URL somente ao signatário correspondente. `step` define a ordem das assinaturas: ao usar etapas, todos os signatários precisam informar uma sequência contínua iniciada em 1; signatários da mesma etapa assinam em paralelo. As etapas seguintes recebem convites quando a anterior termina.
 
-### Email, WhatsApp and A1/A3 certificates
+#### E-mail, WhatsApp e certificados A1/A3
 
-| Verification | Notification | Preparation |
+| Verificação | Notificação | Preparação |
 | --- | --- | --- |
-| `Email` | `Email` | Signer has an email; email OTP is required before signing. |
-| `Whatsapp` | `Whatsapp` | Signer has an E.164 WhatsApp number; account has a paid subscription. |
-| `DigitalCertificate` | `Email` or `Whatsapp` | Account has the Digital Certificate feature; signer has the required CPF/CNPJ; each certificate signer is alone in its signing step. |
+| `Email` | `Email` | O signatário possui e-mail; um código de uso único é exigido antes da assinatura. |
+| `Whatsapp` | `Whatsapp` | O signatário possui número WhatsApp em E.164; a conta possui assinatura paga. |
+| `DigitalCertificate` | `Email` ou `Whatsapp` | A conta possui o recurso de certificado digital; o signatário possui o CPF/CNPJ exigido e fica sozinho em sua etapa de assinatura. |
 
-`notification_methods` takes exactly one entry. Omit verification and notification to default to Email, or send one side and let the API infer the matching side. The server rejects incompatible pairings. Use estimation responses for current prices and feature entitlements.
+`notification_methods` aceita exatamente uma entrada. Omita verificação e notificação para usar e-mail como padrão, ou informe uma delas para que a API deduza a outra. O servidor rejeita combinações incompatíveis. Consulte as estimativas para obter preços atuais e verificar os recursos habilitados para a conta.
 
-A certificate request is ordinary assignment JSON:
+Uma solicitação com certificado usa o mesmo formato JSON de criação:
 
 ```json
 {
@@ -212,20 +265,44 @@ A certificate request is ordinary assignment JSON:
 }
 ```
 
-Assinafy’s signing page uses the signer’s ICP-Brasil A1/A3 certificate through its Web PKI browser extension. A CPF requires the corresponding person’s certificate; a CNPJ requires an e-CNPJ for that company. The SDK creates and follows these requests and retrieves the resulting PAdES document. Device certificates and private keys remain with the signer. The published specification mentions certificate start/complete routes but does not define their request/response contract; use the returned signing URL for that ceremony.
+A página de assinatura da Assinafy utiliza o certificado ICP-Brasil A1/A3 do signatário pela extensão Web PKI do navegador. A1 e A3 usam o mesmo valor `DigitalCertificate`; o que muda é o armazenamento da chave privada no dispositivo. Um CPF exige o certificado da pessoa correspondente; um CNPJ exige o e-CNPJ da empresa. O SDK cria e acompanha essas solicitações e obtém o documento PAdES resultante. Os certificados e as chaves privadas permanecem com o signatário. A especificação publicada menciona rotas de início e conclusão da assinatura com certificado, mas não define seus contratos de requisição e resposta; use a URL de assinatura retornada para concluir esse processo.
 
-Signer-facing REST methods support one-time access codes, OTP verification, data confirmation, terms, field submission, rejection and signature PNGs. They are documented in [API reference](docs/API.md). A signer code is sensitive; avoid logging signing URLs and query strings. DigitalCertificate signers must complete the certificate ceremony rather than submit the ordinary `SignAssignmentItems` request.
+### 4. Concluir o fluxo do signatário
 
-## Follow completion and download artifacts
+A página de assinatura retornada em `signing_urls` conduz o signatário pela verificação de identidade, confirmação de dados, termos e assinatura. Para uma experiência própria, use os métodos REST do signatário com os códigos recebidos pelo canal de entrega:
 
-`GetDocument` retrieves status. `ListDocumentActivities`, `ListAssignments` and `ListWhatsAppNotifications` provide the published activity and notification views. Use `EstimateResendCost` before `ResendSignatureRequest`; resending may consume credits. `ResetAssignmentExpiration` requires the documented expiration JSON. Handle rejection and expiration as terminal states in your application.
+```pascal
+SignerClient := TAssinafyClient.Create('', '', AssinafySandboxURL);
+try
+  Response := SignerClient.GetCurrentSigner(SignerAccessCode);
+  Response.Free;
+  VerificationBody := TJSONObject.Create(['verification-code', VerificationCode]);
+  try
+    Response := SignerClient.VerifySignerCode(SignerAccessCode, VerificationBody);
+    Response.Free;
+  finally
+    VerificationBody.Free;
+  end;
+  // Confirme os dados e os termos antes de concluir a assinatura.
+finally
+  SignerClient.Free;
+end;
+```
 
-After signing and certification, inspect the document’s `artifacts` before downloading. Artifact names include `original`, `certificated`, `certificate-page`, `pades` and `bundle`. Availability depends on document state and signing method. Use `pades` for the version retaining ICP-Brasil signatures; certification can flatten those signatures in the `certificated` PDF.
+`ConfirmSignerData` confirma os dados de cada documento e `AcceptTerms` registra a aceitação dos termos. Consulte a atribuição antes de enviar os campos exigidos por `SignAssignmentItems`, ou use `SignMultipleDocuments` para documentos com método virtual. Os parâmetros e os corpos completos de cada operação estão na [referência da API](docs/API.md). A consulta da atribuição registra sua visualização pelo signatário; use-a durante o fluxo de assinatura.
+
+Os métodos também permitem rejeição e envio de imagens PNG de assinatura. Trate o código de acesso e o código OTP como credenciais e evite registrar URLs de assinatura ou seus parâmetros. Signatários `DigitalCertificate` concluem o processo com certificado na página de assinatura; `SignAssignmentItems` não substitui esse processo.
+
+### 5. Acompanhar a conclusão e baixar arquivos
+
+`GetDocument` consulta o estado do documento. `ListDocumentActivities`, `ListAssignments` e `ListWhatsAppNotifications` mostram atividades, solicitações e notificações. Use `EstimateResendCost` antes de `ResendSignatureRequest`, pois o reenvio pode consumir créditos. `ResetAssignmentExpiration` exige o JSON de expiração documentado. Trate rejeição e expiração como estados finais na aplicação.
+
+Após a assinatura e a certificação, consulte `artifacts` antes de baixar os arquivos. Os nomes disponíveis incluem `original`, `certificated`, `certificate-page`, `pades` e `bundle`. A disponibilidade depende do estado do documento e do método de assinatura. Use `pades` para manter as assinaturas ICP-Brasil; a certificação pode convertê-las em conteúdo estático no PDF `certificated`.
 
 ```pascal
 Response := Client.DownloadDocumentArtifact(DocumentID, 'certificated');
 try
-  Output := TFileStream.Create('signed-contract.pdf', fmCreate);
+  Output := TFileStream.Create('contrato-assinado.pdf', fmCreate);
   try
     Response.SaveToStream(Output);
   finally
@@ -236,24 +313,28 @@ finally
 end;
 ```
 
-Download responses retain raw bytes and their content type. The SDK buffers responses in memory; budget memory for document size and simultaneous downloads. Open the destination after the request succeeds so an HTTP error cannot truncate an existing file. For crash-safe replacement, write a temporary file and rename it in your application.
+As respostas de download preservam os bytes e o tipo de conteúdo. O SDK mantém as respostas em memória; considere o tamanho dos documentos e a quantidade de downloads simultâneos. Abra o arquivo de destino após a requisição ter sucesso para impedir que um erro HTTP sobrescreva um arquivo existente. Para substituir um arquivo com segurança em caso de interrupção, grave em um arquivo temporário e renomeie-o na aplicação.
 
-## Connect customer workspaces with OAuth
+[examples/workflow.pas](examples/workflow.pas) reúne envio do PDF, criação do signatário, estimativa e solicitação. Compile com `make examples` e execute `build/workflow contrato.pdf signer@example.com`. Configure chave de API e ID do espaço de trabalho **ou** um token OAuth. O exemplo descobre o espaço de trabalho quando utiliza OAuth. Executá-lo cria recursos e envia uma solicitação de assinatura ao destinatário informado.
 
-Register a **Public** application for distributed software, or a **Confidential** application for a controlled backend, in the Assinafy application. Register the exact HTTPS redirect URI and the maximum permissions the application may request. A public application has a public `client_id` and uses PKCE; a confidential application also sends its secret during token requests. IDs that look like hashes are still public identifiers.
+## Aplicativos de marketplace e OAuth2
 
-The SDK accepts your application’s registration. A product can use a hosted HTTPS callback with a local relay or an admin-pasted code, as the CLI and WordPress integration do, while keeping the verifier on the initiating device. The host application receives the callback and supplies its decoded query values to the SDK.
+Use OAuth para conectar os espaços de trabalho dos clientes ao seu produto. Registre a aplicação na Assinafy em **Integrações → Apps OAuth → Novo aplicativo**, com a URI HTTPS exata de retorno e as permissões máximas que poderá solicitar. Escolha **Aplicação web ou móvel (Public)** para software distribuído ou **Aplicação no servidor (Confidential)** para um serviço sob seu controle. O cadastro é feito pelo painel, não pela API. A disponibilidade do cadastro depende do ambiente; mantenha a aplicação, o consentimento e os endpoints de token no mesmo ambiente.
 
-1. Read `Client.GetOAuthResourceMetadata` at the API origin. It returns `resource`, `authorization_servers`, `scopes_supported` and `bearer_methods_supported` without an envelope. The authorization server publishes `/.well-known/oauth-authorization-server` with its authorization, token, revocation and userinfo URLs. Keep environments aligned.
-2. Generate a fresh PKCE pair and state. Store the verifier, state and expected issuer with the initiating user’s session.
-3. Redirect the browser to `AuthorizationURL`; PKCE uses SHA-256 and `S256` for every application.
-4. At your registered callback, call `ValidateOAuthCallback` with the decoded query values and stored state/issuer. Consume the saved session transaction once. Reject mismatched state, issuer, duplicate parameters and authorization errors.
-5. Exchange the returned code immediately with `ExchangeCode`. Codes expire after 60 seconds and can be used once.
-6. Persist the returned credentials securely. Assign the access token to `Client.AccessToken` and call `ListMyAccounts`; save the selected workspace’s `data[0].id` with the connection.
-7. Serialize refreshes per connection, persist each new refresh token before using the access token, and revoke the current token on disconnect.
+O `client_id` identifica publicamente sua aplicação. Mesmo que pareça um hash, ele não é uma chave de API nem um token de acesso. Aplicações públicas usam PKCE sem segredo de cliente; aplicações confidenciais também enviam `client_secret` nas requisições de token. A chave de API e o ID do espaço de trabalho da integração direta não são usados para autorizar a aplicação OAuth.
+
+1. Consulte `Client.GetOAuthResourceMetadata` na origem da API. A resposta contém `resource`, `authorization_servers`, `scopes_supported` e `bearer_methods_supported`, sem envelope. O servidor de autorização publica `/.well-known/oauth-authorization-server` com suas URLs de autorização, token, revogação e informações do usuário. Use os endereços do mesmo ambiente.
+2. Gere um novo par PKCE e um estado aleatório. Salve o verificador, o estado e o emissor esperado na sessão do usuário que iniciou o fluxo.
+3. Redirecione o navegador para `AuthorizationURL`; todas as aplicações usam PKCE com SHA-256 e `S256`.
+4. Na URL de retorno registrada, chame `ValidateOAuthCallback` com os parâmetros decodificados e o estado/emissor salvos. Consuma a transação da sessão uma única vez. Rejeite divergências de estado ou emissor, parâmetros duplicados e erros de autorização.
+5. Troque o código imediatamente com `ExchangeCode`. Os códigos expiram após 60 segundos e só podem ser usados uma vez.
+6. Salve as credenciais retornadas com segurança. Atribua o token de acesso a um cliente sem chave de API, chame `ListMyAccounts` e salve o ID do espaço de trabalho autorizado junto da conexão.
+7. Execute renovações sequencialmente por conexão, persista cada novo token de renovação antes de usar o token de acesso e revogue o token atual ao desconectar.
 
 ```pascal
+OAuthClient := TAssinafyClient.Create('', '', AssinafySandboxURL);
 Config.ClientID := GetEnvironmentVariable('ASSINAFY_CLIENT_ID');
+Config.ClientSecret := GetEnvironmentVariable('ASSINAFY_CLIENT_SECRET');
 Config.RedirectURI := 'https://app.example.com/oauth/callback';
 Config.Scopes := 'account:read documents:read documents:write offline_access';
 Config.Issuer := 'https://auth-sandbox.assinafy.com.br';
@@ -261,101 +342,125 @@ Config.Resource := 'https://sandbox.assinafy.com.br';
 PKCE := GeneratePKCE;
 State := GenerateState;
 URL := AuthorizationURL(Config, State, PKCE.Verifier);
-// Store PKCE.Verifier and State in the initiating user's session, then redirect.
+// Salve PKCE.Verifier e State na sessão do usuário antes do redirecionamento.
 ```
 
-At the callback:
+Deixe `ASSINAFY_CLIENT_SECRET` vazia para aplicações públicas; configure-a somente para aplicações confidenciais.
+
+Na URL de retorno:
 
 ```pascal
 Code := ValidateOAuthCallback(CallbackQuery, SavedState, Config.Issuer);
-Response := ExchangeCode(Client, Config, Code, SavedVerifier);
+Response := ExchangeCode(OAuthClient, Config, Code, SavedVerifier);
 try
-  // Persist the response securely before using its credentials.
-  Client.AccessToken := Response.Data.FindPath('access_token').AsString;
+  // Salve a resposta com segurança antes de utilizar as credenciais.
+  OAuthClient.AccessToken := Response.Data.FindPath('access_token').AsString;
 finally
   Response.Free;
 end;
 ```
 
-The flat token response is:
+A resposta de token não possui envelope:
 
 ```json
 {
-  "access_token": "access-token",
+  "access_token": "token-de-acesso",
   "token_type": "Bearer",
   "expires_in": 3600,
   "scope": "account:read documents:read documents:write",
-  "refresh_token": "new-refresh-token",
-  "id_token": "signed-id-token"
+  "refresh_token": "novo-token-de-renovacao",
+  "id_token": "token-de-identidade-assinado"
 }
 ```
 
-`refresh_token` requires `offline_access`; `id_token` requires `openid`. Read the scopes actually returned. Tokens cover one workspace. OAuth cannot access billing, credential administration, account lifecycle or webhook signing secrets. A `403` scope challenge identifies a missing permission; reconnect with that permission instead of retrying. For OIDC, validate the ID token’s signature and `iss`, `aud`, `exp`, `nonce` using an OIDC implementation before treating it as identity; the SDK transports tokens and provides `GetOAuthUserInfo` but does not validate JWTs.
+`refresh_token` exige `offline_access`; `id_token` exige `openid`. Consulte os escopos efetivamente retornados. Cada token abrange um espaço de trabalho. OAuth não permite acesso a cobrança, administração de credenciais, criação/exclusão de contas ou segredos de assinatura de webhooks. Uma resposta `403` com indicação de escopo identifica uma permissão ausente; reconecte com essa permissão. Para OIDC, valide a assinatura do token de identidade e os campos `iss`, `aud`, `exp` e `nonce` com uma implementação OIDC antes de utilizá-lo como identidade. O SDK transporta os tokens e oferece `GetOAuthUserInfo`, mas não valida JWTs.
 
 ```pascal
-Response := RefreshToken(Client, Config, CurrentRefreshToken);
+Response := RefreshToken(OAuthClient, Config, CurrentRefreshToken);
 try
-  // Atomically persist Response.Data.refresh_token before using access_token.
+  // Persista Response.Data.refresh_token atomicamente antes de usar access_token.
 finally
   Response.Free;
 end;
-Response := RevokeToken(Client, Config, LatestStoredToken, 'refresh_token');
+Response := RevokeToken(OAuthClient, Config, LatestStoredToken, 'refresh_token');
 Response.Free;
 ```
 
-Refresh tokens rotate. Reusing a retired token ends the connection. A timeout can mean the server already rotated it; re-read saved state and reconnect when the result is indeterminate. The SDK sends each request once and leaves refresh locking, durable storage and scheduling to your application.
+Os tokens de renovação são rotacionados. Reutilizar um token antigo encerra a conexão. Um timeout pode ocorrer depois de o servidor já ter rotacionado o token; consulte novamente o estado salvo e reconecte se o resultado for incerto. O SDK envia cada requisição uma única vez. A aplicação controla a exclusão mútua das renovações, o armazenamento durável e o agendamento.
 
-[examples/oauth_connect.pas](examples/oauth_connect.pas) demonstrates browser authorization and callback exchange while keeping the verifier in memory. It does not persist credentials. Build it with `make examples` and run `build/oauth_connect` after configuring the application registration.
+[examples/oauth_connect.pas](examples/oauth_connect.pas) demonstra a autorização no navegador e a troca do código, mantendo o verificador em memória. O exemplo não persiste credenciais. Compile com `make examples` e execute `build/oauth_connect` após configurar o registro da aplicação. O SDK não abre um servidor de retorno; sua aplicação recebe a resposta HTTPS e fornece os parâmetros decodificados ao exemplo. Libere `OAuthClient` ao encerrar a conexão na aplicação.
 
-## Receive signed webhooks
+O helper `RefreshToken` exige um token de renovação substituto não vazio. Se a resposta omitir esse token, retornar `null` ou falhar em outra validação, `EAssinafyProtocolError` preserva `StatusCode` e `ResponseBody`, inclusive eventuais tokens utilizáveis. Examine a resposta com segurança e reconecte quando necessário; o token anterior pode já ter sido consumido. O método REST `ExchangeOAuthToken` disponibiliza diretamente o contrato publicado, que permite token de renovação ausente ou nulo.
 
-Use `CreateWebhookEndpoint` to register a delivery URL, contact email and events. Paid plans allow up to three endpoints; the server enforces the workspace’s actual entitlement. `ListWebhookEndpoints`, `GetWebhookEndpoint`, `UpdateWebhookEndpoint` and `DeleteWebhookEndpoint` manage individual endpoints. The older subscription methods remain available.
+`ExchangeCode` e `RefreshToken` verificam se a origem do recurso configurado coincide com a API, incluindo protocolo, host e porta efetiva. Combinações explícitas de emissor sandbox com API de produção, ou o inverso, são rejeitadas antes do envio.
+
+## Webhooks assinados
+
+Use `CreateWebhookEndpoint` para cadastrar a URL de entrega, o e-mail de contato e os eventos. Planos pagos permitem até três endpoints; o servidor aplica os limites efetivos do espaço de trabalho. `ListWebhookEndpoints`, `GetWebhookEndpoint`, `UpdateWebhookEndpoint` e `DeleteWebhookEndpoint` gerenciam cada endpoint. Os métodos anteriores de inscrição em webhooks também continuam disponíveis.
 
 ```json
 {
   "url": "https://app.example.com/assinafy/webhook",
   "email": "webhooks@example.com",
   "events": ["document_ready", "signer_rejected_document"],
-  "name": "Signing events",
+  "name": "Eventos de assinatura",
   "is_active": true,
   "signing_enabled": true
 }
 ```
 
-Retrieve the endpoint secret through `GetWebhookEndpointSigningSecret` using an API key or permitted user token; OAuth applications cannot read it. Store it securely. Secret rotation invalidates the old secret immediately, so coordinate `RotateWebhookEndpointSigningSecret` with your receiver.
+Obtenha o segredo do endpoint com `GetWebhookEndpointSigningSecret`, usando chave de API ou token de usuário autorizado. Aplicações OAuth não podem consultá-lo. Armazene-o com segurança. A rotação invalida o segredo anterior imediatamente; coordene `RotateWebhookEndpointSigningSecret` com o receptor das entregas.
 
-Verify before parsing JSON or accepting any event:
+Verifique a assinatura antes de interpretar o JSON ou aceitar qualquer evento:
 
 ```pascal
 if not VerifyWebhookHeaders(EndpointSecret, RequestHeaders, RawRequestBody) then
-  raise Exception.Create('Invalid webhook delivery');
+  raise Exception.Create('Entrega de webhook inválida');
 ```
 
-`RequestHeaders` is a list of HTTP `name: value` lines or `name=value` pairs. Header names are case-insensitive. The verifier uses the raw body bytes, `webhook-id`, `webhook-timestamp`, a base64-decoded `whsec_` key and HMAC-SHA256. It accepts a matching `v1` signature among multiple entries, compares in constant time and enforces a five-minute clock window. Keep your server clock synchronized. Duplicate IDs/timestamps, missing headers, malformed keys, altered bodies and stale deliveries fail verification.
+`RequestHeaders` aceita linhas HTTP `nome: valor` ou pares `nome=valor`. Os nomes dos cabeçalhos não diferenciam maiúsculas e minúsculas. A verificação usa os bytes originais do corpo, `webhook-id`, `webhook-timestamp`, uma chave `whsec_` decodificada de base64 e HMAC-SHA256. Aceita uma assinatura `v1` válida entre múltiplas entradas, compara em tempo constante e exige uma diferença máxima de cinco minutos entre o horário da entrega e o relógio local. Mantenha o relógio do servidor sincronizado. Identificadores ou timestamps duplicados, cabeçalhos ausentes, chaves malformadas, corpos alterados e entregas fora da janela são rejeitados.
 
-Persist and deduplicate valid events by `webhook-id`, enqueue processing and return `2xx` promptly. Each endpoint is delivered independently. The body contains `id`, `event`, `message`, `payload`, `origin`, `created_at`, `subject`, `object` and `account_id`; subject/object are polymorphic resource objects. [WebhookEvent](docs/SCHEMAS.md#webhookevent) defines the complete envelope. Do not depend on ordering between `assignment_created` and `document_metadata_ready`.
+Persista os eventos válidos e elimine duplicatas por `webhook-id`, encaminhe o processamento para uma fila e retorne `2xx` rapidamente. Cada endpoint recebe entregas independentes. O corpo contém `id`, `event`, `message`, `payload`, `origin`, `created_at`, `subject`, `object` e `account_id`; `subject` e `object` podem representar diferentes tipos de recurso. [WebhookEvent](docs/SCHEMAS.md#webhookevent) define o envelope completo. Não dependa de uma ordem fixa entre `assignment_created` e `document_metadata_ready`.
 
-Use `ListWebhookEventTypes` for the catalog, `ListWebhookDeliveries` for delivery results, and `RetryWebhookDelivery` for an explicit retry. Delivery retries can produce the same event again, so deduplication must remain effective.
+Use `ListWebhookEventTypes` para o catálogo de eventos, `ListWebhookDeliveries` para os resultados das entregas e `RetryWebhookDelivery` para solicitar uma nova tentativa. Reenvios podem entregar o mesmo evento novamente; mantenha a eliminação de duplicatas ativa.
 
-## Templates, fields and tags
+## Modelos, campos e etiquetas
 
-`ListTemplates` retrieves reusable templates. `EstimateDocumentFromTemplateCost` and `CreateDocumentFromTemplate` estimate and create a document using its template ID, role-to-signer mappings and field values. The API reference includes every nested field; use the template’s returned roles/pages rather than inventing identifiers. The current specification publishes template listing and document creation, with no template CRUD contract.
+`ListTemplates` consulta modelos reutilizáveis. `EstimateDocumentFromTemplateCost` e `CreateDocumentFromTemplate` estimam o custo e criam um documento com o identificador do modelo, o vínculo entre papéis e signatários e os valores dos campos. A referência da API inclui todos os campos aninhados; utilize os papéis e páginas retornados pelo modelo. A especificação atual publica a listagem de modelos e a criação de documentos a partir deles, sem um contrato de criação, alteração ou exclusão de modelos.
 
-`ListFields`, `CreateField`, `GetField`, `UpdateField`, `DeleteField`, `ValidateFieldValue`, `ValidateMultipleFieldValues` and `ListFieldTypes` manage field definitions and server-side value validation. These field validations are separate from a signer’s Email/WhatsApp identity verification.
+`ListFields`, `CreateField`, `GetField`, `UpdateField`, `DeleteField`, `ValidateFieldValue`, `ValidateMultipleFieldValues` e `ListFieldTypes` gerenciam definições de campos e validações de valores no servidor. Essas validações de campos são independentes da verificação de identidade por e-mail ou WhatsApp.
 
-`ListTags`, `CreateTag`, `UpdateTag` and `DeleteTag` manage workspace tags. `ListDocumentTags`, `ReplaceDocumentTags`, `AttachDocumentTags` and `DetachDocumentTag` associate them with documents. Omitting an optional JSON property preserves it on partial updates; explicit `TJSONNull` clears nullable values where the API permits it.
+`ListTags`, `CreateTag`, `UpdateTag` e `DeleteTag` gerenciam etiquetas do espaço de trabalho. `ListDocumentTags`, `ReplaceDocumentTags`, `AttachDocumentTags` e `DetachDocumentTag` associam etiquetas aos documentos. Omitir uma propriedade JSON opcional preserva seu valor em atualizações parciais; `TJSONNull` explícito limpa valores que aceitam nulo quando a API permite.
 
-## Pagination, errors and networking
+Para atualizar a imagem do espaço de trabalho, `UploadAccountLogo(AccountID, 'logo.png', 'image/png')` permite informar o tipo de conteúdo da parte multipart. Use `image/jpeg` para JPEG; omitir o terceiro argumento utiliza `application/octet-stream`. A API valida os bytes do arquivo e as permissões da conta.
 
-List methods accept the documented query parameters as a `TStrings` of `name=value` pairs:
+## Respostas, paginação e erros
+
+Cada chamada retorna uma resposta que deve ser liberada pela aplicação. `Response.JSON` contém a resposta inteira, enquanto `Response.Data` referencia o campo `data` do envelope. Respostas OAuth sem envelope ficam disponíveis integralmente nas duas propriedades. Libere a resposta após consultar essas propriedades. Os corpos de requisição e listas de parâmetros também devem ser liberados pela aplicação. `TJSONObject.Add` e `TJSONArray.Add` assumem a responsabilidade de liberar os valores JSON filhos adicionados.
+
+Os bytes JSON recebidos precisam formar UTF-8 válido. Literais Pascal em arquivos UTF-8 devem usar `{$codepage utf8}`; os valores de texto do `fpjson` usam `UTF8String`. Preserve a codificação declarada das strings ao receber texto da aplicação para que consultas sejam convertidas corretamente para UTF-8.
+
+Exemplo de resposta JSON:
+
+```json
+{
+  "status": 200,
+  "message": "Success",
+  "data": {"id": "workspace-id", "name": "Espaço de trabalho de exemplo"}
+}
+```
+
+Um transporte externo permanece sob responsabilidade de quem o forneceu; o cliente gerencia seu transporte libcurl padrão. Use um cliente por processo de trabalho ou thread e evite alterar suas credenciais simultaneamente. Os dados JSON preservam os nomes dos campos da API, valores nulos, campos opcionais e futuras adições.
+
+Os métodos de listagem recebem os parâmetros documentados em um `TStrings` com pares `nome=valor`:
 
 ```pascal
 Query := TStringList.Create;
 try
   Query.Add('page=1');
   Query.Add('per-page=100');
-  Query.Add('search=Example');
-  Response := Client.ListDocuments('', Query);
+  Query.Add('search=Exemplo');
+  Response := Client.ListDocuments(AccountID, Query);
   try
     WriteLn(Response.Data.AsJSON);
     WriteLn(Response.Header('X-Pagination-Page-Count'));
@@ -367,39 +472,43 @@ finally
 end;
 ```
 
-Pagination headers are `X-Pagination-Current-Page`, `X-Pagination-Total-Count`, `X-Pagination-Page-Count` and `X-Pagination-Per-Page`. Maximum `per-page` is 100. Preserve response headers for rate limiting: `X-Rate-Limit-Limit`, `X-Rate-Limit-Remaining`, `X-Rate-Limit-Reset` and `Retry-After`.
+Os cabeçalhos de paginação são `X-Pagination-Current-Page`, `X-Pagination-Total-Count`, `X-Pagination-Page-Count` e `X-Pagination-Per-Page`. O máximo de `per-page` é 100. Preserve os cabeçalhos de limite de requisições: `X-Rate-Limit-Limit`, `X-Rate-Limit-Remaining`, `X-Rate-Limit-Reset` e `Retry-After`.
 
-| Exception | Meaning |
+| Exceção | Significado |
 | --- | --- |
-| `EAssinafyInputError` | Required input, URL, credential, file or security validation failed before sending. |
-| `EAssinafyTransportError` | DNS, connection, TLS, timeout or native crypto failure. The request may already have reached the server. |
-| `EAssinafyProtocolError` | Successful JSON response could not be decoded. |
-| `EAssinafyAPIError` | Non-2xx HTTP response, including OAuth errors. Read `StatusCode`, `ErrorCode`, `ResponseBody`, `RetryAfter` and `Authenticate`. |
+| `EAssinafyInputError` | Falha de validação de entrada obrigatória, URL, credencial, arquivo ou segurança antes do envio. |
+| `EAssinafyTransportError` | Falha de DNS, conexão, TLS, timeout ou criptografia nativa. A requisição pode já ter chegado ao servidor. |
+| `EAssinafyProtocolError` | Uma resposta JSON não pôde ser decodificada ou uma resposta OAuth não passou pela validação. `StatusCode` e `ResponseBody` preservam o resultado HTTP e os bytes recebidos. |
+| `EAssinafyAPIError` | Resposta HTTP fora de `2xx`, incluindo erros OAuth. Consulte `StatusCode`, `ErrorCode`, `ResponseBody`, `RetryAfter` e `Authenticate`. |
 
-Ordinary filesystem exceptions can arise when reading an upload or writing a destination. Error bodies can contain personal data; apply your application’s redaction policy before logging them. The SDK does not log credentials, payloads or signing URLs.
+Exceções comuns do sistema de arquivos podem ocorrer ao ler um arquivo para envio ou gravar o destino. Corpos de erro podem conter dados pessoais; aplique a política de ocultação de dados sensíveis da aplicação antes de registrá-los. O SDK não registra credenciais, corpos de requisição ou URLs de assinatura.
 
-`Client.TimeoutMS` defaults to 30,000 milliseconds and limits connection and overall transfer time. `Client.CAFile` optionally selects a trusted PEM CA bundle. Certificate and hostname verification are always enabled, TLS requires version 1.2 or newer, and redirects are rejected so credentials cannot follow them. API URLs require HTTPS; HTTP is accepted only for explicit loopback testing. System proxy settings follow libcurl’s normal behavior.
+Um erro de protocolo com `StatusCode` em `2xx` indica que o servidor respondeu com sucesso, mesmo que o SDK não consiga interpretar a resposta. Use `ResponseBody` para recuperar identificadores ou reconciliar o estado; repetir uma criação automaticamente pode duplicar recursos. Esse corpo também pode conter tokens OAuth e deve receber a mesma proteção das credenciais.
 
-There are no automatic retries. A `429` carries the server’s delay; apply bounded retries for safe operations in your application. Before repeating any mutation, establish whether the first request succeeded. Token codes and refresh tokens require particular care because they are single-use.
+`Client.TimeoutMS` tem valor padrão de 30.000 milissegundos e limita a conexão e a duração total da transferência. `Client.CAFile` permite selecionar um arquivo PEM com autoridades certificadoras confiáveis. A verificação do certificado e do nome do servidor permanece habilitada, o TLS exige versão 1.2 ou superior e redirecionamentos são rejeitados para impedir o encaminhamento de credenciais. As configurações de proxy seguem o comportamento normal da libcurl.
 
-## Build and test
+O SDK não repete requisições automaticamente. Uma resposta `429` informa o intervalo definido pelo servidor; aplique tentativas limitadas em operações seguras na aplicação. Antes de repetir uma alteração, verifique se a primeira requisição teve sucesso. Códigos de autorização e tokens de renovação exigem cuidado especial por serem de uso único.
+
+## Testes e desenvolvimento
 
 ```sh
 make check
 ```
 
-This verifies generated files against the bundled contract, checks every operation/document link and source hygiene, compiles with warnings treated as errors, runs all 106 method checks plus response/security/helper tests, exercises real local HTTP/multipart/binary/TLS behavior, and compiles both examples. Tests enable range, overflow, I/O, assertion and heap checks. CI runs on Linux and macOS. The local HTTP tests need permission to bind loopback ports.
+O comando verifica os arquivos gerados contra o contrato incluído, a cobertura das operações, os links de documentação e a consistência dos arquivos. Compila tratando avisos como erros, executa as verificações dos 106 métodos e os testes de respostas, segurança e funções auxiliares, exercita requisições HTTP reais locais com multipart, dados binários e TLS, e compila os dois exemplos. Também compila os trechos Pascal deste guia e verifica a sintaxe dos exemplos JSON e shell, sem executá-los. Os testes ativam verificações de faixa, overflow, entrada/saída, asserções e memória. A integração contínua executa em Linux e macOS. Os testes HTTP locais precisam de permissão para abrir portas de loopback.
 
-Live sandbox checks use explicitly supplied environment credentials:
+As verificações Python também testam falhas de contrato com otimização ativada (`python3 -O`), validam a autenticação independentemente dos testes gerados e rejeitam parâmetros ou formatos de envio incompatíveis.
+
+Para verificações no sandbox, forneça a chave de API e o ID do espaço de trabalho pelas variáveis de ambiente:
 
 ```sh
 make live
 ```
 
-By default these perform read operations, OAuth discovery and an invalid-client OAuth contract check. Set `ASSINAFY_TEST_MUTATIONS=1` and `ASSINAFY_TEST_PDF` to a local PDF to exercise isolated document, signer and tag creation, updates, estimation, binary retrieval and cleanup. The test removes only resources it created; it does not send invitations. A successful OAuth consent/refresh cycle needs a registered application and user authorization. End-to-end Email/WhatsApp OTP and A1/A3 signing need a consenting signer, access to their channel and, for certificates, their device. Unit and HTTP contract tests cover SDK requests independently of these requirements.
+Por padrão, o comando executa operações de leitura, descoberta OAuth e uma verificação do erro de cliente OAuth inválido. Defina `ASSINAFY_TEST_MUTATIONS=1` e `ASSINAFY_TEST_PDF` com o caminho de um PDF local para exercitar a criação isolada de documento, signatário e etiqueta, alterações, estimativa de custo, download binário e limpeza. O teste exclui apenas os recursos que criou e não envia convites. Um ciclo OAuth completo de consentimento e renovação exige uma aplicação registrada e autorização do usuário. A verificação completa de códigos OTP por e-mail/WhatsApp e de assinaturas A1/A3 exige um signatário que consinta, acesso ao canal correspondente e, para certificados, seu dispositivo. Os testes unitários e HTTP verificam as requisições do SDK independentemente desses requisitos.
 
-## Maintaining the API contract
+Para atualizar o contrato, baixe o [documento OpenAPI atual](https://api.assinafy.com.br/v1/docs/openapi.json), preserve todas as operações e esquemas e substitua os endereços de contato dos exemplos por domínios reservados antes de atualizar `docs/openapi.json`. Execute `python3 scripts/generate.py`, confira os métodos e as referências de dados gerados e execute `make check`. O gerador mantém métodos, verificações por método e documentação consistentes. Mantenha `VERSION`, `AssinafyVersion`, notas de versão e tags alinhados. As tags seguem `vMAJOR.MINOR.PATCH`.
 
-Download the current [OpenAPI document](https://api.assinafy.com.br/v1/docs/openapi.json), preserve all operations and schemas, and normalize example contact addresses to reserved domains before updating `docs/openapi.json`. Run `python3 scripts/generate.py`, inspect the generated resource methods/payload references and run `make check`. The generator keeps methods, per-method checks and documentation consistent. Keep `VERSION`, `AssinafyVersion`, release notes and tags aligned. Release tags use `vMAJOR.MINOR.PATCH`; this initial minor release is `v0.1.0`.
+## Licença
 
-Local agent instructions live in ignored `AGENTS.md` and `CLAUDE.md`. Product documentation and release notes describe behavior, contracts and usage.
+Distribuído sob a [licença MIT](LICENSE).

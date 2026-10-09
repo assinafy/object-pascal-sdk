@@ -109,7 +109,7 @@ begin
       Params.Values['resource'] := Config.Resource;
     end;
     if Nonce <> '' then Params.Values['nonce'] := Nonce;
-    Result := ExcludeTrailingPathDelimiter(Issuer) + '/oauth/authorize?' + EncodeQuery(Params);
+    Result := TrimURLTrailingSlash(Issuer) + '/oauth/authorize?' + EncodeQuery(Params);
   finally
     Params.Free;
   end;
@@ -156,19 +156,19 @@ var
   Value: TJSONData;
 begin
   if not (Response.JSON is TJSONObject) then
-    raise EAssinafyProtocolError.Create('OAuth token response must be an object');
+    raise EAssinafyProtocolError.Create('OAuth token response must be an object', Response);
   Obj := TJSONObject(Response.JSON);
   Value := Obj.Find('access_token');
   if (Value = nil) or (Value.JSONType <> jtString) or (Value.AsString = '') then
-    raise EAssinafyProtocolError.Create('OAuth response is missing an access token');
+    raise EAssinafyProtocolError.Create('OAuth response is missing an access token', Response);
   Value := Obj.Find('token_type');
   if (Value = nil) or (Value.JSONType <> jtString) or not SameText(Value.AsString, 'Bearer') then
-    raise EAssinafyProtocolError.Create('OAuth token type must be Bearer');
+    raise EAssinafyProtocolError.Create('OAuth token type must be Bearer', Response);
   if RequireRefresh then
   begin
     Value := Obj.Find('refresh_token');
     if (Value = nil) or (Value.JSONType <> jtString) or (Value.AsString = '') then
-      raise EAssinafyProtocolError.Create('OAuth refresh response is missing its replacement refresh token');
+      raise EAssinafyProtocolError.Create('OAuth refresh response is missing its replacement refresh token', Response);
   end;
 end;
 
@@ -180,12 +180,36 @@ begin
   if Config.Resource <> '' then Result.Add('resource', Config.Resource);
 end;
 
+procedure ValidateEnvironment(Client: TAssinafyClient; const Config: TAssinafyOAuthConfig);
+var
+  API, Resource: TURI;
+  Issuer: string;
+begin
+  API := ParseURI(Client.BaseURL);
+  if Config.Resource <> '' then
+  begin
+    RequireHTTPS(Config.Resource, 'Resource');
+    Resource := ParseURI(Config.Resource);
+    if API.Port = 0 then
+      if SameText(API.Protocol, 'https') then API.Port := 443 else API.Port := 80;
+    if Resource.Port = 0 then Resource.Port := 443;
+    if not SameText(API.Protocol, Resource.Protocol) or not SameText(API.Host, Resource.Host) or
+      (API.Port <> Resource.Port) then
+      raise EAssinafyInputError.Create('OAuth resource must match the API origin');
+  end;
+  Issuer := TrimURLTrailingSlash(Config.Issuer);
+  if (SameText(API.Host, 'api.assinafy.com.br') and SameText(Issuer, 'https://auth-sandbox.assinafy.com.br')) or
+    (SameText(API.Host, 'sandbox.assinafy.com.br') and SameText(Issuer, AssinafyOAuthIssuer)) then
+    raise EAssinafyInputError.Create('OAuth issuer and API must use the same environment');
+end;
+
 function ExchangeCode(Client: TAssinafyClient; const Config: TAssinafyOAuthConfig;
   const Code, Verifier: string): TAssinafyResponse;
 var
   Body: TJSONObject;
 begin
   if Client = nil then raise EAssinafyInputError.Create('Client is required');
+  ValidateEnvironment(Client, Config);
   RequireValue(Code, 'Authorization code');
   RequireHTTPS(Config.RedirectURI, 'Redirect URI');
   PKCEChallenge(Verifier);
@@ -213,6 +237,7 @@ var
   Body: TJSONObject;
 begin
   if Client = nil then raise EAssinafyInputError.Create('Client is required');
+  ValidateEnvironment(Client, Config);
   RequireValue(Token, 'Refresh token');
   Body := TokenBody(Config);
   try

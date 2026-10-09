@@ -19,7 +19,7 @@ procedure Passed(Value: TAssinafyResponse; const Name: string);
 begin
   try
     Assert((Value.StatusCode >= 200) and (Value.StatusCode < 300), Name);
-    Assert(Value.JSON <> nil, Name + ': JSON response missing');
+    Assert((Value.StatusCode = 204) or (Value.JSON <> nil), Name + ': JSON response missing');
     Inc(Calls);
     WriteLn('PASS: ', Name);
   finally Value.Free; end;

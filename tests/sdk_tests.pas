@@ -10,7 +10,7 @@ uses
 type
   TFakeTransport = class(TAssinafyTransport)
   public
-    LastMethod, LastURL, LastAuth, LastFile, LastContentType: string;
+    LastMethod, LastURL, LastAuth, LastFile, LastFileField, LastContentType: string;
     LastBody: RawByteString;
     NextStatus, Calls: Integer;
     NextBody, NextContentType: string;
@@ -40,6 +40,7 @@ begin
   LastMethod := Request.Method;
   LastURL := Request.URL;
   LastFile := Request.FileName;
+  LastFileField := Request.FileField;
   LastBody := Request.Body;
   LastContentType := Request.ContentType;
   LastAuth := 'public';
@@ -85,6 +86,12 @@ begin
       9: begin Client.TimeoutMS := 0; Response := Client.GetUser; Response.Free; end;
       10: begin Temp := TAssinafyClient.Create('', '', 'https://user:password@api.example.com/v1'); Temp.Free; end;
       11: begin Temp := TAssinafyClient.Create('', '', 'https://api.example.com/v1?query=value'); Temp.Free; end;
+      12: begin Temp := TAssinafyClient.Create('test-key', '', AssinafySandboxURL, Fake); Temp.Free; end;
+      13: begin Response := Client.UploadDocument('', ''); Response.Free; end;
+      14: begin Response := Client.UploadAccountLogo('', ''); Response.Free; end;
+      15: begin Response := Client.UploadSignatureImage('signer-code', ''); Response.Free; end;
+      16: begin Response := Client.UploadAccountLogo('', FixtureFile, ''); Response.Free; end;
+      17: begin Response := Client.UploadAccountLogo('', FixtureFile, 'image/png' + #13#10 + 'Injected: value'); Response.Free; end;
     end;
     raise Exception.Create(Name + ': expected input error');
   except
@@ -97,10 +104,20 @@ end;
 procedure TestResponses;
 const
   StatusCodes: array[0..6] of Integer = (400, 401, 403, 404, 415, 429, 500);
+  InvalidBodies: array[0..15] of string = ('invalid json', '{"data":1}garbage',
+    '{"data":1}{"data":2}', '   ', '{"data":1,"data":2}',
+    '{"data":1}' + #0 + 'garbage',
+    '{"data":"' + #$FF + '"}', '{"data":"' + #$80 + '"}',
+    '{"data":"' + #$C0#$AF + '"}', '{"data":"' + #$E0#$80#$AF + '"}',
+    '{"data":"' + #$F0#$80#$80#$AF + '"}', '{"data":"' + #$ED#$A0#$80 + '"}',
+    '{"data":"' + #$F4#$90#$80#$80 + '"}', '{"data":"' + #$F5#$80#$80#$80 + '"}',
+    '{"data":"' + #$E2#$82 + '"}', '{"data":"' + #$C2 + '"}');
 var
   Stream: TMemoryStream;
   OldClient: TAssinafyClient;
   Code: Integer;
+  InvalidBody: string;
+  ExpectedText: RawByteString;
 begin
   Fake.NextBody := '{"status":200,"message":"ok","data":{"nullable":null,"enabled":false,"value":9007199254740993,"extra":"kept"}}';
   Response := Client.GetAccount('');
@@ -149,12 +166,49 @@ begin
     raise Exception.Create('Expected API error');
   except on E: EAssinafyAPIError do Check(E.StatusCode = 503, 'Wrongly typed error fields preserve HTTP status'); end;
   Fake.NextStatus := 200;
-  Fake.NextBody := 'invalid json';
+  for InvalidBody in InvalidBodies do
+  begin
+    Fake.NextBody := InvalidBody;
+    try
+      Response := Client.GetUser;
+      Response.Free;
+      raise Exception.Create('Expected protocol error');
+    except
+      on E: EAssinafyProtocolError do
+      begin
+        Check(E.StatusCode = 200, 'Protocol error retains successful HTTP status');
+        Check(E.ResponseBody = Fake.NextBody, 'Protocol error retains original response bytes');
+      end;
+    end;
+  end;
+  for Code := 0 to 31 do
+  begin
+    Fake.NextBody := '{"data":"raw' + Chr(Code) + 'control"}';
+    try
+      Response := Client.GetUser;
+      Response.Free;
+      raise Exception.Create('Expected raw JSON control character rejection');
+    except on E: EAssinafyProtocolError do Check(True, 'Raw JSON control character rejected'); end;
+  end;
+  Fake.NextBody := '{"data":"escaped\u0000null"}';
   try
-    Response := Client.GetUser;
+    Response := Client.CreateAssignment('document', TestBody);
     Response.Free;
-    raise Exception.Create('Expected protocol error');
-  except on E: EAssinafyProtocolError do Check(True, 'Invalid successful JSON rejected'); end;
+    raise Exception.Create('Expected escaped JSON NUL rejection');
+  except
+    on E: EAssinafyProtocolError do
+    begin
+      Check(E.StatusCode = 200, 'Successful mutation status survives escaped NUL error');
+      Check(E.ResponseBody = Fake.NextBody, 'Successful mutation payload survives escaped NUL error');
+    end;
+  end;
+  Fake.NextBody := '{"data":"literal\\u0000"}';
+  Response := Client.GetUser;
+  try Check(Response.Data.AsString = 'literal\u0000', 'Literal Unicode escape text preserved'); finally Response.Free; end;
+  Fake.NextBody := '{"data":"Jo' + #$C3#$A3 + 'o ' + #$F0#$9F#$98#$80 + '"}';
+  ExpectedText := 'Jo' + #$C3#$A3 + 'o ' + #$F0#$9F#$98#$80;
+  Response := Client.GetUser;
+  try Check(RawByteString(Response.Data.AsString) = ExpectedText, 'Accented and supplementary UTF-8 preserved'); finally Response.Free; end;
   Fake.NextContentType := 'application/pdf';
   Fake.NextBody := '%PDF-' + #0 + #255 + 'binary';
   Response := Client.DownloadDocumentArtifact('doc', 'original');
@@ -174,6 +228,10 @@ begin
   Fake.NextBody := '{"status":200,"message":"ok","data":{}}';
   OldClient := TAssinafyClient.Create('api-key', 'account', AssinafySandboxURL, Fake);
   try
+    try
+      OldClient.AccessToken := 'test-bearer';
+      raise Exception.Create('API key and OAuth token accepted together');
+    except on E: EAssinafyInputError do Check(OldClient.AccessToken = '', 'Mixed authentication rejected without changing client'); end;
     Response := OldClient.GetUser;
     Response.Free;
     Check(Fake.LastAuth = 'key', 'API key header supported');
@@ -185,12 +243,92 @@ begin
   finally OldClient.Free; end;
 end;
 
+procedure TestAuthenticationAndURLs;
+var
+  KeyClient, PrefixedClient: TAssinafyClient;
+  I, PriorCalls: Integer;
+begin
+  KeyClient := TAssinafyClient.Create('api-key', 'account', AssinafySandboxURL, Fake);
+  PrefixedClient := TAssinafyClient.Create('', '', 'https://proxy.example.com:8443/api/v1///', Fake);
+  try
+    for I := 0 to 1 do
+    begin
+      if I = 0 then Response := Client.ListSignerDocuments('signer')
+      else Response := Client.SearchSignerDocuments('signer');
+      Response.Free;
+      Check(Fake.LastAuth = 'bearer', 'Signer-or-API uses bearer without signer code');
+      Check(Pos('signer-access-code', Fake.LastURL) = 0, 'Bearer fallback omits signer code');
+      if I = 0 then Response := KeyClient.ListSignerDocuments('signer')
+      else Response := KeyClient.SearchSignerDocuments('signer');
+      Response.Free;
+      Check(Fake.LastAuth = 'key', 'Signer-or-API uses API key without signer code');
+    end;
+    PriorCalls := Fake.Calls;
+    try
+      Response := KeyClient.GetOAuthUserInfo;
+      Response.Free;
+      raise Exception.Create('Userinfo accepted an API key');
+    except on E: EAssinafyInputError do Check(Fake.Calls = PriorCalls, 'Userinfo requires bearer before transport'); end;
+    Response := Client.GetAccount('explicit/account');
+    Response.Free;
+    Check(Fake.LastURL = AssinafySandboxURL + '/accounts/explicit%2Faccount', 'Explicit account overrides default');
+    Response := PrefixedClient.GetOAuthResourceMetadata;
+    Response.Free;
+    Check(Fake.LastURL = 'https://proxy.example.com:8443/.well-known/oauth-protected-resource', 'Metadata uses origin, preserving port');
+    Check(PrefixedClient.BaseURL = 'https://proxy.example.com:8443/api/v1', 'URL slashes normalize portably');
+    Check(TrimURLTrailingSlash('https://api.example.com/v1/') = 'https://api.example.com/v1', 'URL trailing slash helper');
+    Check(TrimURLTrailingSlash('') = '', 'Empty URL trimming is safe');
+  finally PrefixedClient.Free; KeyClient.Free; end;
+end;
+
+procedure TestUploadLimits;
+const
+  Fields: array[0..2] of string = ('file', 'attachment', '');
+var
+  Transport: TAssinafyCurlTransport;
+  Request: TAssinafyRequest;
+  Headers: TStringList;
+  FileName, Field: string;
+  FileStream: TFileStream;
+begin
+  FileName := GetTempFileName;
+  FileStream := TFileStream.Create(FileName, fmCreate);
+  try FileStream.Size := 25 * 1024 * 1024 + 1; finally FileStream.Free; end;
+  Headers := TStringList.Create;
+  Transport := TAssinafyCurlTransport.Create;
+  try
+    Request := Default(TAssinafyRequest);
+    Request.Method := 'POST';
+    Request.URL := 'http://127.0.0.1:9/v1/upload';
+    Request.Headers := Headers;
+    Request.FileName := FileName;
+    Request.ContentType := 'application/octet-stream';
+    Request.TimeoutMS := 1000;
+    for Field in Fields do
+    begin
+      Request.FileField := Field;
+      try
+        Response := Transport.Execute(Request);
+        Response.Free;
+        raise Exception.Create('Oversized upload accepted');
+      except on E: EAssinafyInputError do Check(True, 'All upload fields enforce size before transfer'); end;
+    end;
+  finally Transport.Free; Headers.Free; DeleteFile(FileName); end;
+end;
+
 procedure TestOAuth;
+const
+  InvalidRefreshBodies: array[0..2] of string = (
+    '{"access_token":"new-access","token_type":"Bearer"}',
+    '{"access_token":"new-access","refresh_token":null,"token_type":"Bearer"}',
+    '{"access_token":"new-access","refresh_token":"rotated","token_type":"wrong-type"}');
 var
   PKCE, Second: TAssinafyPKCE;
   Config: TAssinafyOAuthConfig;
   Callback: TStringList;
   URL: string;
+  InvalidBody: string;
+  PriorCalls: Integer;
 begin
   Fake.NextBody := '{"access_token":"access","refresh_token":"replacement","token_type":"Bearer","expires_in":3600}';
   Check(PKCEChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk') =
@@ -206,6 +344,9 @@ begin
   URL := AuthorizationURL(Config, 'state', PKCE.Verifier);
   Check(Pos('code_challenge_method=S256', URL) > 0, 'PKCE is always S256');
   Check(Pos('scope=documents%3Aread%20offline_access', URL) > 0, 'Scope encoded');
+  Config.Issuer := AssinafyOAuthIssuer + '/';
+  Check(Pos(AssinafyOAuthIssuer + '/oauth/authorize?', AuthorizationURL(Config, 'state', PKCE.Verifier)) = 1,
+    'Issuer trailing slash does not duplicate URL separator');
   Callback := TStringList.Create;
   try
     Callback.Add('state=state');
@@ -226,6 +367,8 @@ begin
     try ValidateOAuthCallback(Callback, 'state'); raise Exception.Create('Code and error accepted');
     except on E: EAssinafyInputError do Check(True, 'Ambiguous callback rejected'); end;
   finally Callback.Free; end;
+  Config.Issuer := 'https://auth-sandbox.assinafy.com.br';
+  Config.Resource := 'https://sandbox.assinafy.com.br:443/';
   Response := ExchangeCode(Client, Config, 'code', PKCE.Verifier);
   Response.Free;
   Check(Pos('authorization_code', Fake.LastBody) > 0, 'Authorization grant');
@@ -239,12 +382,23 @@ begin
   Response := RevokeToken(Client, Config, 'token', 'refresh_token');
   Response.Free;
   Check(Pos('token_type_hint', Fake.LastBody) > 0, 'Revocation token hint');
-  Fake.NextBody := '{"access_token":"access","token_type":"Bearer"}';
-  try
-    Response := RefreshToken(Client, Config, 'old-refresh');
-    Response.Free;
-    raise Exception.Create('Missing replacement refresh token accepted');
-  except on E: EAssinafyProtocolError do Check(True, 'Missing replacement refresh token rejected'); end;
+  for InvalidBody in InvalidRefreshBodies do
+  begin
+    Fake.NextBody := InvalidBody;
+    PriorCalls := Fake.Calls;
+    try
+      Response := RefreshToken(Client, Config, 'old-refresh');
+      Response.Free;
+      raise Exception.Create('Invalid refresh response accepted');
+    except
+      on E: EAssinafyProtocolError do
+      begin
+        Check(E.StatusCode = 200, 'Refresh protocol error preserves HTTP status');
+        Check(E.ResponseBody = InvalidBody, 'Returned tokens remain recoverable after refresh rejection');
+        Check(Fake.Calls = PriorCalls + 1, 'Refresh is never retried');
+      end;
+    end;
+  end;
   Fake.NextBody := '{"access_token":"access","token_type":"wrong-type"}';
   try
     Response := ExchangeCode(Client, Config, 'code', PKCE.Verifier);
@@ -253,6 +407,74 @@ begin
   except on E: EAssinafyProtocolError do Check(True, 'Invalid token type rejected'); end;
   try PKCEChallenge('short'); raise Exception.Create('Short verifier accepted');
   except on E: EAssinafyInputError do Check(True, 'Short verifier rejected'); end;
+end;
+
+procedure TestTextEncoding;
+type
+  TLatinText = type AnsiString(1252);
+var
+  OldCodePage: TSystemCodePage;
+  Name: TLatinText;
+  Body: RawByteString;
+  Query: TStringList;
+begin
+  OldCodePage := DefaultSystemCodePage;
+  Query := TStringList.Create;
+  try
+    DefaultSystemCodePage := 1252;
+    Name := 'Jo' + #$E3 + 'o';
+    Check(PercentEncode(Name) = 'Jo%C3%A3o', 'Legacy code page converts query text to UTF-8');
+    Query.Add('search=' + Name);
+    Check(EncodeQuery(Query) = 'search=Jo%C3%A3o', 'Legacy query values use UTF-8 on the wire');
+    Body := '%PDF-' + #0#$FF + 'fixture';
+    SetCodePage(Body, CP_UTF8, False);
+    Check(VerifyWebhook('whsec_c2VjcmV0', Name, '1700000000',
+      'v1,V95AJ5O7LD3URtN97mJ8JxW7e3LweqtrXHysLXqkKWM=', Body, 1700000000),
+      'Webhook text uses UTF-8 while raw body bytes are unchanged');
+  finally
+    DefaultSystemCodePage := OldCodePage;
+    Query.Free;
+  end;
+end;
+
+procedure TestOAuthEnvironments;
+const
+  Resources: array[0..1] of string = ('https://sandbox.assinafy.com.br', 'https://api.assinafy.com.br');
+  Issuers: array[0..1] of string = ('https://auth-sandbox.assinafy.com.br', AssinafyOAuthIssuer);
+var
+  Clients: array[0..1] of TAssinafyClient;
+  Config: TAssinafyOAuthConfig;
+  I, J, Grant, PriorCalls: Integer;
+begin
+  Clients[0] := Client;
+  Clients[1] := TAssinafyClient.Create('', '', AssinafyProductionURL, Fake);
+  Config := Default(TAssinafyOAuthConfig);
+  Config.ClientID := 'client-id';
+  Config.RedirectURI := 'https://app.example.com/oauth/callback';
+  Fake.NextBody := '{"access_token":"access","refresh_token":"replacement","token_type":"Bearer"}';
+  try
+    for I := 0 to 1 do
+      for J := 0 to 2 do
+      begin
+        Config.Issuer := Issuers[I];
+        Config.Resource := Resources[I];
+        case J of
+          0: Config.Resource := Resources[1 - I];
+          1: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I]; end;
+          2: Config.Resource := Resources[I] + ':444';
+        end;
+        for Grant := 0 to 1 do
+        begin
+          PriorCalls := Fake.Calls;
+          try
+            if Grant = 0 then Response := ExchangeCode(Clients[I], Config, 'code', StringOfChar('a', 43))
+            else Response := RefreshToken(Clients[I], Config, 'refresh');
+            Response.Free;
+            raise Exception.Create('OAuth environment mismatch accepted');
+          except on E: EAssinafyInputError do Check(Fake.Calls = PriorCalls, 'OAuth environment mismatch rejected before transport'); end;
+        end;
+      end;
+  finally Clients[1].Free; end;
 end;
 
 procedure TestWebhooks;
@@ -298,6 +520,13 @@ begin
     Headers.Add('webhook-timestamp=' + CurrentTimestamp);
     Headers.Add('webhook-signature=' + Signature);
     Check(VerifyWebhookHeaders(Secret, Headers, Body), 'Name=value webhook headers');
+    Signature := 'v1,' + EncodeStringBase64(HMACSHA256('secret', 'msg:1=2.' + CurrentTimestamp + '.' + Body));
+    Headers[0] := 'webhook-id=msg:1=2';
+    Headers[2] := 'webhook-signature=' + Signature;
+    Check(VerifyWebhookHeaders(Secret, Headers, Body), 'Name=value header retains colon in value');
+    Headers[0] := 'webhook-id: msg:1=2';
+    Headers[2] := 'webhook-signature: ' + Signature;
+    Check(VerifyWebhookHeaders(Secret, Headers, Body), 'Name:value header retains equals in value');
     Headers.Insert(0, 'webhook-id:');
     Check(not VerifyWebhookHeaders(Secret, Headers, Body), 'Empty duplicate webhook ID rejected');
     Headers.Delete(0);
@@ -354,7 +583,7 @@ begin
   Fake.NextStatus := 200;
   Fake.NextBody := '{"status":200,"message":"ok","data":{}}';
   Fake.NextContentType := 'application/json';
-  Client := TAssinafyClient.Create('test-key', 'default-account', AssinafySandboxURL, Fake);
+  Client := TAssinafyClient.Create('', 'default-account', AssinafySandboxURL, Fake);
   Client.AccessToken := 'test-bearer';
   TestBody := TJSONObject.Create(['enabled', False, 'email', 'developer@example.com']);
   TestQuery := TStringList.Create;
@@ -364,9 +593,13 @@ begin
     Response := Client.GetDocument('doc/with space');
     Response.Free;
     Check(Pos('doc%2Fwith%20space', Fake.LastURL) > 0, 'Path segments encoded');
-    for I := 1 to 11 do ExpectInputError('Input ' + IntToStr(I), I);
+    for I := 1 to 17 do ExpectInputError('Input ' + IntToStr(I), I);
     TestResponses;
+    TestAuthenticationAndURLs;
+    TestUploadLimits;
     TestOAuth;
+    TestOAuthEnvironments;
+    TestTextEncoding;
     TestWebhooks;
     TestSigningMethods;
     WriteLn('PASS: ', Checks, ' checks across all 106 API methods, responses, OAuth and webhooks');

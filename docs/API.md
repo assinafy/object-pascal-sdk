@@ -1106,7 +1106,7 @@ Content type: `application/json`
 ## UploadAccountLogo
 
 ```pascal
-function UploadAccountLogo(const AAccountId: string; const FileName: string): TAssinafyResponse;
+function UploadAccountLogo(const AAccountId: string; const FileName: string; const ContentType: string = 'application/octet-stream'): TAssinafyResponse;
 ```
 
 `POST /v1/accounts/{accountId}/logo`
@@ -1116,6 +1116,8 @@ Upload or replace the account logo image.
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
+
+`ContentType` is an optional SDK parameter for the file part media type (for example `image/png` or `image/jpeg`); the default is `application/octet-stream`. It does not add a JSON field.
 
 - `accountId` (path, required): Workspace account ID.
 ```json

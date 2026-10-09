@@ -29,10 +29,12 @@ begin
     nil, nil, '', '', '', '');
 end;
 
-function TAssinafyClient.UploadAccountLogo(const AAccountId: string; const FileName: string): TAssinafyResponse;
+function TAssinafyClient.UploadAccountLogo(const AAccountId: string; const FileName: string; const ContentType: string): TAssinafyResponse;
 begin
+  RequireValue(FileName, 'File name');
+  RequireValue(ContentType, 'File content type');
   Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/logo', aaAPI,
-    nil, nil, FileName, 'file', 'application/octet-stream', '');
+    nil, nil, FileName, 'file', ContentType, '');
 end;
 
 function TAssinafyClient.DeleteAccountLogo(const AAccountId: string): TAssinafyResponse;
@@ -142,6 +144,7 @@ end;
 
 function TAssinafyClient.UploadDocument(const AAccountId: string; const FileName: string): TAssinafyResponse;
 begin
+  RequireValue(FileName, 'File name');
   Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/documents', aaAPI,
     nil, nil, FileName, 'file', 'application/pdf', '');
 end;
@@ -458,6 +461,7 @@ end;
 
 function TAssinafyClient.UploadSignatureImage(const SignerAccessCode: string; const FileName: string; Query: TStrings): TAssinafyResponse;
 begin
+  RequireValue(FileName, 'File name');
   Result := Call('POST', '/signature', aaSigner,
     Query, nil, FileName, '', 'image/png', SignerAccessCode);
 end;
