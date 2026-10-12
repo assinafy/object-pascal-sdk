@@ -68,6 +68,9 @@ begin
   Result.Headers.Add('Retry-After: 17');
   Result.Headers.Add('WWW-Authenticate: Bearer error="insufficient_scope"');
   Result.Headers.Add('X-Pagination-Total-Count: 150');
+  Result.Headers.Add('X-Rate-Limit-Limit: 60');
+  Result.Headers.Add('X-Rate-Limit-Remaining: 0');
+  Result.Headers.Add('X-Rate-Limit-Reset: 42');
 end;
 
 procedure ExpectInputError(const Name: string; Action: Integer);
@@ -172,6 +175,8 @@ begin
         Check(E.StatusCode = Code, 'HTTP error status retained');
         Check(E.ErrorCode = 'invalid_grant', 'OAuth error code retained');
         Check(E.RetryAfter = '17', 'Retry delay retained');
+        Check((E.RateLimitLimit = '60') and (E.RateLimitRemaining = '0') and
+          (E.RateLimitReset = '42'), 'Rate-limit headers retained');
         Check(Pos('insufficient_scope', E.Authenticate) > 0, 'Scope challenge retained');
         Check(E.ResponseBody = Fake.NextBody, 'Error payload retained');
       end;
@@ -275,15 +280,26 @@ begin
   try
     for I := 0 to 1 do
     begin
-      if I = 0 then Response := Client.ListSignerDocuments('signer')
-      else Response := Client.SearchSignerDocuments('signer');
+      PriorCalls := Fake.Calls;
+      try
+        if I = 0 then Response := KeyClient.ListSignerDocuments('signer', ' ')
+        else Response := KeyClient.SearchSignerDocuments('signer');
+        Response.Free;
+        raise Exception.Create('Signer route fell back to workspace credentials');
+      except on E: EAssinafyInputError do Check(Fake.Calls = PriorCalls, 'Empty signer code rejected before transport'); end;
+      if I = 0 then Response := KeyClient.ListSignerDocuments('signer', 'code')
+      else Response := KeyClient.SearchSignerDocuments('signer', 'code');
       Response.Free;
-      Check(Fake.LastAuth = 'bearer', 'Signer-or-API uses bearer without signer code');
-      Check(Pos('signer-access-code', Fake.LastURL) = 0, 'Bearer fallback omits signer code');
-      if I = 0 then Response := KeyClient.ListSignerDocuments('signer')
-      else Response := KeyClient.SearchSignerDocuments('signer');
+      Check(Fake.LastAuth = 'signer', 'Signer code sent without workspace credentials');
+      if I = 0 then Response := Client.ListSignerDocumentsAsWorkspace('signer')
+      else Response := Client.SearchSignerDocumentsAsWorkspace('signer');
       Response.Free;
-      Check(Fake.LastAuth = 'key', 'Signer-or-API uses API key without signer code');
+      Check(Fake.LastAuth = 'bearer', 'Workspace method uses bearer token');
+      Check(Pos('signer-access-code', Fake.LastURL) = 0, 'Workspace method omits signer code');
+      if I = 0 then Response := KeyClient.ListSignerDocumentsAsWorkspace('signer')
+      else Response := KeyClient.SearchSignerDocumentsAsWorkspace('signer');
+      Response.Free;
+      Check(Fake.LastAuth = 'key', 'Workspace method uses API key');
     end;
     PriorCalls := Fake.Calls;
     try
@@ -848,7 +864,7 @@ begin
     TestJSONCompatibility;
     {$IFDEF FPC}TestNativeFPCCompatibility;{$ENDIF}
     TestSigningMethods;
-    WriteLn('PASS: ', Checks, ' checks across all 106 API methods, responses, OAuth and webhooks');
+    WriteLn('PASS: ', Checks, ' checks across all 106 API operations, responses, OAuth and webhooks');
   finally
     TestQuery.Free;
     TestBody.Free;

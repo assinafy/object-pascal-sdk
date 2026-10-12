@@ -146,8 +146,12 @@
     function DownloadSignatureImage(const SignatureType: string; const SignerAccessCode: string): TAssinafyResponse;
     // GET /v1/signers/{signerId}/documents; payloads: docs/API.md#listsignerdocuments
     function ListSignerDocuments(const SignerId: string; const SignerAccessCode: string = ''; Query: TStrings = nil): TAssinafyResponse;
+    // GET /v1/signers/{signerId}/documents (workspace credentials); payloads: docs/API.md#listsignerdocumentsasworkspace
+    function ListSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings = nil): TAssinafyResponse;
     // GET /v1/signers/{signerId}/documents/search; payloads: docs/API.md#searchsignerdocuments
     function SearchSignerDocuments(const SignerId: string; const SignerAccessCode: string = ''; Query: TStrings = nil): TAssinafyResponse;
+    // GET /v1/signers/{signerId}/documents/search (workspace credentials); payloads: docs/API.md#searchsignerdocumentsasworkspace
+    function SearchSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings = nil): TAssinafyResponse;
     // GET /v1/signers/{signerId}/documents/{documentId}/download/{artifactName}; payloads: docs/API.md#downloadsignerdocumentartifact
     function DownloadSignerDocumentArtifact(const SignerId: string; const DocumentId: string; const ArtifactName: string): TAssinafyResponse;
     // POST /v1/authentication/social-login; payloads: docs/API.md#sociallogin

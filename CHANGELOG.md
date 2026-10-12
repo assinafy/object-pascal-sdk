@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1] - 2026-10-12
+
+- **Behavior change (security):** `ListSignerDocuments` and `SearchSignerDocuments` now require a nonempty `SignerAccessCode` and send only that code. Previously an empty code silently fell back to the workspace API key or bearer token. Signatures are unchanged.
+- Add `ListSignerDocumentsAsWorkspace` and `SearchSignerDocumentsAsWorkspace` for explicit API key or bearer token access to the signer document routes.
+- Expose `X-Rate-Limit-Limit`, `X-Rate-Limit-Remaining` and `X-Rate-Limit-Reset` on `EAssinafyAPIError` as `RateLimitLimit`, `RateLimitRemaining` and `RateLimitReset`, next to `RetryAfter`.
+- Document the `send-token` body (`channel: "email"` and `recipient`, both required) and clearing an assignment expiration by sending `expires_at: null`.
+- Refresh the bundled API contract from the published OpenAPI document.
+
 ## 0.3.0 — 2026-10-09
 
 - Add experimental Delphi 12+ Windows source integration and runtime-package projects, sharing all 106 resource methods with Free Pascal.

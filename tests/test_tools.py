@@ -42,6 +42,20 @@ class GeneratorTests(unittest.TestCase):
             with self.subTest(security=security):
                 self.assertEqual(self.operation(security)['auth'], expected)
 
+    def test_signer_or_workspace_routes_get_separate_workspace_method(self):
+        spec = copy.deepcopy(generate.SPEC)
+        spec['paths'] = {'/v1/signers/{signerId}/documents': {
+            'parameters': [{'name': 'signerId', 'in': 'path', 'required': True}],
+            'get': {'summary': 'Test operation', 'security': [
+                {'signerAccessCode': []}, {'bearerAuth': []}, {'apiKeyAuth': []}]},
+        }}
+        with patch.object(generate, 'SPEC', spec):
+            signer, workspace = generate.operations()
+        self.assertEqual((signer['auth'], workspace['auth']), ('aaSignerOrAPI', 'aaAPI'))
+        self.assertEqual(workspace['name'], 'TestOperationAsWorkspace')
+        self.assertIn('SignerAccessCode', [x[0] for x in signer['args']])
+        self.assertNotIn('SignerAccessCode', [x[0] for x in workspace['args']])
+
     def test_unknown_or_combined_security_is_rejected(self):
         for security in [[{'signer_access_code': []}],
                          [{'apiKeyAuth': [], 'signerAccessCode': []}]]:

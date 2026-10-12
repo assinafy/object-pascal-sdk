@@ -551,12 +551,29 @@
   Check(Fake.LastAuth = 'signer', 'ListSignerDocuments authentication');
 
   TestQuery.Clear;
+  TestQuery.Add('page=1');
+  TestQuery.Add('per-page=25');
+  Response := Client.ListSignerDocumentsAsWorkspace('SignerId', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListSignerDocumentsAsWorkspace verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents?page=1&per-page=25', 'ListSignerDocumentsAsWorkspace URL');
+  Check(Fake.LastAuth = 'bearer', 'ListSignerDocumentsAsWorkspace authentication');
+
+  TestQuery.Clear;
   TestQuery.Add('search=<string>');
   Response := Client.SearchSignerDocuments('SignerId', 'SignerAccessCode', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'SearchSignerDocuments verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/search?search=%3Cstring%3E&signer-access-code=SignerAccessCode', 'SearchSignerDocuments URL');
   Check(Fake.LastAuth = 'signer', 'SearchSignerDocuments authentication');
+
+  TestQuery.Clear;
+  TestQuery.Add('search=<string>');
+  Response := Client.SearchSignerDocumentsAsWorkspace('SignerId', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'SearchSignerDocumentsAsWorkspace verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/search?search=%3Cstring%3E', 'SearchSignerDocumentsAsWorkspace URL');
+  Check(Fake.LastAuth = 'bearer', 'SearchSignerDocumentsAsWorkspace authentication');
 
   Response := Client.DownloadSignerDocumentArtifact('SignerId', 'DocumentId', 'ArtifactName');
   Response.Free;

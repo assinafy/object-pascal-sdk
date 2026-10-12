@@ -137,15 +137,23 @@ def operations():
                 args.append(('Query', 'TStrings', 'nil'))
             if custom_media:
                 args.append(('ContentType', 'string', "'application/octet-stream'"))
-            yield {
+            op = {
                 'name': name, 'path': path, 'verb': verb.upper(), 'op': operation,
                 'parameters': parameters, 'paths': paths, 'auth': auth, 'args': args,
                 'file': is_file, 'body': has_body, 'query': has_query,
                 'signer': signer, 'content': content,
                 'file_field': file_field, 'media_type': media_type,
                 'required_body': body_spec.get('required', False),
-                'custom_media': custom_media,
+                'custom_media': custom_media, 'workspace_of': '',
             }
+            yield op
+            if signer and api:
+                # Signer-code methods never fall back to workspace credentials;
+                # workspace access to the same route is a separate explicit method.
+                names.add((name + 'AsWorkspace').lower())
+                yield op | {'name': name + 'AsWorkspace', 'auth': 'aaAPI', 'signer': False,
+                            'workspace_of': name,
+                            'args': [x for x in args if x[0] != 'SignerAccessCode']}
 
 
 def signature(op, defaults=True):
@@ -172,7 +180,8 @@ def path_expression(op):
 def generate_methods(ops):
     declarations, implementations, checks = [], [], []
     for op in ops:
-        declarations.append(f"    // {op['verb']} {op['path']}; payloads: docs/API.md#{op['name'].lower()}")
+        variant = ' (workspace credentials)' if op['workspace_of'] else ''
+        declarations.append(f"    // {op['verb']} {op['path']}{variant}; payloads: docs/API.md#{op['name'].lower()}")
         declarations.append(f"    function {op['name']}{signature(op)}: TAssinafyResponse;")
         impl = [f"function TAssinafyClient.{op['name']}{signature(op, False)}: TAssinafyResponse;", 'begin']
         if op['body'] and op['required_body']:
@@ -274,11 +283,13 @@ def code(value, language='json'):
 
 
 def generate_docs(ops):
-    lines = ['# API reference', '', 'Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).', '', f'The client exposes all {len(ops)} published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).', '', '## Ownership and payloads', '', 'Every call returns a caller-owned `TAssinafyResponse`; free it in `finally`. `Response.JSON` contains the entire wire response; `Response.Data` refers to the envelope’s `data`, or the entire flat OAuth response. Both are borrowed until `Response.Free`. Requests borrow `Body` and `Query`; the caller frees them. Empty account IDs use the client’s configured account. Other path parameters are required and percent-encoded.', '', '`Query` is a `TStrings` of decoded `name=value` pairs; use the exact API field names. The SDK percent-encodes names and values, preserving duplicates and empty values. Send JSON booleans, arrays, numbers and explicit nulls using `AssinafyJson` helpers or the compiler’s native JSON classes. Binary response bytes remain in `Response.Body`; use `Response.SaveToStream` to write them after a successful request.', '', 'Payload examples show the documented fields, including optional fields. They illustrate shapes; follow each schema’s `required`, `enum`, constraints and descriptions when constructing an actual request. Placeholder values and mutually exclusive variants must be replaced with valid values. `{}` denotes an open object whose fields the API does not specify.', '', '## Operations', '', '| Method | HTTP operation |', '| --- | --- |']
+    lines = ['# API reference', '', 'Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).', '', f'The client exposes all {len({(op["verb"], op["path"]) for op in ops})} published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).', '', '## Ownership and payloads', '', 'Every call returns a caller-owned `TAssinafyResponse`; free it in `finally`. `Response.JSON` contains the entire wire response; `Response.Data` refers to the envelope’s `data`, or the entire flat OAuth response. Both are borrowed until `Response.Free`. Requests borrow `Body` and `Query`; the caller frees them. Empty account IDs use the client’s configured account. Other path parameters are required and percent-encoded.', '', '`Query` is a `TStrings` of decoded `name=value` pairs; use the exact API field names. The SDK percent-encodes names and values, preserving duplicates and empty values. Send JSON booleans, arrays, numbers and explicit nulls using `AssinafyJson` helpers or the compiler’s native JSON classes. Binary response bytes remain in `Response.Body`; use `Response.SaveToStream` to write them after a successful request.', '', 'Payload examples show the documented fields, including optional fields. They illustrate shapes; follow each schema’s `required`, `enum`, constraints and descriptions when constructing an actual request. Placeholder values and mutually exclusive variants must be replaced with valid values. `{}` denotes an open object whose fields the API does not specify.', '', '## Operations', '', '| Method | HTTP operation |', '| --- | --- |']
     lines += [f"| [{op['name']}](#{op['name'].lower()}) | `{op['verb']} {op['path']}` |" for op in ops]
     for op in ops:
         lines += ['', f"## {op['name']}", '', code(f"function {op['name']}{signature(op)}: TAssinafyResponse;", 'pascal'), f"`{op['verb']} {op['path']}`", '', op['op'].get('description', op['op']['summary']), '']
-        auth = {'aaPublic': 'Public: workspace credentials are omitted.', 'aaAPI': 'API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.', 'aaSigner': 'Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.', 'aaSignerOrAPI': 'Signer code when supplied; otherwise API key or bearer token.', 'aaBearer': 'Required bearer access token (`Client.AccessToken`).'}[op['auth']]
+        if op['workspace_of']:
+            lines += [f"Workspace-credential form of [{op['workspace_of']}](#{op['workspace_of'].lower()}): it sends the API key or bearer token and never a signer access code.", '']
+        auth = {'aaPublic': 'Public: workspace credentials are omitted.', 'aaAPI': 'API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.', 'aaSigner': 'Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.', 'aaSignerOrAPI': f"Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [{op['name']}AsWorkspace](#{op['name'].lower()}asworkspace).", 'aaBearer': 'Required bearer access token (`Client.AccessToken`).'}[op['auth']]
         lines += ['**Authentication:** ' + auth, '', '**Parameters:**']
         if op['custom_media']:
             lines += ['', '`ContentType` is an optional SDK parameter for the file part media type (for example `image/png` or `image/jpeg`); the default is `application/octet-stream`. It does not add a JSON field.']
@@ -328,7 +339,7 @@ def main():
             path.write_text(content, encoding='utf-8')
     if stale:
         raise SystemExit('Regenerate files: ' + ', '.join(stale))
-    print(f'{len(ops)} API operations and complete payload references verified.')
+    print(f"{len({(op['verb'], op['path']) for op in ops})} API operations and complete payload references verified.")
 
 
 if __name__ == '__main__':

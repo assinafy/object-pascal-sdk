@@ -133,7 +133,8 @@ class Handler(BaseHTTPRequestHandler):
             self.server.redirect_followed = True
         elif path == '/v1/documents/rate-limit':
             status = 429
-            extra['Retry-After'] = '3'
+            extra.update({'Retry-After': '3', 'X-Rate-Limit-Limit': '60',
+                          'X-Rate-Limit-Remaining': '0', 'X-Rate-Limit-Reset': '3'})
         elif path == '/v1/documents/html-error':
             status = 503
             content_type = 'text/html'

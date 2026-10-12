@@ -174,7 +174,7 @@ Response.Free;
 
 Cada token OAuth corresponde ao espaço de trabalho autorizado. Salve o ID retornado junto da conexão. O exemplo pressupõe a resposta documentada com o espaço de trabalho autorizado; trate respostas inesperadas na aplicação. Proteja os tokens no cofre de credenciais do sistema operacional ou em um armazenamento criptografado do serviço.
 
-Operações públicas e operações do signatário podem usar um cliente sem credenciais da conta. Métodos públicos não enviam chave de API ou token; métodos de signatário enviam apenas seu código de acesso. Os métodos de login e gerenciamento de sessão de usuário também permanecem disponíveis na [referência da API](docs/API.md), com autenticação e permissões próprias.
+Operações públicas e operações do signatário podem usar um cliente sem credenciais da conta. Métodos públicos não enviam chave de API ou token; métodos de signatário enviam apenas seu código de acesso e rejeitam um código vazio antes da requisição. `ListSignerDocuments` e `SearchSignerDocuments` exigem o código; para consultar as mesmas rotas com a chave de API ou o token OAuth, use `ListSignerDocumentsAsWorkspace` e `SearchSignerDocumentsAsWorkspace`. Os métodos de login e gerenciamento de sessão de usuário também permanecem disponíveis na [referência da API](docs/API.md), com autenticação e permissões próprias.
 
 ## Fluxo completo do documento
 
@@ -316,11 +316,11 @@ end;
 
 `ConfirmSignerData` confirma os dados de cada documento e `AcceptTerms` registra a aceitação dos termos. Consulte a atribuição antes de enviar os campos exigidos por `SignAssignmentItems`, ou use `SignMultipleDocuments` para documentos com método virtual. Os parâmetros e os corpos completos de cada operação estão na [referência da API](docs/API.md). A consulta da atribuição registra sua visualização pelo signatário; use-a durante o fluxo de assinatura.
 
-Os métodos também permitem rejeição e envio de imagens PNG de assinatura. Trate o código de acesso e o código OTP como credenciais e evite registrar URLs de assinatura ou seus parâmetros. Signatários `DigitalCertificate` concluem o processo com certificado na página de assinatura; `SignAssignmentItems` não substitui esse processo.
+Os métodos também permitem rejeição e envio de imagens PNG de assinatura. `SendAccessTokenForPublicDocument` reenvia o código por e-mail com `{"channel": "email", "recipient": "signer@example.com"}` (ambos obrigatórios). Trate o código de acesso e o código OTP como credenciais e evite registrar URLs de assinatura ou seus parâmetros. Signatários `DigitalCertificate` concluem o processo com certificado na página de assinatura; `SignAssignmentItems` não substitui esse processo.
 
 ### 5. Acompanhar a conclusão e baixar arquivos
 
-`GetDocument` consulta o estado do documento. `ListDocumentActivities`, `ListAssignments` e `ListWhatsAppNotifications` mostram atividades, solicitações e notificações. Use `EstimateResendCost` antes de `ResendSignatureRequest`, pois o reenvio pode consumir créditos. `ResetAssignmentExpiration` exige o JSON de expiração documentado. Trate rejeição e expiração como estados finais na aplicação.
+`GetDocument` consulta o estado do documento. `ListDocumentActivities`, `ListAssignments` e `ListWhatsAppNotifications` mostram atividades, solicitações e notificações. Use `EstimateResendCost` antes de `ResendSignatureRequest`, pois o reenvio pode consumir créditos. `ResetAssignmentExpiration` exige o campo `expires_at`: envie uma data ISO 8601 pelo menos uma hora no futuro, ou `null` para remover a expiração (`JSONObj(['expires_at', nil])`). Trate rejeição e expiração como estados finais na aplicação.
 
 Após a assinatura e a certificação, consulte `artifacts` antes de baixar os arquivos. Os nomes disponíveis incluem `original`, `certificated`, `certificate-page`, `pades` e `bundle`. A disponibilidade depende do estado do documento e do método de assinatura. Use `pades` para manter as assinaturas ICP-Brasil; a certificação pode convertê-las em conteúdo estático no PDF `certificated`.
 
@@ -504,7 +504,7 @@ Os cabeçalhos de paginação são `X-Pagination-Current-Page`, `X-Pagination-To
 | `EAssinafyInputError` | Falha de validação de entrada obrigatória, URL, credencial, arquivo ou segurança antes do envio. |
 | `EAssinafyTransportError` | Falha de DNS, conexão, TLS, timeout ou criptografia nativa. A requisição pode já ter chegado ao servidor. |
 | `EAssinafyProtocolError` | Uma resposta JSON não pôde ser decodificada ou uma resposta OAuth não passou pela validação. `StatusCode` e `ResponseBody` preservam o resultado HTTP e os bytes recebidos. |
-| `EAssinafyAPIError` | Resposta HTTP fora de `2xx`, incluindo erros OAuth. Consulte `StatusCode`, `ErrorCode`, `ResponseBody`, `RetryAfter` e `Authenticate`. |
+| `EAssinafyAPIError` | Resposta HTTP fora de `2xx`, incluindo erros OAuth. Consulte `StatusCode`, `ErrorCode`, `ResponseBody`, `RetryAfter`, `Authenticate`, `RateLimitLimit`, `RateLimitRemaining` e `RateLimitReset`. |
 
 Exceções comuns do sistema de arquivos podem ocorrer ao ler um arquivo para envio ou gravar o destino. Corpos de erro podem conter dados pessoais; aplique a política de ocultação de dados sensíveis da aplicação antes de registrá-los. O SDK não registra credenciais, corpos de requisição ou URLs de assinatura.
 

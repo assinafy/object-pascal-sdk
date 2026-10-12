@@ -160,7 +160,9 @@ begin
         on E: EAssinafyAPIError do
         begin
           Check(E.StatusCode = Expected[I], 'Actual HTTP error status');
-          if I = 1 then Check(E.RetryAfter = '3', 'Wire rate-limit retry delay');
+          if I = 1 then
+            Check((E.RetryAfter = '3') and (E.RateLimitLimit = '60') and
+              (E.RateLimitRemaining = '0') and (E.RateLimitReset = '3'), 'Wire rate-limit headers');
         end;
       end;
     end;

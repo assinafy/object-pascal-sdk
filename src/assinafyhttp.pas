@@ -45,6 +45,10 @@ type
     ResponseBody: RawByteString;
     RetryAfter: string;
     Authenticate: string;
+    // X-Rate-Limit-Limit/Remaining/Reset as sent by the server ('' when absent).
+    RateLimitLimit: string;
+    RateLimitRemaining: string;
+    RateLimitReset: string;
     constructor Create(Response: TAssinafyResponse);
   end;
 
@@ -258,6 +262,9 @@ begin
   ResponseBody := Response.Body;
   RetryAfter := Response.Header('Retry-After');
   Authenticate := Response.Header('WWW-Authenticate');
+  RateLimitLimit := Response.Header('X-Rate-Limit-Limit');
+  RateLimitRemaining := Response.Header('X-Rate-Limit-Remaining');
+  RateLimitReset := Response.Header('X-Rate-Limit-Reset');
   Detail := '';
   ErrorCode := '';
   if Response.JSON is TJSONObject then

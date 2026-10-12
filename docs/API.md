@@ -90,7 +90,9 @@ Payload examples show the documented fields, including optional fields. They ill
 | [UploadSignatureImage](#uploadsignatureimage) | `POST /v1/signature` |
 | [DownloadSignatureImage](#downloadsignatureimage) | `GET /v1/signature/{signatureType}` |
 | [ListSignerDocuments](#listsignerdocuments) | `GET /v1/signers/{signerId}/documents` |
+| [ListSignerDocumentsAsWorkspace](#listsignerdocumentsasworkspace) | `GET /v1/signers/{signerId}/documents` |
 | [SearchSignerDocuments](#searchsignerdocuments) | `GET /v1/signers/{signerId}/documents/search` |
+| [SearchSignerDocumentsAsWorkspace](#searchsignerdocumentsasworkspace) | `GET /v1/signers/{signerId}/documents/search` |
 | [DownloadSignerDocumentArtifact](#downloadsignerdocumentartifact) | `GET /v1/signers/{signerId}/documents/{documentId}/download/{artifactName}` |
 | [SocialLogin](#sociallogin) | `POST /v1/authentication/social-login` |
 | [LinkSocialLogin](#linksociallogin) | `POST /v1/auth/link-social-login` |
@@ -11489,7 +11491,7 @@ Send a one-time access token to a signer of a public document, so they can view 
     "recipient": {
       "description": "The signer's address on that channel — for `email`, the signer's email address.",
       "type": "string",
-      "example": "developer@example.com"
+      "example": "signer@example.com"
     }
   },
   "type": "object"
@@ -11501,7 +11503,7 @@ Send a one-time access token to a signer of a public document, so they can view 
 ```json
 {
   "channel": "email",
-  "recipient": "developer@example.com"
+  "recipient": "signer@example.com"
 }
 ```
 
@@ -11552,7 +11554,7 @@ Content type: `application/json`
             },
             "recipient": {
               "type": "string",
-              "example": "developer@example.com"
+              "example": "signer@example.com"
             }
           },
           "type": "object"
@@ -11579,7 +11581,7 @@ Content type: `application/json`
       "created_by": "Jane Doe"
     },
     "channel": "email",
-    "recipient": "developer@example.com"
+    "recipient": "signer@example.com"
   }
 }
 ```
@@ -14918,7 +14920,278 @@ function ListSignerDocuments(const SignerId: string; const SignerAccessCode: str
 
 List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
 
-**Authentication:** Signer code when supplied; otherwise API key or bearer token.
+**Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [ListSignerDocumentsAsWorkspace](#listsignerdocumentsasworkspace).
+
+**Parameters:**
+
+- `signerId` (path, required): The signer ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `page` (query, optional): Page number.
+```json
+{
+  "type": "integer",
+  "minimum": 1,
+  "example": 1
+}
+```
+
+
+- `per-page` (query, optional): Records per page (max 100).
+```json
+{
+  "type": "integer",
+  "maximum": 100,
+  "example": 25
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The signer's documents
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Document"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "resource": "document",
+      "id": "615601fab04c0a3147bb1246",
+      "account_id": "d199996981dbd199996981db",
+      "template_id": null,
+      "name": "document.pdf",
+      "status": "metadata_ready",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      },
+      "is_closed": false,
+      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "decline_reason": null,
+      "declined_by": {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "developer@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false
+      },
+      "tags": [
+        {
+          "id": "<string>",
+          "name": "<string>"
+        }
+      ],
+      "assignment": {
+        "resource": "assignment",
+        "id": "615606ef81d199996981dbce",
+        "sender_email": "developer@example.com",
+        "method": "virtual",
+        "expires_at": null,
+        "message": "<string>",
+        "signers": [
+          {
+            "resource": "signer",
+            "id": "62d6ee35c7741ca4006b9e11",
+            "full_name": "John Signer",
+            "email": "developer@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": "39053344705",
+            "has_accepted_terms": false,
+            "verification_method": "Email",
+            "notification_methods": [
+              "Email"
+            ],
+            "step": 1,
+            "notified": false,
+            "completed": false,
+            "notification_history": [
+              {
+                "event": "signature_request",
+                "status": "sent",
+                "error_code": "<string>",
+                "error_message": "<string>",
+                "sent_at": "2026-07-07T12:00:00Z",
+                "failed_at": null
+              }
+            ]
+          }
+        ],
+        "copy_receivers": [
+          {}
+        ],
+        "items": [
+          {
+            "id": "<string>",
+            "page": {
+              "id": "615601faf166d6d1d8e7dc30",
+              "number": 1,
+              "height": 2100,
+              "width": 1275,
+              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            },
+            "signer": {},
+            "field": {},
+            "display_settings": "<string>",
+            "value": "<string>",
+            "completed": false
+          }
+        ],
+        "summary": {
+          "signer_count": 1,
+          "completed_count": 1,
+          "signers": [
+            {}
+          ]
+        },
+        "signing_urls": [
+          {
+            "signer_id": "<string>",
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          }
+        ]
+      },
+      "pages": [
+        {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        }
+      ],
+      "created_at": "2026-06-03T03:54:16Z",
+      "updated_at": "2026-06-03T03:54:16Z"
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## ListSignerDocumentsAsWorkspace
+
+```pascal
+function ListSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings = nil): TAssinafyResponse;
+```
+
+`GET /v1/signers/{signerId}/documents`
+
+List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
+
+Workspace-credential form of [ListSignerDocuments](#listsignerdocuments): it sends the API key or bearer token and never a signer access code.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
 
@@ -15187,7 +15460,266 @@ function SearchSignerDocuments(const SignerId: string; const SignerAccessCode: s
 
 Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
 
-**Authentication:** Signer code when supplied; otherwise API key or bearer token.
+**Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [SearchSignerDocumentsAsWorkspace](#searchsignerdocumentsasworkspace).
+
+**Parameters:**
+
+- `signerId` (path, required): The signer ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `search` (query, optional): Search term.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** Matching documents
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Document"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "resource": "document",
+      "id": "615601fab04c0a3147bb1246",
+      "account_id": "d199996981dbd199996981db",
+      "template_id": null,
+      "name": "document.pdf",
+      "status": "metadata_ready",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      },
+      "is_closed": false,
+      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "decline_reason": null,
+      "declined_by": {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "developer@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false
+      },
+      "tags": [
+        {
+          "id": "<string>",
+          "name": "<string>"
+        }
+      ],
+      "assignment": {
+        "resource": "assignment",
+        "id": "615606ef81d199996981dbce",
+        "sender_email": "developer@example.com",
+        "method": "virtual",
+        "expires_at": null,
+        "message": "<string>",
+        "signers": [
+          {
+            "resource": "signer",
+            "id": "62d6ee35c7741ca4006b9e11",
+            "full_name": "John Signer",
+            "email": "developer@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": "39053344705",
+            "has_accepted_terms": false,
+            "verification_method": "Email",
+            "notification_methods": [
+              "Email"
+            ],
+            "step": 1,
+            "notified": false,
+            "completed": false,
+            "notification_history": [
+              {
+                "event": "signature_request",
+                "status": "sent",
+                "error_code": "<string>",
+                "error_message": "<string>",
+                "sent_at": "2026-07-07T12:00:00Z",
+                "failed_at": null
+              }
+            ]
+          }
+        ],
+        "copy_receivers": [
+          {}
+        ],
+        "items": [
+          {
+            "id": "<string>",
+            "page": {
+              "id": "615601faf166d6d1d8e7dc30",
+              "number": 1,
+              "height": 2100,
+              "width": 1275,
+              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            },
+            "signer": {},
+            "field": {},
+            "display_settings": "<string>",
+            "value": "<string>",
+            "completed": false
+          }
+        ],
+        "summary": {
+          "signer_count": 1,
+          "completed_count": 1,
+          "signers": [
+            {}
+          ]
+        },
+        "signing_urls": [
+          {
+            "signer_id": "<string>",
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          }
+        ]
+      },
+      "pages": [
+        {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        }
+      ],
+      "created_at": "2026-06-03T03:54:16Z",
+      "updated_at": "2026-06-03T03:54:16Z"
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## SearchSignerDocumentsAsWorkspace
+
+```pascal
+function SearchSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings = nil): TAssinafyResponse;
+```
+
+`GET /v1/signers/{signerId}/documents/search`
+
+Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
+
+Workspace-credential form of [SearchSignerDocuments](#searchsignerdocuments): it sends the API key or bearer token and never a signer access code.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
 

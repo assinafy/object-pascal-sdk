@@ -4109,7 +4109,7 @@
                   "recipient": {
                     "description": "The signer's address on that channel — for `email`, the signer's email address.",
                     "type": "string",
-                    "example": "developer@example.com"
+                    "example": "signer@example.com"
                   }
                 },
                 "type": "object"
@@ -4163,7 +4163,7 @@
                             },
                             "recipient": {
                               "type": "string",
-                              "example": "developer@example.com"
+                              "example": "signer@example.com"
                             }
                           },
                           "type": "object"

@@ -9,7 +9,7 @@ uses
   Classes, SysUtils, AssinafyJson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.3.0';
+  AssinafyVersion = '0.3.1';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 
@@ -128,7 +128,9 @@ begin
           if (LowerCase(Query.Names[I]) = 'access-token') or
              (LowerCase(Query.Names[I]) = 'signer-access-code') then
             raise EAssinafyInputError.Create('Pass authentication through the SDK credential parameters');
-      if (Auth = aaSigner) or ((Auth = aaSignerOrAPI) and (SignerAccessCode <> '')) then
+      // Signer-code routes send only the code; workspace access to routes that
+      // also accept workspace credentials uses the separate *AsWorkspace methods.
+      if Auth in [aaSigner, aaSignerOrAPI] then
       begin
         RequireValue(SignerAccessCode, 'Signer access code');
         if Params <> '' then Params := Params + '&';

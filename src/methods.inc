@@ -478,10 +478,22 @@ begin
     Query, nil, '', '', '', SignerAccessCode);
 end;
 
+function TAssinafyClient.ListSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings): TAssinafyResponse;
+begin
+  Result := Call('GET', '/signers/' + PathValue(SignerId, 'SignerId') + '/documents', aaAPI,
+    Query, nil, '', '', '', '');
+end;
+
 function TAssinafyClient.SearchSignerDocuments(const SignerId: string; const SignerAccessCode: string; Query: TStrings): TAssinafyResponse;
 begin
   Result := Call('GET', '/signers/' + PathValue(SignerId, 'SignerId') + '/documents/search', aaSignerOrAPI,
     Query, nil, '', '', '', SignerAccessCode);
+end;
+
+function TAssinafyClient.SearchSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings): TAssinafyResponse;
+begin
+  Result := Call('GET', '/signers/' + PathValue(SignerId, 'SignerId') + '/documents/search', aaAPI,
+    Query, nil, '', '', '', '');
 end;
 
 function TAssinafyClient.DownloadSignerDocumentArtifact(const SignerId: string; const DocumentId: string; const ArtifactName: string): TAssinafyResponse;
