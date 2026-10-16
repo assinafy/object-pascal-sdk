@@ -1,6 +1,6 @@
 # Assinafy Object Pascal SDK
 
-Cliente nativo em Object Pascal para a [API Assinafy v1](https://api.assinafy.com.br/v1/docs), com suporte às 106 operações REST publicadas. Use o SDK em serviços Free Pascal ou aplicações Lazarus para gerenciar documentos, signatários, solicitações de assinatura, modelos, campos, etiquetas, espaços de trabalho e webhooks.
+Cliente nativo em Object Pascal para a [API Assinafy v1](https://api.assinafy.com.br/v1/docs), com suporte às 112 operações REST publicadas. Use o SDK em serviços Free Pascal ou aplicações Lazarus para gerenciar documentos, signatários, solicitações de assinatura, modelos, campos, etiquetas, espaços de trabalho e webhooks.
 
 Este guia acompanha um documento do envio do PDF até a assinatura e o download dos arquivos finais. A [referência da API](docs/API.md) documenta cada método com os esquemas completos de requisição e resposta, exemplos de estrutura, parâmetros, autenticação e erros. Os [esquemas de dados](docs/SCHEMAS.md) definem os modelos compartilhados; a [referência do SDK](docs/SDK.md) explica tipos, gerenciamento de memória, transportes e funções auxiliares. O [contrato OpenAPI](docs/openapi.json) está disponível para ferramentas e consulta offline.
 
@@ -55,7 +55,7 @@ A integração contínua executa os testes em Linux e macOS. No Windows, são ne
 
 ### Delphi no Windows
 
-A implementação Delphi é **experimental**: os alvos previstos são Delphi 12 ou superior, Win32 e Win64, e a compilação e os testes nesse compilador ainda precisam ser executados. O mesmo código mantém as 106 operações e utiliza `System.JSON` e `System.Net.HttpClient`; Delphi não depende de libcurl. O TLS usa o armazenamento de certificados do Windows, com TLS 1.2/1.3 e redirecionamentos desabilitados.
+A implementação Delphi é **experimental**: os alvos previstos são Delphi 12 ou superior, Win32 e Win64, e a compilação e os testes nesse compilador ainda precisam ser executados. O mesmo código mantém as 112 operações e utiliza `System.JSON` e `System.Net.HttpClient`; Delphi não depende de libcurl. O TLS usa o armazenamento de certificados do Windows, com TLS 1.2/1.3 e redirecionamentos desabilitados.
 
 O [Delphi Community Edition](https://www.embarcadero.com/products/delphi/starter) fornece o compilador para usuários elegíveis. Consulte os [requisitos de licença](https://www.embarcadero.com/products/delphi/starter/faq). A instalação requer Windows; Free Pascal em modo Delphi não substitui essa ferramenta para validar compatibilidade.
 
@@ -76,7 +76,7 @@ Para executar a verificação Delphi em uma máquina Windows isolada, abra o ter
 .\delphi\check.ps1 -Platform Win64 -CryptoDirectory C:\OpenSSL-Win64\bin -TrustTestCertificate
 ```
 
-O comando reconstrói o pacote, os testes e os exemplos; confere as 106 operações; executa os testes de JSON, autenticação, OAuth, webhooks, HTTP e TLS; e compila os trechos Pascal do README. `-TrustTestCertificate` permite confiar temporariamente no certificado local gerado para o teste de TLS, no armazenamento **CurrentUser → Root**. O comando remove esse certificado ao concluir, inclusive quando um teste falha. Um segundo certificado permanece não confiável para verificar a rejeição; o teste também verifica hostname incorreto, redirecionamentos e timeout durante uma resposta contínua. Não execute esse teste interrompendo o processo durante a alteração temporária do armazenamento.
+O comando reconstrói o pacote, os testes e os exemplos; confere as 112 operações; executa os testes de JSON, autenticação, OAuth, webhooks, HTTP e TLS; e compila os trechos Pascal do README. `-TrustTestCertificate` permite confiar temporariamente no certificado local gerado para o teste de TLS, no armazenamento **CurrentUser → Root**. O comando remove esse certificado ao concluir, inclusive quando um teste falha. Um segundo certificado permanece não confiável para verificar a rejeição; o teste também verifica hostname incorreto, redirecionamentos e timeout durante uma resposta contínua. Não execute esse teste interrompendo o processo durante a alteração temporária do armazenamento.
 
 ## Ambientes e configuração
 
@@ -253,7 +253,7 @@ try
   end;
   Response := Client.CreateAssignment(DocumentID, AssignmentBody);
   try
-    WriteLn(JSONText(Response.Data));
+    WriteLn(JSONString(JSONFind(Response.Data, 'id')));
   finally
     Response.Free;
   end;
@@ -266,13 +266,14 @@ A requisição usa `signers: [{"id": "signer-id"}]`. Também pode incluir `entri
 
 A estimativa informa `has_sufficient_resources`, `blocking_reason`, saldo e detalhamento dos custos. Confirme os recursos antes da criação. A resposta da solicitação inclui seu identificador, signatários, resumo, itens e `signing_urls`. Envie cada URL somente ao signatário correspondente. `step` define a ordem das assinaturas: ao usar etapas, todos os signatários precisam informar uma sequência contínua iniciada em 1; signatários da mesma etapa assinam em paralelo. As etapas seguintes recebem convites quando a anterior termina.
 
-#### E-mail, WhatsApp e certificados A1/A3
+#### E-mail, WhatsApp, biometria e certificados A1/A3
 
 | Verificação | Notificação | Preparação |
 | --- | --- | --- |
 | `Email` | `Email` | O signatário possui e-mail; um código de uso único é exigido antes da assinatura. |
 | `Whatsapp` | `Whatsapp` | O signatário possui número WhatsApp em E.164; a conta possui assinatura paga. |
 | `DigitalCertificate` | `Email` ou `Whatsapp` | A conta possui o recurso de certificado digital; o signatário possui o CPF/CNPJ exigido e fica sozinho em sua etapa de assinatura. |
+| `IdDocumentFaceMatchBasic` | `Email` ou `Whatsapp` | A conta possui o recurso de documento de identidade e comparação facial; o signatário possui CPF válido em `government_id` e consente com o tratamento biométrico. |
 
 `notification_methods` aceita exatamente uma entrada. Omita verificação e notificação para usar e-mail como padrão, ou informe uma delas para que a API deduza a outra. O servidor rejeita combinações incompatíveis. Consulte as estimativas para obter preços atuais e verificar os recursos habilitados para a conta.
 
@@ -291,6 +292,34 @@ Uma solicitação com certificado usa o mesmo formato JSON de criação:
 ```
 
 A página de assinatura da Assinafy utiliza o certificado ICP-Brasil A1/A3 do signatário pela extensão Web PKI do navegador. A1 e A3 usam o mesmo valor `DigitalCertificate`; o que muda é o armazenamento da chave privada no dispositivo. Um CPF exige o certificado da pessoa correspondente; um CNPJ exige o e-CNPJ da empresa. O SDK cria e acompanha essas solicitações e obtém o documento PAdES resultante. Os certificados e as chaves privadas permanecem com o signatário. A especificação publicada menciona rotas de início e conclusão da assinatura com certificado, mas não define seus contratos de requisição e resposta; use a URL de assinatura retornada para concluir esse processo.
+
+Para biometria, use `IdDocumentFaceMatchBasic` no mesmo campo `verification_method`. A verificação utiliza o documento de identidade, uma foto do signatário com o documento e uma prova de vida no provedor. Consulte a estimativa antes de criar a solicitação: o recurso depende da conta e tem custo por signatário, além da notificação escolhida.
+
+#### Verificação biométrica e análise de identidade
+
+A página de assinatura conduz a captura biométrica. Em uma experiência própria, consulte `GetIdentityVerificationStatus` com o código do signatário. Inicie a captura somente quando `can_start` for verdadeiro e após obter consentimento explícito:
+
+```pascal
+// Execute somente depois de obter o consentimento explícito do signatário.
+VerificationBody := JSONObj(['consent', True]);
+try
+  Response := SignerClient.StartIdentityVerification(SignerAccessCode, VerificationBody);
+  try
+    URL := JSONString(JSONFind(Response.Data, 'url'));
+    // Redirecione o signatário para URL sem alterar seu fragmento #t=.
+  finally
+    Response.Free;
+  end;
+finally
+  VerificationBody.Free;
+end;
+```
+
+A URL retornada é uma credencial: abra-a integralmente, incluindo o fragmento, sem registrá-la ou persistir no navegador. Só existe uma sessão ativa por signatário. Uma sessão `Expired` pode ser substituída; `Pending`, `InReview`, `Approved`, `Declined` e `Abandoned` não podem ser reiniciadas. Uma verificação recusada ou abandonada exige um novo processo com outro documento e atribuição. Reenviar a notificação não substitui a sessão, e o reinício de uma sessão expirada não cobra novamente a verificação.
+
+Com `InReview`, o signatário pode confirmar seus dados e assinar enquanto a conta analisa a identidade. Após todas as assinaturas, `pending_identity_review` indica que a certificação aguarda essa análise. Use `GetSignerIdentityReview` com credenciais da conta para consultar os motivos e `DownloadSignerIdentityReviewImage` para obter somente as imagens enumeradas em `images`. Os bytes podem ser JPEG, PNG ou PDF e só ficam disponíveis enquanto a análise está aberta; preserve `Cache-Control: no-store` e não persista essas imagens.
+
+`DecideSignerIdentityReview` recebe `{"decision":"Approved","note":null}` ou `{"decision":"Rejected","note":"Motivo interno"}`. Aprovar libera a certificação quando não restam assinaturas ou análises pendentes. Rejeitar cancela o documento e notifica signatários e destinatários de cópia; a nota não é mostrada ao signatário. Os eventos `signer_identity_verified`, `signer_identity_verification_failed` e `signer_identity_review_required/approved/rejected` permitem acompanhar essas transições. Os [contratos completos](docs/API.md#getidentityverificationstatus) incluem estados, evidências, decisões e erros.
 
 ### 4. Concluir o fluxo do signatário
 
@@ -316,7 +345,7 @@ end;
 
 `ConfirmSignerData` confirma os dados de cada documento e `AcceptTerms` registra a aceitação dos termos. Consulte a atribuição antes de enviar os campos exigidos por `SignAssignmentItems`, ou use `SignMultipleDocuments` para documentos com método virtual. Os parâmetros e os corpos completos de cada operação estão na [referência da API](docs/API.md). A consulta da atribuição registra sua visualização pelo signatário; use-a durante o fluxo de assinatura.
 
-Os métodos também permitem rejeição e envio de imagens PNG de assinatura. `SendAccessTokenForPublicDocument` reenvia o código por e-mail com `{"channel": "email", "recipient": "signer@example.com"}` (ambos obrigatórios). Trate o código de acesso e o código OTP como credenciais e evite registrar URLs de assinatura ou seus parâmetros. Signatários `DigitalCertificate` concluem o processo com certificado na página de assinatura; `SignAssignmentItems` não substitui esse processo.
+Os métodos também permitem rejeição e envio de imagens PNG de assinatura. `SendAccessTokenForPublicDocument` reenvia o código por e-mail com `{"channel": "email", "recipient": "signer@example.com"}` (ambos obrigatórios). Trate o código de acesso e o código OTP como credenciais e evite registrar URLs de assinatura ou seus parâmetros. `VerifySignerCode` aplica-se à verificação por e-mail ou WhatsApp; `IdDocumentFaceMatchBasic` utiliza o fluxo biométrico descrito acima. Signatários `DigitalCertificate` concluem o processo com certificado na página de assinatura; `SignAssignmentItems` não substitui esse processo.
 
 ### 5. Acompanhar a conclusão e baixar arquivos
 
@@ -434,7 +463,9 @@ Use `CreateWebhookEndpoint` para cadastrar a URL de entrega, o e-mail de contato
 }
 ```
 
-Obtenha o segredo do endpoint com `GetWebhookEndpointSigningSecret`, usando chave de API ou token de usuário autorizado. Aplicações OAuth não podem consultá-lo. Armazene-o com segurança. A rotação invalida o segredo anterior imediatamente; coordene `RotateWebhookEndpointSigningSecret` com o receptor das entregas.
+Quando `signing_enabled` é verdadeiro, `CreateWebhookEndpoint` retorna o segredo em `Response.Data.secret`, inclusive para aplicações OAuth. Salve-o com segurança nesse momento; listagens e consultas do endpoint não o retornam. `GetWebhookEndpointSigningSecret` permite recuperá-lo usando chave de API ou token de usuário autorizado, mas aplicações OAuth não podem consultá-lo: se perderem o segredo, precisam excluir o endpoint e criá-lo novamente. A rotação invalida o segredo anterior imediatamente; coordene `RotateWebhookEndpointSigningSecret` com o receptor das entregas.
+
+`ListWebhookEndpoints` aceita um `Query` opcional com `url` para localizar a URL exata registrada. `DeleteWebhookEndpointByURL` recebe o mesmo parâmetro obrigatório em `Query` e libera o slot do endpoint. Passe a URL completa como valor decodificado, incluindo sua query string; o SDK faz a codificação. A exclusão retorna `404` quando não existe correspondência, e exige `webhooks:write` em conexões OAuth.
 
 Verifique a assinatura antes de interpretar o JSON ou aceitar qualquer evento:
 
@@ -445,7 +476,7 @@ if not VerifyWebhookHeaders(EndpointSecret, RequestHeaders, RawRequestBody) then
 
 `RequestHeaders` aceita linhas HTTP `nome: valor` ou pares `nome=valor`. Os nomes dos cabeçalhos não diferenciam maiúsculas e minúsculas. A verificação usa os bytes originais do corpo, `webhook-id`, `webhook-timestamp`, uma chave `whsec_` decodificada de base64 e HMAC-SHA256. Aceita uma assinatura `v1` válida entre múltiplas entradas, compara em tempo constante e exige uma diferença máxima de cinco minutos entre o horário da entrega e o relógio local. Mantenha o relógio do servidor sincronizado. Identificadores ou timestamps duplicados, cabeçalhos ausentes, chaves malformadas, corpos alterados e entregas fora da janela são rejeitados.
 
-Persista os eventos válidos e elimine duplicatas por `webhook-id`, encaminhe o processamento para uma fila e retorne `2xx` rapidamente. Cada endpoint recebe entregas independentes. O corpo contém `id`, `event`, `message`, `payload`, `origin`, `created_at`, `subject`, `object` e `account_id`; `subject` e `object` podem representar diferentes tipos de recurso. [WebhookEvent](docs/SCHEMAS.md#webhookevent) define o envelope completo. Não dependa de uma ordem fixa entre `assignment_created` e `document_metadata_ready`.
+Persista os eventos válidos e elimine duplicatas por `webhook-id`, encaminhe o processamento para uma fila e retorne `2xx` rapidamente. Cada endpoint recebe entregas independentes. O corpo contém `id`, `event`, `message`, `payload`, `origin`, `created_at`, `subject`, `object` e `account_id`; `subject` e `object` podem representar diferentes tipos de recurso. [WebhookEvent](docs/SCHEMAS.md#webhookevent) define o envelope completo; a [referência de entregas](docs/API.md#webhook-deliveries) inclui cabeçalhos e exemplos completos dos 23 eventos. Não dependa de uma ordem fixa entre `assignment_created` e `document_metadata_ready`.
 
 Use `ListWebhookEventTypes` para o catálogo de eventos, `ListWebhookDeliveries` para os resultados das entregas e `RetryWebhookDelivery` para solicitar uma nova tentativa. Reenvios podem entregar o mesmo evento novamente; mantenha a eliminação de duplicatas ativa.
 
@@ -520,7 +551,7 @@ O SDK não repete requisições automaticamente. Uma resposta `429` informa o in
 make check
 ```
 
-O comando verifica os arquivos gerados contra o contrato incluído, a cobertura das operações, os links de documentação e a consistência dos arquivos. Compila tratando avisos como erros, executa as verificações dos 106 métodos e os testes de respostas, segurança e funções auxiliares, exercita requisições HTTP reais locais com multipart, dados binários e TLS, e compila os dois exemplos. Também compila os trechos Pascal deste guia e verifica a sintaxe dos exemplos JSON e shell, sem executá-los. Os testes ativam verificações de faixa, overflow, entrada/saída, asserções e memória. A integração contínua executa em Linux e macOS. Os testes HTTP locais precisam de permissão para abrir portas de loopback.
+O comando verifica os arquivos gerados contra o contrato incluído, a cobertura das operações, os links de documentação e a consistência dos arquivos. Compila tratando avisos como erros, executa as verificações dos 112 métodos e os testes de respostas, segurança e funções auxiliares, exercita requisições HTTP reais locais com multipart, dados binários e TLS, e compila os dois exemplos. Também compila os trechos Pascal deste guia e verifica a sintaxe dos exemplos JSON e shell, sem executá-los. Os testes ativam verificações de faixa, overflow, entrada/saída, asserções e memória. A integração contínua executa em Linux e macOS. Os testes HTTP locais precisam de permissão para abrir portas de loopback.
 
 As verificações Python também testam falhas de contrato com otimização ativada (`python3 -O`), validam a autenticação independentemente dos testes gerados e rejeitam parâmetros ou formatos de envio incompatíveis.
 

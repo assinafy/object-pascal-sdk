@@ -20,6 +20,20 @@ module_spec.loader.exec_module(generate)
 
 
 class GeneratorTests(unittest.TestCase):
+    def test_reference_preserves_sibling_description(self):
+        value = generate.resolve({'$ref': '#/components/responses/ValidationError',
+                                  'description': '`url` is missing.'})
+        self.assertEqual(value['description'], '`url` is missing.')
+        self.assertIn('content', value)
+
+    def test_webhook_payloads_are_documented(self):
+        docs = generate.generate_docs(list(generate.operations()))['docs/API.md']
+        for name, item in generate.SPEC['webhooks'].items():
+            with self.subTest(event=name):
+                self.assertIn('\n### ' + name + '\n', docs)
+                content = item['post']['requestBody']['content']['application/json']
+                self.assertIn(generate.code(content['example']), docs)
+
     def operation(self, security, **changes):
         spec = copy.deepcopy(generate.SPEC)
         operation = {'summary': 'Test operation', 'security': security, **changes}

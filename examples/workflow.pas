@@ -59,7 +59,7 @@ begin
           raise EAssinafyInputError.Create('Insufficient resources to request signatures');
       finally Response.Free; end;
       Response := Client.CreateAssignment(DocumentID, AssignmentBody);
-      try WriteLn('Assignment: ', JSONText(Response.Data)); finally Response.Free; end;
+      try WriteLn('Assignment ID: ', JSONString(JSONFind(Response.Data, 'id'))); finally Response.Free; end;
     finally AssignmentBody.Free; end;
     WriteLn('Document ID: ', DocumentID);
   finally Client.Free; end;

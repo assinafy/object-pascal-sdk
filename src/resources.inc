@@ -30,6 +30,12 @@
     function EstimateResendCost(const DocumentId: string; const AssignmentId: string; const SignerId: string): TAssinafyResponse;
     // PUT /v1/documents/{documentId}/assignments/{assignmentId}/reset-expiration; payloads: docs/API.md#resetassignmentexpiration
     function ResetAssignmentExpiration(const DocumentId: string; const AssignmentId: string; Body: TJSONData): TAssinafyResponse;
+    // GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification; payloads: docs/API.md#getsigneridentityreview
+    function GetSignerIdentityReview(const DocumentId: string; const AssignmentId: string; const SignerId: string): TAssinafyResponse;
+    // GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/images/{name}; payloads: docs/API.md#downloadsigneridentityreviewimage
+    function DownloadSignerIdentityReviewImage(const DocumentId: string; const AssignmentId: string; const SignerId: string; const Name: string): TAssinafyResponse;
+    // POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/review; payloads: docs/API.md#decidesigneridentityreview
+    function DecideSignerIdentityReview(const DocumentId: string; const AssignmentId: string; const SignerId: string; Body: TJSONData): TAssinafyResponse;
     // POST /v1/login; payloads: docs/API.md#login
     function Login(Body: TJSONData): TAssinafyResponse;
     // PUT /v1/authentication/request-password-reset; payloads: docs/API.md#requestpasswordreset
@@ -122,6 +128,10 @@
     function DeleteSigner(const AAccountId: string; const SignerId: string): TAssinafyResponse;
     // GET /v1/signers/self; payloads: docs/API.md#getcurrentsigner
     function GetCurrentSigner(const SignerAccessCode: string): TAssinafyResponse;
+    // GET /v1/signers/identity-verification; payloads: docs/API.md#getidentityverificationstatus
+    function GetIdentityVerificationStatus(const SignerAccessCode: string): TAssinafyResponse;
+    // POST /v1/signers/identity-verification; payloads: docs/API.md#startidentityverification
+    function StartIdentityVerification(const SignerAccessCode: string; Body: TJSONData): TAssinafyResponse;
     // GET /v1/signers/{signerId}/document; payloads: docs/API.md#getsignerdocument
     function GetSignerDocument(const SignerId: string; const SignerAccessCode: string): TAssinafyResponse;
     // GET /v1/sign; payloads: docs/API.md#viewdocumenttosign
@@ -197,9 +207,11 @@
     // POST /v1/accounts/{accountId}/webhooks/{historyId}/retry; payloads: docs/API.md#retrywebhookdelivery
     function RetryWebhookDelivery(const AAccountId: string; const HistoryId: string): TAssinafyResponse;
     // GET /v1/accounts/{accountId}/webhooks/endpoints; payloads: docs/API.md#listwebhookendpoints
-    function ListWebhookEndpoints(const AAccountId: string): TAssinafyResponse;
+    function ListWebhookEndpoints(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
     // POST /v1/accounts/{accountId}/webhooks/endpoints; payloads: docs/API.md#createwebhookendpoint
     function CreateWebhookEndpoint(const AAccountId: string; Body: TJSONData): TAssinafyResponse;
+    // DELETE /v1/accounts/{accountId}/webhooks/endpoints; payloads: docs/API.md#deletewebhookendpointbyurl
+    function DeleteWebhookEndpointByURL(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
     // GET /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}; payloads: docs/API.md#getwebhookendpoint
     function GetWebhookEndpoint(const AAccountId: string; const EndpointId: string): TAssinafyResponse;
     // PUT /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}; payloads: docs/API.md#updatewebhookendpoint

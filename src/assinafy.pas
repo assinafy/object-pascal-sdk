@@ -9,7 +9,7 @@ uses
   Classes, SysUtils, AssinafyJson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.3.1';
+  AssinafyVersion = '0.4.0';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 

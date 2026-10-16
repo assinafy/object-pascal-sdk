@@ -17,6 +17,12 @@ The [API reference](API.md) defines every resource method. This document defines
 
 `Free` releases only the owned transport. Clients are synchronous; use one per worker and do not modify properties concurrently. `AssinafyVersion`, `AssinafyProductionURL` and `AssinafySandboxURL` are public string constants. `TAssinafyAuth` is the resource authentication enumeration: public, API, signer, signer-or-API and bearer-only.
 
+## Identity verification resources
+
+`GetIdentityVerificationStatus(SignerAccessCode)` and `StartIdentityVerification(SignerAccessCode, Body)` send only a nonempty signer code. Starting requires explicit biometric consent (`{"consent":true}`). The returned capture URL is a bearer credential; preserve its fragment and keep it out of logs and browser storage. The application obtains consent and follows the server's `can_start` state. See the complete [status](API.md#getidentityverificationstatus) and [session](API.md#startidentityverification) contracts.
+
+`GetSignerIdentityReview(DocumentID, AssignmentID, SignerID)`, `DownloadSignerIdentityReviewImage(DocumentID, AssignmentID, SignerID, Name)` and `DecideSignerIdentityReview(DocumentID, AssignmentID, SignerID, Body)` require workspace credentials. The download returns exact image/PDF bytes, available only during an open review; preserve `Cache-Control: no-store`. Decisions use `Approved` or `Rejected` and an optional nullable note. Rejection cancels the document and notifies its recipients. The [resource reference](API.md#getsigneridentityreview) defines all evidence, statuses and errors; the [signing flow](../README.md#verificação-biométrica-e-análise-de-identidade) explains session expiry and certification holds. These methods have the same response/body ownership as every resource call.
+
 ## TAssinafyResponse
 
 `Create` allocates an empty response and its case-insensitive header list. `Free` frees the header list and parsed JSON tree.

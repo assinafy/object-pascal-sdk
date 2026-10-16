@@ -16,7 +16,7 @@ from email import policy
 from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 FILE_BYTES = b'%PDF-\x00\xfffixture!'
 ENCODED_BYTES = base64.b64decode('H4sIAAAAAAAC/1MNcHHTZfiflllRUlqUqggAXGVJUQ8AAAA=')
@@ -126,6 +126,28 @@ class Handler(BaseHTTPRequestHandler):
             'key': self.headers.get('X-Api-Key', ''),
             'authorization': self.headers.get('Authorization', ''),
         }
+        review_path = '/v1/documents/review-doc/assignments/assignment/signers/signer/identity-verification'
+        if path == '/v1/signers/identity-verification':
+            check(not data['key'] and not data['authorization'], 'Identity capture must omit workspace credentials')
+            check(parse_qs(urlsplit(self.path).query) == {'signer-access-code': ['code & private']}, 'Identity signer code')
+            if self.command == 'POST':
+                check(json.loads(raw) == {'consent': True}, 'Explicit biometric consent')
+                data.update(id='session', url='https://verify.example.com/c/session#t=private-token', expires_at=None)
+            else:
+                check(self.command == 'GET', 'Identity status verb')
+                data.update(can_start=False, status='InReview', url=None)
+        elif path in {review_path, review_path + '/review'}:
+            check(data['authorization'] == 'Bearer test-bearer' and not data['key'], 'Identity review workspace credentials')
+            if path.endswith('/review'):
+                check(self.command == 'POST' and json.loads(raw) == {'decision': 'Approved', 'note': None}, 'Identity review decision')
+                data['status'] = 'Approved'
+            else:
+                check(self.command == 'GET', 'Identity review verb')
+                data.update(status='InReview', images=['face', 'document_pdf'])
+        elif path == '/v1/accounts/account/webhooks/endpoints':
+            check(self.command == 'DELETE', 'Webhook deletion verb')
+            check(data['authorization'] == 'Bearer test-bearer' and not data['key'], 'Webhook deletion workspace credentials')
+            check(parse_qs(urlsplit(self.path).query) == {'url': ['https://app.example.com/hook?tenant=a&next=/x']}, 'Webhook URL retained exactly')
         if path == '/v1/documents/redirect':
             status = 302
             extra['Location'] = f'http://127.0.0.1:{self.server.server_port}/trap'
@@ -163,7 +185,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.command == 'PATCH':
             check(self.headers['Content-Type'] == 'application/json', 'Expected JSON content type')
             data['body'] = json.loads(raw)
-        if path == '/v1/documents/binary/download/original':
+        if path.startswith(review_path + '/images/'):
+            check(data['authorization'] == 'Bearer test-bearer' and not data['key'], 'Identity image workspace credentials')
+            content_type = 'application/pdf' if path.endswith('/document_pdf') else 'image/png'
+            body = FILE_BYTES
+        elif path == '/v1/documents/binary/download/original':
             content_type = 'application/pdf'
             body = FILE_BYTES
         elif path == '/v1/oauth/token':

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0] - 2026-10-16
+
+- Add signer identity-verification status and consent-based session creation for `IdDocumentFaceMatchBasic`.
+- Add workspace identity-review retrieval, binary evidence downloads and approval/rejection decisions.
+- Add webhook endpoint deletion by exact URL and an optional URL filter to `ListWebhookEndpoints`.
+- Include all 112 published operations, identity-verification schemas and 23 webhook event payloads in the generated reference.
+- Preserve endpoint-specific descriptions on referenced response schemas.
+- Print only the assignment ID in the workflow example, keeping signing URLs out of console output.
+
 ## [0.3.1] - 2026-10-12
 
 - **Behavior change (security):** `ListSignerDocuments` and `SearchSignerDocuments` now require a nonempty `SignerAccessCode` and send only that code. Previously an empty code silently fell back to the workspace API key or bearer token. Signatures are unchanged.

@@ -112,6 +112,26 @@
   Check(Fake.LastBody = JSONText(TestBody), 'ResetAssignmentExpiration body');
   Check(Fake.LastContentType = 'application/json', 'ResetAssignmentExpiration content type');
 
+  Response := Client.GetSignerIdentityReview('DocumentId', 'AssignmentId', 'SignerId');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetSignerIdentityReview verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/AssignmentId/signers/SignerId/identity-verification', 'GetSignerIdentityReview URL');
+  Check(Fake.LastAuth = 'bearer', 'GetSignerIdentityReview authentication');
+
+  Response := Client.DownloadSignerIdentityReviewImage('DocumentId', 'AssignmentId', 'SignerId', 'Name');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'DownloadSignerIdentityReviewImage verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/AssignmentId/signers/SignerId/identity-verification/images/Name', 'DownloadSignerIdentityReviewImage URL');
+  Check(Fake.LastAuth = 'bearer', 'DownloadSignerIdentityReviewImage authentication');
+
+  Response := Client.DecideSignerIdentityReview('DocumentId', 'AssignmentId', 'SignerId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'DecideSignerIdentityReview verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/AssignmentId/signers/SignerId/identity-verification/review', 'DecideSignerIdentityReview URL');
+  Check(Fake.LastAuth = 'bearer', 'DecideSignerIdentityReview authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'DecideSignerIdentityReview body');
+  Check(Fake.LastContentType = 'application/json', 'DecideSignerIdentityReview content type');
+
   Response := Client.Login(TestBody);
   Response.Free;
   Check(Fake.LastMethod = 'POST', 'Login verb');
@@ -455,6 +475,20 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/self?signer-access-code=SignerAccessCode', 'GetCurrentSigner URL');
   Check(Fake.LastAuth = 'signer', 'GetCurrentSigner authentication');
 
+  Response := Client.GetIdentityVerificationStatus('SignerAccessCode');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetIdentityVerificationStatus verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/identity-verification?signer-access-code=SignerAccessCode', 'GetIdentityVerificationStatus URL');
+  Check(Fake.LastAuth = 'signer', 'GetIdentityVerificationStatus authentication');
+
+  Response := Client.StartIdentityVerification('SignerAccessCode', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'StartIdentityVerification verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/identity-verification?signer-access-code=SignerAccessCode', 'StartIdentityVerification URL');
+  Check(Fake.LastAuth = 'signer', 'StartIdentityVerification authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'StartIdentityVerification body');
+  Check(Fake.LastContentType = 'application/json', 'StartIdentityVerification content type');
+
   Response := Client.GetSignerDocument('SignerId', 'SignerAccessCode');
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'GetSignerDocument verb');
@@ -745,10 +779,12 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/HistoryId/retry', 'RetryWebhookDelivery URL');
   Check(Fake.LastAuth = 'bearer', 'RetryWebhookDelivery authentication');
 
-  Response := Client.ListWebhookEndpoints('');
+  TestQuery.Clear;
+  TestQuery.Add('url=https://app.example.com/resource');
+  Response := Client.ListWebhookEndpoints('', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListWebhookEndpoints verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints', 'ListWebhookEndpoints URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints?url=https%3A%2F%2Fapp.example.com%2Fresource', 'ListWebhookEndpoints URL');
   Check(Fake.LastAuth = 'bearer', 'ListWebhookEndpoints authentication');
 
   Response := Client.CreateWebhookEndpoint('', TestBody);
@@ -758,6 +794,14 @@
   Check(Fake.LastAuth = 'bearer', 'CreateWebhookEndpoint authentication');
   Check(Fake.LastBody = JSONText(TestBody), 'CreateWebhookEndpoint body');
   Check(Fake.LastContentType = 'application/json', 'CreateWebhookEndpoint content type');
+
+  TestQuery.Clear;
+  TestQuery.Add('url=https://app.example.com/resource');
+  Response := Client.DeleteWebhookEndpointByURL('', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'DELETE', 'DeleteWebhookEndpointByURL verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints?url=https%3A%2F%2Fapp.example.com%2Fresource', 'DeleteWebhookEndpointByURL URL');
+  Check(Fake.LastAuth = 'bearer', 'DeleteWebhookEndpointByURL authentication');
 
   Response := Client.GetWebhookEndpoint('', 'EndpointId');
   Response.Free;

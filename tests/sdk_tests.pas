@@ -98,6 +98,11 @@ begin
       15: begin Response := Client.UploadSignatureImage('signer-code', ''); Response.Free; end;
       16: begin Response := Client.UploadAccountLogo('', FixtureFile, ''); Response.Free; end;
       17: begin Response := Client.UploadAccountLogo('', FixtureFile, 'image/png' + #13#10 + 'Injected: value'); Response.Free; end;
+      18: begin Response := Client.GetIdentityVerificationStatus(''); Response.Free; end;
+      19: begin Response := Client.StartIdentityVerification('', TestBody); Response.Free; end;
+      20: begin Response := Client.StartIdentityVerification('code', nil); Response.Free; end;
+      21: begin Response := Client.DecideSignerIdentityReview('document', 'assignment', 'signer', nil); Response.Free; end;
+      22: begin Response := Client.DownloadSignerIdentityReviewImage('document', 'assignment', 'signer', '..'); Response.Free; end;
     end;
     raise Exception.Create(Name + ': expected input error');
   except
@@ -795,29 +800,43 @@ end;
 
 procedure TestSigningMethods;
 const
-  Methods: array[0..2] of string = ('Email', 'Whatsapp', 'DigitalCertificate');
+  Methods: array[0..5] of string = ('Email', 'Whatsapp', 'DigitalCertificate',
+    'DigitalCertificate', 'IdDocumentFaceMatchBasic', 'IdDocumentFaceMatchBasic');
+  Channels: array[0..5] of string = ('Email', 'Whatsapp', 'Email', 'Whatsapp', 'Email', 'Whatsapp');
 var
   Method, Channel: string;
-  Body: TJSONObject;
+  Body, TemplateBody, Signer: TJSONObject;
   Signers: TJSONArray;
+  I: Integer;
 begin
   Fake.NextBody := '{"status":200,"message":"ok","data":{}}';
-  for Method in Methods do
+  for I := 0 to High(Methods) do
   begin
-    Channel := 'Email';
-    if Method = 'Whatsapp' then Channel := 'Whatsapp';
+    Method := Methods[I];
+    Channel := Channels[I];
     Body := JSONObj(['method', 'virtual']);
     try
       Signers := TJSONArray.Create;
       JSONAdd(Body, 'signers', Signers);
-      JSONAdd(Signers, JSONObj(['id', 'signer', 'verification_method', Method,
-        'notification_methods', JSONArr([Channel]), 'step', 1]));
+      Signer := JSONObj(['id', 'signer', 'verification_method', Method,
+        'notification_methods', JSONArr([Channel]), 'step', 1]);
+      JSONAdd(Signers, Signer);
       Response := Client.EstimateAssignmentCost('document', Body);
       Response.Free;
       Check(Fake.LastBody = JSONText(Body), Method + ' estimation payload retained');
       Response := Client.CreateAssignment('document', Body);
       Response.Free;
       Check(Fake.LastBody = JSONText(Body), Method + ' assignment payload retained');
+      JSONAdd(Signer, 'role_id', 'role');
+      TemplateBody := JSONObj(['signers', Signers.Clone]);
+      try
+        Response := Client.EstimateDocumentFromTemplateCost('', 'template', TemplateBody);
+        Response.Free;
+        Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template estimate retained');
+        Response := Client.CreateDocumentFromTemplate('', 'template', TemplateBody);
+        Response.Free;
+        Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template creation retained');
+      finally TemplateBody.Free; end;
     finally Body.Free; end;
   end;
   Body := JSONObj(['verification-code', '123456']);
@@ -827,6 +846,50 @@ begin
     Check(Fake.LastBody = JSONText(Body), 'OTP field spelling preserved');
     Check(Fake.LastAuth = 'signer', 'OTP uses signer authentication');
   finally Body.Free; end;
+end;
+
+procedure TestIdentityVerification;
+const
+  CaptureURL = 'https://verify.example.com/c/session#t=private-token';
+var Body: TJSONObject;
+begin
+  Fake.NextBody := '{"data":{"can_start":false,"status":"InReview","url":null}}';
+  Response := Client.GetIdentityVerificationStatus('code & private');
+  try
+    Check(not JSONBoolean(JSONFind(Response.Data, 'can_start')), 'Identity session cannot restart while under review');
+    Check(JSONKind(JSONFind(Response.Data, 'url')) = jtNull, 'Identity capture URL may be null');
+    Check(Fake.LastURL = AssinafySandboxURL + '/signers/identity-verification?signer-access-code=code%20%26%20private', 'Identity code encoded');
+    Check(Fake.LastAuth = 'signer', 'Identity status omits workspace bearer');
+  finally Response.Free; end;
+  Body := JSONObj(['consent', True]);
+  try
+    Fake.NextBody := '{"data":{"id":"session","url":"' + CaptureURL + '","expires_at":null}}';
+    Response := Client.StartIdentityVerification('code', Body);
+    try
+      Check(Fake.LastAuth = 'signer', 'Biometric consent omits workspace bearer');
+      Check(Fake.LastBody = JSONText(Body), 'Explicit biometric consent retained');
+      Check(JSONString(JSONFind(Response.Data, 'url')) = CaptureURL, 'Capture URL fragment retained');
+    finally Response.Free; end;
+  finally Body.Free; end;
+  Body := JSONObj(['decision', 'Rejected', 'note', nil]);
+  try
+    Fake.NextBody := '{"data":{"status":"Declined","evidence_available":false,"images":[]}}';
+    Response := Client.DecideSignerIdentityReview('doc', 'assignment', 'signer', Body);
+    try
+      Check(Fake.LastAuth = 'bearer', 'Identity decision requires workspace credentials');
+      Check(Fake.LastBody = JSONText(Body), 'Identity decision and explicit null note retained');
+      Check(JSONString(JSONFind(Response.Data, 'status')) = 'Declined', 'Identity decision response retained');
+    finally Response.Free; end;
+  finally Body.Free; end;
+  Fake.NextContentType := 'image/jpeg';
+  Fake.NextBody := RawBytes([$FF, $D8, 0, $FF, $D9]);
+  Response := Client.DownloadSignerIdentityReviewImage('doc', 'assignment', 'signer', 'face');
+  try
+    Check(Response.Body = Fake.NextBody, 'Identity evidence binary bytes retained');
+    Check(Response.JSON = nil, 'Identity image is not decoded as JSON');
+  finally Response.Free; end;
+  Fake.NextContentType := 'application/json';
+  Fake.NextBody := '{"data":{}}';
 end;
 
 var
@@ -851,7 +914,7 @@ begin
     Response := Client.GetDocument('doc/with space');
     Response.Free;
     Check(Pos('doc%2Fwith%20space', Fake.LastURL) > 0, 'Path segments encoded');
-    for I := 1 to 17 do ExpectInputError('Input ' + IntToStr(I), I);
+    for I := 1 to 22 do ExpectInputError('Input ' + IntToStr(I), I);
     TestResponses;
     TestAuthenticationAndURLs;
     TestUploadLimits;
@@ -864,7 +927,8 @@ begin
     TestJSONCompatibility;
     {$IFDEF FPC}TestNativeFPCCompatibility;{$ENDIF}
     TestSigningMethods;
-    WriteLn('PASS: ', Checks, ' checks across all 106 API operations, responses, OAuth and webhooks');
+    TestIdentityVerification;
+    WriteLn('PASS: ', Checks, ' checks across all 112 API operations, responses, OAuth and webhooks');
   finally
     TestQuery.Free;
     TestBody.Free;

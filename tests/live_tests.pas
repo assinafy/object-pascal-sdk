@@ -14,6 +14,8 @@ var
   BaseURL, AccountID, DocumentID, SignerID, TagID, AssignmentID, SignerEmail, TestName, FixtureFile: string;
   Calls: Integer = 0;
   Attempt: Integer;
+  VerificationMethod, Channel: string;
+  PaidMethods: array[0..1] of string = ('Whatsapp', 'DigitalCertificate');
   Ready: Boolean = False;
   CleanupFailed: Boolean = False;
 
@@ -139,20 +141,25 @@ begin
           Response.Free;
           raise Exception.Create('Empty signer access code was sent');
         except on E: EAssinafyInputError do begin Inc(Calls); WriteLn('PASS: Empty signer access code rejected'); end; end;
-        Body := JSONObj(['method', 'virtual']);
-        JSONAdd(Body, 'signers', JSONArr([JSONObj(['id', SignerID, 'verification_method', 'Whatsapp',
-          'notification_methods', JSONArr(['Whatsapp'])])]));
-        try
+        for VerificationMethod in PaidMethods do
+        begin
+          Channel := 'Email';
+          if VerificationMethod = 'Whatsapp' then Channel := 'Whatsapp';
+          Body := JSONObj(['method', 'virtual']);
+          JSONAdd(Body, 'signers', JSONArr([JSONObj(['verification_method', VerificationMethod,
+            'notification_methods', JSONArr([Channel])])]));
           try
-            Passed(Client.EstimateAssignmentCost(DocumentID, Body), 'WhatsApp assignment cost');
-          except
-            on E: EAssinafyAPIError do
-            begin
-              Assert(E.StatusCode = 403, 'WhatsApp plan gate status');
-              Inc(Calls); WriteLn('PASS: WhatsApp assignment cost is plan-gated (403)');
+            try
+              Passed(Client.EstimateAssignmentCost(DocumentID, Body), VerificationMethod + ' assignment cost');
+            except
+              on E: EAssinafyAPIError do
+              begin
+                Assert(E.StatusCode = 403, VerificationMethod + ' plan gate status');
+                Inc(Calls); WriteLn('PASS: ', VerificationMethod, ' assignment cost is plan-gated (403)');
+              end;
             end;
-          end;
-        finally Body.Free; end;
+          finally Body.Free; end;
+        end;
         Body := JSONObj(['method', 'virtual']);
         JSONAdd(Body, 'signers', JSONArr([JSONObj(['id', SignerID, 'verification_method', 'Email'])]));
         try Passed(Client.EstimateAssignmentCost(DocumentID, Body), 'Email assignment cost'); finally Body.Free; end;

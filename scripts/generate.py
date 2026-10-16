@@ -35,17 +35,23 @@ OVERRIDES = {
     "List signer's documents": 'ListSignerDocuments',
     "Search signer's documents": 'SearchSignerDocuments',
     "Download signer's document artifact": 'DownloadSignerDocumentArtifact',
+    'Identity document verification status': 'GetIdentityVerificationStatus',
+    'Start identity document verification': 'StartIdentityVerification',
+    'Signer identity review': 'GetSignerIdentityReview',
+    'Signer identity review image': 'DownloadSignerIdentityReviewImage',
 }
 
 
 def resolve(value):
     while isinstance(value, dict) and '$ref' in value:
         reference = value['$ref']
+        siblings = {key: item for key, item in value.items() if key != '$ref'}
         if not reference.startswith('#/'):
             raise ValueError(f'External reference: {reference}')
         value = SPEC
         for part in reference[2:].split('/'):
             value = value[part.replace('~1', '/').replace('~0', '~')]
+        value = value | siblings
     return value
 
 
@@ -315,6 +321,19 @@ def generate_docs(ops):
                     lines += ['Raw binary bytes; preserved without JSON decoding.']
             if response.get('headers'):
                 lines += ['', '**Response headers:**', '', code(response['headers'])]
+    if SPEC.get('webhooks'):
+        lines += ['', '## Webhook deliveries', '',
+                  'Assinafy sends these HTTP POST requests to subscribed endpoints. Verify the raw bytes with [VerifyWebhookHeaders](SDK.md#webhook-verification) before parsing, deduplicate `webhook-id`, and acknowledge with `2xx`. Headers and payload examples below come from the published contract.']
+        for name, item in SPEC['webhooks'].items():
+            operation = resolve(item)['post']
+            lines += ['', f'### {name}', '', operation.get('description', ''), '',
+                      '**Request headers:**', '', code(operation.get('parameters', []))]
+            for media, content in resolve(operation['requestBody'])['content'].items():
+                schema = content.get('schema', {})
+                lines += ['', f'**Request: `{media}`**', '', code(schema),
+                          '**Payload shape:**', '', code(content.get('example', example(schema)))]
+            for status, response in operation['responses'].items():
+                lines += ['', f"**Response `{status}`:** {resolve(response).get('description', '')}"]
     schemas = ['# Payload schemas', '', 'Complete shared request and response schemas from the [published API](https://api.assinafy.com.br/v1/docs). References use the identifiers in [openapi.json](openapi.json).', '']
     for name, schema in SPEC['components'].get('schemas', {}).items():
         schemas += [f'## {name}', '', code(schema), '**Payload shape:**', '', code(example(schema))]

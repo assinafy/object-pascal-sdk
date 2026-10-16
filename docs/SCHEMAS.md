@@ -110,7 +110,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "example@example.com"
     },
     "telephone": {
       "type": [
@@ -158,7 +158,7 @@ Complete shared request and response schemas from the [published API](https://ap
 {
   "id": "bgjazeo5r9v2lq7l36dx48np",
   "name": "John Smith",
-  "email": "developer@example.com",
+  "email": "example@example.com",
   "telephone": "17989206641",
   "government_id": "15774136604",
   "is_email_verified": false,
@@ -310,6 +310,17 @@ Complete shared request and response schemas from the [published API](https://ap
           "description": "Whether the signer opted to reuse their saved signature/initials in future processes. When false, clients should not pre-render the saved image even if `has_signature`/`has_initial` is true.",
           "type": "boolean",
           "example": false
+        },
+        "verification_method": {
+          "description": "How this signature request verifies the signer. `Email`/`Whatsapp` ask for the 6-digit code; `IdDocumentFaceMatchBasic` runs the identity document check instead (see **Identity document verification status**).",
+          "type": "string",
+          "enum": [
+            "Email",
+            "Whatsapp",
+            "DigitalCertificate",
+            "IdDocumentFaceMatchBasic"
+          ],
+          "example": "Email"
         }
       },
       "type": "object"
@@ -331,7 +342,8 @@ Complete shared request and response schemas from the [published API](https://ap
   "has_accepted_terms": false,
   "has_signature": true,
   "has_initial": false,
-  "is_signature_reusable": false
+  "is_signature_reusable": false,
+  "verification_method": "Email"
 }
 ```
 
@@ -628,7 +640,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "assignment": {
     "resource": "assignment",
     "id": "615606ef81d199996981dbce",
-    "sender_email": "developer@example.com",
+    "sender_email": "sender@example.com",
     "method": "virtual",
     "expires_at": null,
     "message": "<string>",
@@ -647,6 +659,7 @@ Complete shared request and response schemas from the [published API](https://ap
         ],
         "step": 1,
         "notified": false,
+        "identity_verification_status": "InReview",
         "completed": false,
         "notification_history": [
           {
@@ -690,7 +703,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
       }
     ]
   },
@@ -922,7 +935,7 @@ Complete shared request and response schemas from the [published API](https://ap
     },
     "url": {
       "type": "string",
-      "example": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+      "example": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
     }
   },
   "type": "object"
@@ -934,7 +947,7 @@ Complete shared request and response schemas from the [published API](https://ap
 ```json
 {
   "signer_id": "<string>",
-  "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+  "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
 }
 ```
 
@@ -983,6 +996,22 @@ Complete shared request and response schemas from the [published API](https://ap
             "null"
           ]
         },
+        "identity_verification_status": {
+          "description": "Latest identity-document verification status; `InReview` means the account must decide it before the document can be certificated.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "Pending",
+            "InReview",
+            "Approved",
+            "Declined",
+            "Expired",
+            "Abandoned"
+          ],
+          "example": "InReview"
+        },
         "completed": {
           "description": "Only present in account-owner contexts.",
           "type": [
@@ -1024,6 +1053,7 @@ Complete shared request and response schemas from the [published API](https://ap
   ],
   "step": 1,
   "notified": false,
+  "identity_verification_status": "InReview",
   "completed": false,
   "notification_history": [
     {
@@ -1216,7 +1246,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "sender_email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "sender@example.com"
     },
     "method": {
       "type": "string",
@@ -1278,7 +1308,7 @@ Complete shared request and response schemas from the [published API](https://ap
 {
   "resource": "assignment",
   "id": "615606ef81d199996981dbce",
-  "sender_email": "developer@example.com",
+  "sender_email": "sender@example.com",
   "method": "virtual",
   "expires_at": null,
   "message": "<string>",
@@ -1297,6 +1327,7 @@ Complete shared request and response schemas from the [published API](https://ap
       ],
       "step": 1,
       "notified": false,
+      "identity_verification_status": "InReview",
       "completed": false,
       "notification_history": [
         {
@@ -1340,7 +1371,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "signing_urls": [
     {
       "signer_id": "<string>",
-      "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+      "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
     }
   ]
 }
@@ -1866,7 +1897,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "description": "Contact email for delivery-failure notices.",
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "ops@example.com"
     },
     "events": {
       "description": "Event types delivered to this endpoint (see **List webhook event types**).",
@@ -1911,7 +1942,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
   "name": "ERP",
   "url": "https://example.com/webhooks/assinafy",
-  "email": "developer@example.com",
+  "email": "ops@example.com",
   "events": [
     "document_ready",
     "signer_signed_document"
@@ -2595,7 +2626,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "user": {
     "id": "bgjazeo5r9v2lq7l36dx48np",
     "name": "John Smith",
-    "email": "developer@example.com",
+    "email": "example@example.com",
     "telephone": "17989206641",
     "government_id": "15774136604",
     "is_email_verified": false,
@@ -2614,6 +2645,310 @@ Complete shared request and response schemas from the [published API](https://ap
       "created_at": "2023-03-03T11:51:34Z"
     }
   ]
+}
+```
+
+## SignerIdentityReview
+
+```json
+{
+  "properties": {
+    "id": {
+      "type": "string",
+      "example": "104c267f8e1e8c6855d7788b76a8"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pending",
+        "InReview",
+        "Approved",
+        "Declined",
+        "Expired",
+        "Abandoned"
+      ],
+      "example": "InReview"
+    },
+    "provider": {
+      "type": "string",
+      "enum": [
+        "AssinafyVerify"
+      ],
+      "example": "AssinafyVerify"
+    },
+    "verification_method": {
+      "type": "string",
+      "enum": [
+        "IdDocumentFaceMatchBasic"
+      ],
+      "example": "IdDocumentFaceMatchBasic"
+    },
+    "reason_codes": {
+      "description": "Why the provider sent it to review, in its order. Unknown codes have the code as description.",
+      "type": "array",
+      "items": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "NAME_MISMATCH"
+          },
+          "description": {
+            "type": "string",
+            "example": "Nome no documento difere do cadastrado (similaridade 52%)"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "evidence_available": {
+      "type": "boolean",
+      "example": true
+    },
+    "expected": {
+      "description": "What the signer was registered with.",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "example": "Maria da Silva"
+        },
+        "cpf": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "example": "52998224725"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "document": {
+      "description": "What was read from the document.",
+      "properties": {
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "example": "CNH"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "example": "MARIA SILVA"
+        },
+        "cpf": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "example": "52998224725"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "matches": {
+      "properties": {
+        "cpf": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "example": true
+        },
+        "name": {
+          "description": "Name similarity, 0-1.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "example": 0.5217
+        },
+        "birth_date": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "example": null
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "name"
+          },
+          "result": {
+            "description": "pass, review, skipped, or a failure result.",
+            "type": "string",
+            "example": "review"
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "example": 0.5217
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "NAME_MISMATCH"
+            ]
+          }
+        },
+        "type": "object"
+      }
+    },
+    "images": {
+      "description": "The evidence images the reviewer can open with **Signer identity review image**, in display order: `document_front`, `document_back`, `document_pdf`, `face`. Only while `status` is `InReview`; empty once decided.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "document_front",
+          "document_back",
+          "document_pdf",
+          "face"
+        ]
+      },
+      "example": [
+        "document_front",
+        "document_back",
+        "face"
+      ]
+    },
+    "ruleset_version": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "2026-10-12.2"
+    },
+    "evidence_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "9f2c0d6e4b1a8c3f5e7d9b0a2c4e6f8a1b3d5f7091e2c4a6b8d0f2e4a6c8e0b2"
+    },
+    "reviewed_by": {
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "Kx9pQ2"
+        },
+        "name": {
+          "type": "string",
+          "example": "Ana Souza"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "reviewed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "example": "2026-10-13T21:05:00Z"
+    },
+    "review_note": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "Conferido por videochamada."
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "example": "2026-10-13T21:05:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": "104c267f8e1e8c6855d7788b76a8",
+  "status": "InReview",
+  "provider": "AssinafyVerify",
+  "verification_method": "IdDocumentFaceMatchBasic",
+  "reason_codes": [
+    {
+      "code": "NAME_MISMATCH",
+      "description": "Nome no documento difere do cadastrado (similaridade 52%)"
+    }
+  ],
+  "evidence_available": true,
+  "expected": {
+    "name": "Maria da Silva",
+    "cpf": "52998224725"
+  },
+  "document": {
+    "type": "CNH",
+    "name": "MARIA SILVA",
+    "cpf": "52998224725"
+  },
+  "matches": {
+    "cpf": true,
+    "name": 0.5217,
+    "birth_date": null
+  },
+  "checks": [
+    {
+      "name": "name",
+      "result": "review",
+      "score": 0.5217,
+      "reasons": [
+        "NAME_MISMATCH"
+      ]
+    }
+  ],
+  "images": [
+    "document_front",
+    "document_back",
+    "face"
+  ],
+  "ruleset_version": "2026-10-12.2",
+  "evidence_sha256": "9f2c0d6e4b1a8c3f5e7d9b0a2c4e6f8a1b3d5f7091e2c4a6b8d0f2e4a6c8e0b2",
+  "reviewed_by": {
+    "id": "Kx9pQ2",
+    "name": "Ana Souza"
+  },
+  "reviewed_at": "2026-10-13T21:05:00Z",
+  "review_note": "Conferido por videochamada.",
+  "completed_at": "2026-10-13T21:05:00Z"
 }
 ```
 

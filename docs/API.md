@@ -2,7 +2,7 @@
 
 Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).
 
-The client exposes all 106 published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).
+The client exposes all 112 published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).
 
 ## Ownership and payloads
 
@@ -32,6 +32,9 @@ Payload examples show the documented fields, including optional fields. They ill
 | [ResendSignatureRequest](#resendsignaturerequest) | `PUT /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/resend` |
 | [EstimateResendCost](#estimateresendcost) | `POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/estimate-resend-cost` |
 | [ResetAssignmentExpiration](#resetassignmentexpiration) | `PUT /v1/documents/{documentId}/assignments/{assignmentId}/reset-expiration` |
+| [GetSignerIdentityReview](#getsigneridentityreview) | `GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification` |
+| [DownloadSignerIdentityReviewImage](#downloadsigneridentityreviewimage) | `GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/images/{name}` |
+| [DecideSignerIdentityReview](#decidesigneridentityreview) | `POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/review` |
 | [Login](#login) | `POST /v1/login` |
 | [RequestPasswordReset](#requestpasswordreset) | `PUT /v1/authentication/request-password-reset` |
 | [ResetPassword](#resetpassword) | `PUT /v1/authentication/reset-password` |
@@ -78,6 +81,8 @@ Payload examples show the documented fields, including optional fields. They ill
 | [UpdateSigner](#updatesigner) | `PUT /v1/accounts/{accountId}/signers/{signerId}` |
 | [DeleteSigner](#deletesigner) | `DELETE /v1/accounts/{accountId}/signers/{signerId}` |
 | [GetCurrentSigner](#getcurrentsigner) | `GET /v1/signers/self` |
+| [GetIdentityVerificationStatus](#getidentityverificationstatus) | `GET /v1/signers/identity-verification` |
+| [StartIdentityVerification](#startidentityverification) | `POST /v1/signers/identity-verification` |
 | [GetSignerDocument](#getsignerdocument) | `GET /v1/signers/{signerId}/document` |
 | [ViewDocumentToSign](#viewdocumenttosign) | `GET /v1/sign` |
 | [SignAssignmentItems](#signassignmentitems) | `POST /v1/documents/{documentId}/assignments/{assignmentId}` |
@@ -117,6 +122,7 @@ Payload examples show the documented fields, including optional fields. They ill
 | [RetryWebhookDelivery](#retrywebhookdelivery) | `POST /v1/accounts/{accountId}/webhooks/{historyId}/retry` |
 | [ListWebhookEndpoints](#listwebhookendpoints) | `GET /v1/accounts/{accountId}/webhooks/endpoints` |
 | [CreateWebhookEndpoint](#createwebhookendpoint) | `POST /v1/accounts/{accountId}/webhooks/endpoints` |
+| [DeleteWebhookEndpointByURL](#deletewebhookendpointbyurl) | `DELETE /v1/accounts/{accountId}/webhooks/endpoints` |
 | [GetWebhookEndpoint](#getwebhookendpoint) | `GET /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}` |
 | [UpdateWebhookEndpoint](#updatewebhookendpoint) | `PUT /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}` |
 | [DeleteWebhookEndpoint](#deletewebhookendpoint) | `DELETE /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}` |
@@ -2001,7 +2007,7 @@ Content type: `application/json`
     {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -2020,6 +2026,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -2063,7 +2070,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     }
@@ -2205,17 +2212,18 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
             "example": "615605f50e968054a5b7c9b8"
           },
           "verification_method": {
-            "description": "How the signer's identity is verified before signing. `Email` (default) sends a one-time code to the signer's email; `Whatsapp` sends the code over WhatsApp — the verification itself is not billed, but it requires the WhatsApp notification channel, so the signer costs 0.45 credits (available only on paid subscriptions); `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate (A1/A3) — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id`, must be alone in its signing step, and is charged 0.5 credits per signer. A CPF requires that person's certificate (an e-CPF, or an e-CNPJ naming them as legal representative); a CNPJ requires an e-CNPJ for that company, from any of its representatives. Omit to default to `Email`.",
+            "description": "How the signer's identity is verified before signing. `Email` (default) sends a one-time code to the signer's email; `Whatsapp` sends the code over WhatsApp — the verification itself is not billed, but it requires the WhatsApp notification channel, so the signer costs 0.45 credits (available only on paid subscriptions); `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate (A1/A3) — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id`, must be alone in its signing step, and is charged 0.5 credits per signer. A CPF requires that person's certificate (an e-CPF, or an e-CNPJ naming them as legal representative); a CNPJ requires an e-CNPJ for that company, from any of its representatives. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Omit to default to `Email`.",
             "type": "string",
             "enum": [
               "Email",
               "Whatsapp",
-              "DigitalCertificate"
+              "DigitalCertificate",
+              "IdDocumentFaceMatchBasic"
             ],
             "example": "Email"
           },
           "notification_methods": {
-            "description": "How the signer is told a signature is being requested. **Exactly one method per signer** — the array shape is historical, and sending two returns `400`. The method must also be compatible with `verification_method`: `Email` verification takes `Email`, `Whatsapp` verification takes `Whatsapp`, and `DigitalCertificate` takes either. WhatsApp incurs an additional cost and is available only on paid subscriptions. Omit it to have it inferred from `verification_method`, or `{\"Email\"}` when neither is sent. See **Verification & Notification Methods** for the full pairing table.",
+            "description": "How the signer is told a signature is being requested. **Exactly one method per signer** — the array shape is historical, and sending two returns `400`. The method must also be compatible with `verification_method`: `Email` verification takes `Email`, `Whatsapp` verification takes `Whatsapp`, and `DigitalCertificate` and `IdDocumentFaceMatchBasic` take either. WhatsApp incurs an additional cost and is available only on paid subscriptions. Omit it to have it inferred from `verification_method`, or `{\"Email\"}` when neither is sent. See **Verification & Notification Methods** for the full pairing table.",
             "type": "array",
             "items": {
               "type": "string",
@@ -2362,7 +2370,7 @@ Content type: `application/json`
   "data": {
     "resource": "assignment",
     "id": "615606ef81d199996981dbce",
-    "sender_email": "developer@example.com",
+    "sender_email": "sender@example.com",
     "method": "virtual",
     "expires_at": null,
     "message": "<string>",
@@ -2381,6 +2389,7 @@ Content type: `application/json`
         ],
         "step": 1,
         "notified": false,
+        "identity_verification_status": "InReview",
         "completed": false,
         "notification_history": [
           {
@@ -2424,7 +2433,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
       }
     ]
   }
@@ -2603,12 +2612,13 @@ Verification methods are not priced separately — every line in the `breakdown`
       "items": {
         "properties": {
           "verification_method": {
-            "description": "Verification method to price. `Whatsapp` forces the WhatsApp notification, so it prices at 0.45 credits per signer; `DigitalCertificate` adds the per-signer signature cost on top of its notification.",
+            "description": "Verification method to price. `Whatsapp` forces the WhatsApp notification, so it prices at 0.45 credits per signer; `DigitalCertificate` adds the per-signer signature cost on top of its notification. `IdDocumentFaceMatchBasic` requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged a per-signer fee.",
             "type": "string",
             "enum": [
               "Email",
               "Whatsapp",
-              "DigitalCertificate"
+              "DigitalCertificate",
+              "IdDocumentFaceMatchBasic"
             ],
             "example": "Whatsapp"
           },
@@ -3262,7 +3272,7 @@ Content type: `application/json`
   "data": {
     "resource": "assignment",
     "id": "615606ef81d199996981dbce",
-    "sender_email": "developer@example.com",
+    "sender_email": "sender@example.com",
     "method": "virtual",
     "expires_at": null,
     "message": "<string>",
@@ -3281,6 +3291,7 @@ Content type: `application/json`
         ],
         "step": 1,
         "notified": false,
+        "identity_verification_status": "InReview",
         "completed": false,
         "notification_history": [
           {
@@ -3324,7 +3335,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
       }
     ]
   }
@@ -3488,6 +3499,624 @@ Content type: `application/json`
 ```
 
 
+## GetSignerIdentityReview
+
+```pascal
+function GetSignerIdentityReview(const DocumentId: string; const AssignmentId: string; const SignerId: string): TAssinafyResponse;
+```
+
+`GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification`
+
+The signer's identity-document verification as the account's reviewer sees it. When the provider sends a verification to review, the account decides it with **Decide signer identity review**. The signer can still view and sign meanwhile; the review holds the document's certification instead (status `pending_identity_review` once every signer has signed).
+Evidence is a summary kept by Assinafy (no images or biometrics). `evidence_available` is false when the provider keeps none or it could not be fetched yet. While the review is open, `images` lists the evidence images the reviewer can open with **Signer identity review image**. A verification the provider approved directly, without a review, shows no evidence here (`evidence_available` is false); its evidence is on the `signer_identity_verified` activity.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `assignmentId` (path, required): The assignment ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `signerId` (path, required): The signer ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** Identity review
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/SignerIdentityReview"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "id": "104c267f8e1e8c6855d7788b76a8",
+    "status": "InReview",
+    "provider": "AssinafyVerify",
+    "verification_method": "IdDocumentFaceMatchBasic",
+    "reason_codes": [
+      {
+        "code": "NAME_MISMATCH",
+        "description": "Nome no documento difere do cadastrado (similaridade 52%)"
+      }
+    ],
+    "evidence_available": true,
+    "expected": {
+      "name": "Maria da Silva",
+      "cpf": "52998224725"
+    },
+    "document": {
+      "type": "CNH",
+      "name": "MARIA SILVA",
+      "cpf": "52998224725"
+    },
+    "matches": {
+      "cpf": true,
+      "name": 0.5217,
+      "birth_date": null
+    },
+    "checks": [
+      {
+        "name": "name",
+        "result": "review",
+        "score": 0.5217,
+        "reasons": [
+          "NAME_MISMATCH"
+        ]
+      }
+    ],
+    "images": [
+      "document_front",
+      "document_back",
+      "face"
+    ],
+    "ruleset_version": "2026-10-12.2",
+    "evidence_sha256": "9f2c0d6e4b1a8c3f5e7d9b0a2c4e6f8a1b3d5f7091e2c4a6b8d0f2e4a6c8e0b2",
+    "reviewed_by": {
+      "id": "Kx9pQ2",
+      "name": "Ana Souza"
+    },
+    "reviewed_at": "2026-10-13T21:05:00Z",
+    "review_note": "Conferido por videochamada.",
+    "completed_at": "2026-10-13T21:05:00Z"
+  }
+}
+```
+
+
+**Response `404`:** Assignment, signer or verification not found.
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## DownloadSignerIdentityReviewImage
+
+```pascal
+function DownloadSignerIdentityReviewImage(const DocumentId: string; const AssignmentId: string; const SignerId: string; const Name: string): TAssinafyResponse;
+```
+
+`GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/images/{name}`
+
+One evidence image of a signer identity verification that is `InReview`, for the account's reviewer: the document photos (or the digital document PDF) and the face photo. Fetched from the verification provider on each request and never stored by Assinafy. Available only while the review is open; once it is decided, every image returns 404. `name` must be one of the review's `images`.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `assignmentId` (path, required): The assignment ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `signerId` (path, required): The signer ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `name` (path, required): The image, as listed in the review's `images`.
+```json
+{
+  "type": "string",
+  "enum": [
+    "document_front",
+    "document_back",
+    "document_pdf",
+    "face"
+  ]
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The image bytes (`image/jpeg`, `image/png`) or the document PDF (`application/pdf`). Sent with `Cache-Control: no-store`.
+
+Content type: `image/jpeg`
+
+```json
+{
+  "type": "string",
+  "format": "binary"
+}
+```
+
+Raw binary bytes; preserved without JSON decoding.
+
+Content type: `image/png`
+
+```json
+{
+  "type": "string",
+  "format": "binary"
+}
+```
+
+Raw binary bytes; preserved without JSON decoding.
+
+Content type: `application/pdf`
+
+```json
+{
+  "type": "string",
+  "format": "binary"
+}
+```
+
+Raw binary bytes; preserved without JSON decoding.
+
+**Response `404`:** Assignment, signer or verification not found, the review is not open, or there is no such image.
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## DecideSignerIdentityReview
+
+```pascal
+function DecideSignerIdentityReview(const DocumentId: string; const AssignmentId: string; const SignerId: string; Body: TJSONData): TAssinafyResponse;
+```
+
+`POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/review`
+
+Approves or rejects a signer whose identity verification is `InReview`, while the document is `pending_signature` or `pending_identity_review`. Approved: once every signer has signed and no other signer is under review, the document is certificated; the certificate states the approval by review and every difference found. Rejected: the document is cancelled (`rejected_by_user`, with the reviewer as the user) and every signer and copy receiver gets the cancellation notice; the note is never shown to them. The signer gets no message about the decision itself. The decision is also reported to the verification provider.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `assignmentId` (path, required): The assignment ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `signerId` (path, required): The signer ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (required)**
+
+```json
+{
+  "required": [
+    "decision"
+  ],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": [
+        "Approved",
+        "Rejected"
+      ],
+      "example": "Approved"
+    },
+    "note": {
+      "description": "Optional. Recorded in the activity log and sent to the provider; never shown to the signer.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000,
+      "example": "Conferido por videochamada."
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "decision": "Approved",
+  "note": "Conferido por videochamada."
+}
+```
+
+
+**Response `200`:** Decided
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/SignerIdentityReview"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "id": "104c267f8e1e8c6855d7788b76a8",
+    "status": "InReview",
+    "provider": "AssinafyVerify",
+    "verification_method": "IdDocumentFaceMatchBasic",
+    "reason_codes": [
+      {
+        "code": "NAME_MISMATCH",
+        "description": "Nome no documento difere do cadastrado (similaridade 52%)"
+      }
+    ],
+    "evidence_available": true,
+    "expected": {
+      "name": "Maria da Silva",
+      "cpf": "52998224725"
+    },
+    "document": {
+      "type": "CNH",
+      "name": "MARIA SILVA",
+      "cpf": "52998224725"
+    },
+    "matches": {
+      "cpf": true,
+      "name": 0.5217,
+      "birth_date": null
+    },
+    "checks": [
+      {
+        "name": "name",
+        "result": "review",
+        "score": 0.5217,
+        "reasons": [
+          "NAME_MISMATCH"
+        ]
+      }
+    ],
+    "images": [
+      "document_front",
+      "document_back",
+      "face"
+    ],
+    "ruleset_version": "2026-10-12.2",
+    "evidence_sha256": "9f2c0d6e4b1a8c3f5e7d9b0a2c4e6f8a1b3d5f7091e2c4a6b8d0f2e4a6c8e0b2",
+    "reviewed_by": {
+      "id": "Kx9pQ2",
+      "name": "Ana Souza"
+    },
+    "reviewed_at": "2026-10-13T21:05:00Z",
+    "review_note": "Conferido por videochamada.",
+    "completed_at": "2026-10-13T21:05:00Z"
+  }
+}
+```
+
+
+**Response `400`:** Invalid decision, the verification is not `InReview`, or the document is no longer awaiting signatures.
+
+**Response `404`:** Assignment, signer or verification not found.
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
 ## Login
 
 ```pascal
@@ -3516,7 +4145,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "user@example.com"
     },
     "password": {
       "type": "string",
@@ -3532,7 +4161,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "developer@example.com",
+  "email": "user@example.com",
   "password": "password"
 }
 ```
@@ -3572,7 +4201,7 @@ Content type: `application/json`
     "user": {
       "id": "bgjazeo5r9v2lq7l36dx48np",
       "name": "John Smith",
-      "email": "developer@example.com",
+      "email": "example@example.com",
       "telephone": "17989206641",
       "government_id": "15774136604",
       "is_email_verified": false,
@@ -3701,7 +4330,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "user@example.com"
     }
   },
   "type": "object"
@@ -3712,7 +4341,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "developer@example.com"
+  "email": "user@example.com"
 }
 ```
 
@@ -3735,7 +4364,7 @@ Content type: `application/json`
             "email": {
               "type": "string",
               "format": "email",
-              "example": "developer@example.com"
+              "example": "user@example.com"
             }
           },
           "type": "object"
@@ -3754,7 +4383,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
-    "email": "developer@example.com"
+    "email": "user@example.com"
   }
 }
 ```
@@ -3827,7 +4456,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "user@example.com"
     },
     "token": {
       "description": "Token received by email.",
@@ -3848,7 +4477,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "developer@example.com",
+  "email": "user@example.com",
   "token": "b3ac64d6c55b3ac64d6c55",
   "new_password": "N3w_p4ssw0rd"
 }
@@ -3873,7 +4502,7 @@ Content type: `application/json`
             "email": {
               "type": "string",
               "format": "email",
-              "example": "developer@example.com"
+              "example": "user@example.com"
             }
           },
           "type": "object"
@@ -3892,7 +4521,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
-    "email": "developer@example.com"
+    "email": "user@example.com"
   }
 }
 ```
@@ -4005,7 +4634,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "user@example.com"
     },
     "password": {
       "description": "The current password.",
@@ -4028,7 +4657,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "developer@example.com",
+  "email": "user@example.com",
   "password": "X3$_!456aTa",
   "new_password": "X3$_!456aT"
 }
@@ -4053,7 +4682,7 @@ Content type: `application/json`
             "email": {
               "type": "string",
               "format": "email",
-              "example": "developer@example.com"
+              "example": "user@example.com"
             }
           },
           "type": "object"
@@ -4072,7 +4701,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
-    "email": "developer@example.com"
+    "email": "user@example.com"
   }
 }
 ```
@@ -4278,7 +4907,7 @@ Content type: `application/json`
     "user": {
       "id": "bgjazeo5r9v2lq7l36dx48np",
       "name": "John Smith",
-      "email": "developer@example.com",
+      "email": "example@example.com",
       "telephone": "17989206641",
       "government_id": "15774136604",
       "is_email_verified": false,
@@ -4302,7 +4931,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** One or more fields failed validation.
+**Response `400`:** Invalid or already-used code
 
 Content type: `application/json`
 
@@ -4534,7 +5163,7 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
-        "sender_email": "developer@example.com",
+        "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -4553,6 +5182,7 @@ Content type: `application/json`
             ],
             "step": 1,
             "notified": false,
+            "identity_verification_status": "InReview",
             "completed": false,
             "notification_history": [
               {
@@ -4596,7 +5226,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
           }
         ]
       },
@@ -4804,7 +5434,7 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -4823,6 +5453,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -4866,7 +5497,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     },
@@ -5127,7 +5758,7 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
-        "sender_email": "developer@example.com",
+        "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -5146,6 +5777,7 @@ Content type: `application/json`
             ],
             "step": 1,
             "notified": false,
+            "identity_verification_status": "InReview",
             "completed": false,
             "notification_history": [
               {
@@ -5189,7 +5821,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
           }
         ]
       },
@@ -5309,6 +5941,7 @@ The supported document statuses and whether a document in each status can be del
 | `certificated` | no | The document is certificated. |
 | `rejected_by_signer` | yes | A signer declined signing the document. |
 | `pending_signature` | yes | The document is waiting for signatures. |
+| `pending_identity_review` | yes | Every signer has signed; the document waits for the account to review a signer's identity before it is certificated. Deleting it cancels it and notifies the signers. |
 | `rejected_by_user` | yes | The signature process was cancelled by a user. |
 | `failed` | yes | The document processing has failed. |
 
@@ -5524,7 +6157,7 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -5543,6 +6176,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -5586,7 +6220,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     },
@@ -6009,7 +6643,7 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -6028,6 +6662,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -6071,7 +6706,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     },
@@ -9155,7 +9790,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** One or more fields failed validation.
+**Response `400`:** Invalid enrollment code, or — when replacing an existing method — missing or invalid re-authentication.
 
 Content type: `application/json`
 
@@ -11289,7 +11924,7 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -11308,6 +11943,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -11351,7 +11987,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     },
@@ -11926,7 +12562,7 @@ Create a signer in the workspace.
       "example": "+5548999990000"
     },
     "government_id": {
-      "description": "Signer's CPF (11 digits) or CNPJ (14 characters; may be alphanumeric). Formatting is accepted and the value is normalized on save.",
+      "description": "Signer's CPF (11 digits) or CNPJ (14 characters; may be alphanumeric). Formatting is accepted and the value is normalized on save. Required before the signer can use a verification method that identifies them by CPF.",
       "type": "string",
       "example": "390.533.447-05"
     }
@@ -12761,7 +13397,7 @@ function GetCurrentSigner(const SignerAccessCode: string): TAssinafyResponse;
 
 `GET /v1/signers/self`
 
-Return the signer identified by the signer access code, including the `has_signature`/`has_initial`/`is_signature_reusable` flags.
+Return the signer identified by the signer access code, including the `has_signature`/`has_initial`/`is_signature_reusable` flags and the `verification_method` of this signature request. Available before verification, so the signing page can pick the right first step.
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
@@ -12810,11 +13446,373 @@ Content type: `application/json`
     "has_accepted_terms": false,
     "has_signature": true,
     "has_initial": false,
-    "is_signature_reusable": false
+    "is_signature_reusable": false,
+    "verification_method": "Email"
   }
 }
 ```
 
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## GetIdentityVerificationStatus
+
+```pascal
+function GetIdentityVerificationStatus(const SignerAccessCode: string): TAssinafyResponse;
+```
+
+`GET /v1/signers/identity-verification`
+
+Current state of the signer's identity document verification. Backfills a pending decision from the provider. Uses the signer access code.
+
+**One live session per signer:** `can_start` is true before a provider session exists, and again once that session is Expired -- the capture link lapsed before anything was submitted, so the signer may open a new one. Once a session is Pending, In Review, Approved, Declined or Abandoned it is false. A signer who reaches Declined or Abandoned cannot restart here; the account must start a whole new process (new document, new assignment).
+
+**In review:** the signer continues -- views, confirms their data and signs -- while the account reviews the result. The document is certificated only after the account approves every signer under review; if it rejects one, the document is cancelled and every signer receives the cancellation notice.
+
+**Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
+
+**Parameters:**
+
+No path or query parameters.
+
+**Request body:** none.
+
+**Response `200`:** Verification state
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "properties": {
+            "can_start": {
+              "description": "True when no session exists yet, or the last one Expired.",
+              "type": "boolean",
+              "example": false
+            },
+            "status": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "example": "Pending"
+            },
+            "url": {
+              "description": "The provider's capture URL while the session is Pending; null otherwise. A bearer link: open it as-is (including any `#t=` fragment); never log it or store it in the browser.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "example": "https://verify.assinafy.com.br/c/01a0ed77-2afe-7f4b-bca9-349edcf4bb99#t=token"
+            },
+            "expires_at": {
+              "description": "When the capture link stops working. Verification may still be processed or reviewed after it. Null for providers that do not report it.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time",
+              "example": "2026-10-07T21:18:47Z"
+            },
+            "completed_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time",
+              "example": "2026-08-10T20:32:00Z"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "can_start": false,
+    "status": "Pending",
+    "url": "https://verify.assinafy.com.br/c/01a0ed77-2afe-7f4b-bca9-349edcf4bb99#t=token",
+    "expires_at": "2026-10-07T21:18:47Z",
+    "completed_at": "2026-08-10T20:32:00Z"
+  }
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## StartIdentityVerification
+
+```pascal
+function StartIdentityVerification(const SignerAccessCode: string; Body: TJSONData): TAssinafyResponse;
+```
+
+`POST /v1/signers/identity-verification`
+
+Records the signer's biometric-processing consent and opens a provider session. Returns the hosted verification URL to redirect to. Uses the signer access code.
+
+**One live session per signer:** this succeeds when no session exists yet, or when the last one Expired (the capture link lapsed before anything was submitted); the expired session is replaced by a new one. Otherwise -- Pending, In Review, Approved, Declined or Abandoned -- it returns `400`. A resend never destroys or replaces a live provider session, and the account is billed once per signer at assignment creation, never again on a restart. Recovering from a Declined or Abandoned verification means the account must start a whole new process (new document, new assignment).
+
+**Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
+
+**Parameters:**
+
+No path or query parameters.
+
+**Request: `application/json` (required)**
+
+```json
+{
+  "required": [
+    "consent"
+  ],
+  "properties": {
+    "consent": {
+      "description": "Must be true. Explicit consent to biometric processing.",
+      "type": "boolean",
+      "example": true
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "consent": true
+}
+```
+
+
+**Response `200`:** Session created
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "properties": {
+            "id": {
+              "type": "string",
+              "example": "6152120297080d55bdd13197"
+            },
+            "url": {
+              "description": "The provider's capture URL for the session just opened. A bearer link: open it as-is (including any `#t=` fragment); never log it or store it in the browser.",
+              "type": "string",
+              "example": "https://verify.assinafy.com.br/c/01a0ed77-2afe-7f4b-bca9-349edcf4bb99#t=token"
+            },
+            "expires_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time",
+              "example": "2026-10-07T21:18:47Z"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "id": "6152120297080d55bdd13197",
+    "url": "https://verify.assinafy.com.br/c/01a0ed77-2afe-7f4b-bca9-349edcf4bb99#t=token",
+    "expires_at": "2026-10-07T21:18:47Z"
+  }
+}
+```
+
+
+**Response `400`:** Consent missing, or this signer already has a verification session that is not Expired.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -12978,7 +13976,7 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -12997,6 +13995,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -13040,7 +14039,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     },
@@ -13263,7 +14262,7 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -13282,6 +14281,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -13325,7 +14325,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     },
@@ -14358,7 +15358,9 @@ The signer confirms or updates their data before signing. Uses the signer access
       "format": "email"
     },
     "government_id": {
-      "type": "string"
+      "description": "Signer's CPF/CNPJ; digits only on save.",
+      "type": "string",
+      "example": "39053344705"
     }
   },
   "type": "object"
@@ -14371,7 +15373,7 @@ The signer confirms or updates their data before signing. Uses the signer access
 {
   "full_name": "<string>",
   "email": "developer@example.com",
-  "government_id": "<string>"
+  "government_id": "39053344705"
 }
 ```
 
@@ -15018,7 +16020,7 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
-        "sender_email": "developer@example.com",
+        "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -15037,6 +16039,7 @@ Content type: `application/json`
             ],
             "step": 1,
             "notified": false,
+            "identity_verification_status": "InReview",
             "completed": false,
             "notification_history": [
               {
@@ -15080,7 +16083,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
           }
         ]
       },
@@ -15289,7 +16292,7 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
-        "sender_email": "developer@example.com",
+        "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -15308,6 +16311,7 @@ Content type: `application/json`
             ],
             "step": 1,
             "notified": false,
+            "identity_verification_status": "InReview",
             "completed": false,
             "notification_history": [
               {
@@ -15351,7 +16355,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
           }
         ]
       },
@@ -15546,7 +16550,7 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
-        "sender_email": "developer@example.com",
+        "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -15565,6 +16569,7 @@ Content type: `application/json`
             ],
             "step": 1,
             "notified": false,
+            "identity_verification_status": "InReview",
             "completed": false,
             "notification_history": [
               {
@@ -15608,7 +16613,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
           }
         ]
       },
@@ -15805,7 +16810,7 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
-        "sender_email": "developer@example.com",
+        "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -15824,6 +16829,7 @@ Content type: `application/json`
             ],
             "step": 1,
             "notified": false,
+            "identity_verification_status": "InReview",
             "completed": false,
             "notification_history": [
               {
@@ -15867,7 +16873,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
           }
         ]
       },
@@ -16196,7 +17202,7 @@ Content type: `application/json`
     "user": {
       "id": "bgjazeo5r9v2lq7l36dx48np",
       "name": "John Smith",
-      "email": "developer@example.com",
+      "email": "example@example.com",
       "telephone": "17989206641",
       "government_id": "15774136604",
       "is_email_verified": false,
@@ -16585,7 +17591,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** One or more fields failed validation.
+**Response `400`:** Invalid month
 
 Content type: `application/json`
 
@@ -16793,7 +17799,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** One or more fields failed validation.
+**Response `400`:** Invalid month
 
 Content type: `application/json`
 
@@ -18061,12 +19067,13 @@ Generate a new document from a template, creating its assignment in the same cal
             "example": "fa8c140cb49b79f940aab95fddd"
           },
           "verification_method": {
-            "description": "Verification method for this signer. If provided without notification_methods, the notification method is inferred. Defaults to Email. `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id` (a CPF requires that person's certificate; a CNPJ requires an e-CNPJ for that company), must be alone in its signing step, and is charged 0.5 credits per signer. Only applies to signers (not copy receivers).",
+            "description": "Verification method for this signer. If provided without notification_methods, the notification method is inferred. Defaults to Email. `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id` (a CPF requires that person's certificate; a CNPJ requires an e-CNPJ for that company), must be alone in its signing step, and is charged 0.5 credits per signer. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Only applies to signers (not copy receivers).",
             "type": "string",
             "enum": [
               "Email",
               "Whatsapp",
-              "DigitalCertificate"
+              "DigitalCertificate",
+              "IdDocumentFaceMatchBasic"
             ],
             "example": "Email"
           },
@@ -18231,7 +19238,7 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
-      "sender_email": "developer@example.com",
+      "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -18250,6 +19257,7 @@ Content type: `application/json`
           ],
           "step": 1,
           "notified": false,
+          "identity_verification_status": "InReview",
           "completed": false,
           "notification_history": [
             {
@@ -18293,7 +19301,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
         }
       ]
     },
@@ -18482,12 +19490,13 @@ Estimate the cost of creating a document from a template without creating it. Co
             "example": "fa8c14f32d732271e071998246e"
           },
           "verification_method": {
-            "description": "Verification method. If provided without notification_methods, the notification method is inferred. Defaults to Email. Verification is never billed on its own — the cost comes from the notification it is paired with, so `Whatsapp` verification requires the WhatsApp notification and costs 0.45 credits per signer. `DigitalCertificate` adds the per-signer signature cost (0.5 credits) on top of the notification cost.",
+            "description": "Verification method. If provided without notification_methods, the notification method is inferred. Defaults to Email. Verification is never billed on its own — the cost comes from the notification it is paired with, so `Whatsapp` verification requires the WhatsApp notification and costs 0.45 credits per signer. `DigitalCertificate` adds the per-signer signature cost (0.5 credits) on top of the notification cost. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged a per-signer fee.",
             "type": "string",
             "enum": [
               "Email",
               "Whatsapp",
-              "DigitalCertificate"
+              "DigitalCertificate",
+              "IdDocumentFaceMatchBasic"
             ],
             "example": "Whatsapp"
           },
@@ -18709,7 +19718,7 @@ Content type: `application/json`
   "data": {
     "id": "bgjazeo5r9v2lq7l36dx48np",
     "name": "John Smith",
-    "email": "developer@example.com",
+    "email": "example@example.com",
     "telephone": "17989206641",
     "government_id": "15774136604",
     "is_email_verified": false,
@@ -20187,7 +21196,706 @@ Content type: `application/json`
 ```
 
 
+**Response `400`:** The webhook subscription is inactive or the event type is not subscribed.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 422
+        },
+        "message": {
+          "type": "string",
+          "example": "One or more fields failed validation."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 422,
+  "message": "One or more fields failed validation.",
+  "data": null
+}
+```
+
+
+**Response `404`:** The webhook entry was not found or does not belong to this account.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "The requested resource was not found."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "The requested resource was not found.",
+  "data": null
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## ListWebhookEndpoints
+
+```pascal
+function ListWebhookEndpoints(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
+```
+
+`GET /v1/accounts/{accountId}/webhooks/endpoints`
+
+List the account's webhook endpoints, oldest first. Requires the `account:read` OAuth scope.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `url` (query, optional): Only the endpoint registered with exactly this URL.
+```json
+{
+  "type": "string",
+  "format": "uri"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The endpoints
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/WebhookEndpoint"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
+      "name": "ERP",
+      "url": "https://example.com/webhooks/assinafy",
+      "email": "ops@example.com",
+      "events": [
+        "document_ready",
+        "signer_signed_document"
+      ],
+      "is_active": true,
+      "signing_enabled": true,
+      "created_at": "2026-10-01T12:00:00Z",
+      "updated_at": "2026-10-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## CreateWebhookEndpoint
+
+```pascal
+function CreateWebhookEndpoint(const AAccountId: string; Body: TJSONData): TAssinafyResponse;
+```
+
+`POST /v1/accounts/{accountId}/webhooks/endpoints`
+
+Register a URL to receive the account's webhook events. An account can have 1 endpoint, or up to 3 on paid plans; creating one past the limit returns `403`. Each endpoint of a workspace must have a different `url` (`400` otherwise). When `signing_enabled` is `true`, a signing secret is generated and returned once, as `secret` in this response — store it, since it is never shown in list or view responses. It can be read again later with **Get webhook endpoint signing secret**, except by OAuth applications: an OAuth application that loses the secret must delete the endpoint and create a new one. Requires the `webhooks:write` OAuth scope.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (required)**
+
+```json
+{
+  "required": [
+    "url",
+    "email",
+    "events"
+  ],
+  "properties": {
+    "url": {
+      "description": "URL that receives the events (http or https).",
+      "type": "string",
+      "format": "uri",
+      "example": "https://example.com/webhooks/assinafy"
+    },
+    "email": {
+      "description": "Contact email for delivery-failure notices.",
+      "type": "string",
+      "format": "email",
+      "example": "ops@example.com"
+    },
+    "events": {
+      "description": "Event types to deliver (see `GET /v1/webhooks/event-types`).",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "example": [
+        "document_ready",
+        "signer_signed_document"
+      ]
+    },
+    "name": {
+      "description": "Label to tell endpoints apart.",
+      "type": "string",
+      "example": "ERP"
+    },
+    "is_active": {
+      "description": "Whether events are delivered. Defaults to `true`.",
+      "type": "boolean",
+      "example": true
+    },
+    "signing_enabled": {
+      "description": "Sign deliveries with a Standard Webhooks signature. Defaults to `false`.",
+      "type": "boolean",
+      "example": true
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "url": "https://example.com/webhooks/assinafy",
+  "email": "ops@example.com",
+  "events": [
+    "document_ready",
+    "signer_signed_document"
+  ],
+  "name": "ERP",
+  "is_active": true,
+  "signing_enabled": true
+}
+```
+
+
+**Response `200`:** The created endpoint
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/WebhookEndpoint"
+            },
+            {
+              "properties": {
+                "secret": {
+                  "description": "Standard Webhooks signing secret: `whsec_` followed by the base64-encoded key. Present only when `signing_enabled` is `true`.",
+                  "type": "string",
+                  "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
+    "name": "ERP",
+    "url": "https://example.com/webhooks/assinafy",
+    "email": "ops@example.com",
+    "events": [
+      "document_ready",
+      "signer_signed_document"
+    ],
+    "is_active": true,
+    "signing_enabled": true,
+    "created_at": "2026-10-01T12:00:00Z",
+    "updated_at": "2026-10-01T12:00:00Z",
+    "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+  }
+}
+```
+
+
 **Response `400`:** One or more fields failed validation.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 422
+        },
+        "message": {
+          "type": "string",
+          "example": "One or more fields failed validation."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 422,
+  "message": "One or more fields failed validation.",
+  "data": null
+}
+```
+
+
+**Response `403`:** The account already has as many endpoints as its plan allows.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "You are not allowed to perform this action."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "You are not allowed to perform this action.",
+  "data": null
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## DeleteWebhookEndpointByURL
+
+```pascal
+function DeleteWebhookEndpointByURL(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
+```
+
+`DELETE /v1/accounts/{accountId}/webhooks/endpoints`
+
+Stop delivering events to the endpoint registered with `url` and free its slot, for integrations that keep the URL they registered rather than the endpoint ID. The URL must match exactly as it was registered. Returns `404` when no endpoint of the workspace uses it. Requires the `webhooks:write` OAuth scope.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `url` (query, required): The endpoint's URL.
+```json
+{
+  "type": "string",
+  "format": "uri"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** Endpoint deleted
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": [],
+          "example": []
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": []
+}
+```
+
+
+**Response `400`:** `url` is missing.
 
 Content type: `application/json`
 
@@ -20343,455 +22051,6 @@ Content type: `application/json`
 ```
 
 
-## ListWebhookEndpoints
-
-```pascal
-function ListWebhookEndpoints(const AAccountId: string): TAssinafyResponse;
-```
-
-`GET /v1/accounts/{accountId}/webhooks/endpoints`
-
-List the account's webhook endpoints, oldest first. Requires the `account:read` OAuth scope.
-
-**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
-
-**Parameters:**
-
-- `accountId` (path, required): Workspace account ID.
-```json
-{
-  "type": "string"
-}
-```
-
-
-**Request body:** none.
-
-**Response `200`:** The endpoints
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/Envelope"
-    },
-    {
-      "properties": {
-        "data": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/WebhookEndpoint"
-          }
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 200,
-  "message": "",
-  "data": [
-    {
-      "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
-      "name": "ERP",
-      "url": "https://example.com/webhooks/assinafy",
-      "email": "developer@example.com",
-      "events": [
-        "document_ready",
-        "signer_signed_document"
-      ],
-      "is_active": true,
-      "signing_enabled": true,
-      "created_at": "2026-10-01T12:00:00Z",
-      "updated_at": "2026-10-01T12:00:00Z"
-    }
-  ]
-}
-```
-
-
-**Response `401`:** Missing or invalid credentials.
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/ErrorEnvelope"
-    },
-    {
-      "properties": {
-        "status": {
-          "type": "integer",
-          "example": 401
-        },
-        "message": {
-          "type": "string",
-          "example": "Your request was made with invalid credentials."
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 401,
-  "message": "Your request was made with invalid credentials.",
-  "data": null
-}
-```
-
-
-**Response `500`:** Unexpected server error.
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/ErrorEnvelope"
-    },
-    {
-      "properties": {
-        "status": {
-          "type": "integer",
-          "example": 500
-        },
-        "message": {
-          "type": "string",
-          "example": "An unexpected error occurred."
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 500,
-  "message": "An unexpected error occurred.",
-  "data": null
-}
-```
-
-
-## CreateWebhookEndpoint
-
-```pascal
-function CreateWebhookEndpoint(const AAccountId: string; Body: TJSONData): TAssinafyResponse;
-```
-
-`POST /v1/accounts/{accountId}/webhooks/endpoints`
-
-Register a URL to receive the account's webhook events. An account can have 1 endpoint, or up to 3 on paid plans; creating one past the limit returns `403`. Each endpoint of a workspace must have a different `url` (`400` otherwise). When `signing_enabled` is `true`, a signing secret is generated: read it with **Get webhook endpoint signing secret**. Requires the `webhooks:write` OAuth scope.
-
-**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
-
-**Parameters:**
-
-- `accountId` (path, required): Workspace account ID.
-```json
-{
-  "type": "string"
-}
-```
-
-
-**Request: `application/json` (required)**
-
-```json
-{
-  "required": [
-    "url",
-    "email",
-    "events"
-  ],
-  "properties": {
-    "url": {
-      "description": "URL that receives the events (http or https).",
-      "type": "string",
-      "format": "uri",
-      "example": "https://example.com/webhooks/assinafy"
-    },
-    "email": {
-      "description": "Contact email for delivery-failure notices.",
-      "type": "string",
-      "format": "email",
-      "example": "developer@example.com"
-    },
-    "events": {
-      "description": "Event types to deliver (see `GET /v1/webhooks/event-types`).",
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "example": [
-        "document_ready",
-        "signer_signed_document"
-      ]
-    },
-    "name": {
-      "description": "Label to tell endpoints apart.",
-      "type": "string",
-      "example": "ERP"
-    },
-    "is_active": {
-      "description": "Whether events are delivered. Defaults to `true`.",
-      "type": "boolean",
-      "example": true
-    },
-    "signing_enabled": {
-      "description": "Sign deliveries with a Standard Webhooks signature. Defaults to `false`.",
-      "type": "boolean",
-      "example": true
-    }
-  },
-  "type": "object"
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "url": "https://example.com/webhooks/assinafy",
-  "email": "developer@example.com",
-  "events": [
-    "document_ready",
-    "signer_signed_document"
-  ],
-  "name": "ERP",
-  "is_active": true,
-  "signing_enabled": true
-}
-```
-
-
-**Response `200`:** The created endpoint
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/Envelope"
-    },
-    {
-      "properties": {
-        "data": {
-          "$ref": "#/components/schemas/WebhookEndpoint"
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 200,
-  "message": "",
-  "data": {
-    "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
-    "name": "ERP",
-    "url": "https://example.com/webhooks/assinafy",
-    "email": "developer@example.com",
-    "events": [
-      "document_ready",
-      "signer_signed_document"
-    ],
-    "is_active": true,
-    "signing_enabled": true,
-    "created_at": "2026-10-01T12:00:00Z",
-    "updated_at": "2026-10-01T12:00:00Z"
-  }
-}
-```
-
-
-**Response `400`:** One or more fields failed validation.
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/ErrorEnvelope"
-    },
-    {
-      "properties": {
-        "status": {
-          "type": "integer",
-          "example": 422
-        },
-        "message": {
-          "type": "string",
-          "example": "One or more fields failed validation."
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 422,
-  "message": "One or more fields failed validation.",
-  "data": null
-}
-```
-
-
-**Response `403`:** Authenticated but not allowed to perform this action.
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/ErrorEnvelope"
-    },
-    {
-      "properties": {
-        "status": {
-          "type": "integer",
-          "example": 403
-        },
-        "message": {
-          "type": "string",
-          "example": "You are not allowed to perform this action."
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 403,
-  "message": "You are not allowed to perform this action.",
-  "data": null
-}
-```
-
-
-**Response `401`:** Missing or invalid credentials.
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/ErrorEnvelope"
-    },
-    {
-      "properties": {
-        "status": {
-          "type": "integer",
-          "example": 401
-        },
-        "message": {
-          "type": "string",
-          "example": "Your request was made with invalid credentials."
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 401,
-  "message": "Your request was made with invalid credentials.",
-  "data": null
-}
-```
-
-
-**Response `500`:** Unexpected server error.
-
-Content type: `application/json`
-
-```json
-{
-  "type": "object",
-  "allOf": [
-    {
-      "$ref": "#/components/schemas/ErrorEnvelope"
-    },
-    {
-      "properties": {
-        "status": {
-          "type": "integer",
-          "example": 500
-        },
-        "message": {
-          "type": "string",
-          "example": "An unexpected error occurred."
-        }
-      },
-      "type": "object"
-    }
-  ]
-}
-```
-
-**Payload shape:**
-
-```json
-{
-  "status": 500,
-  "message": "An unexpected error occurred.",
-  "data": null
-}
-```
-
-
 ## GetWebhookEndpoint
 
 ```pascal
@@ -20857,7 +22116,7 @@ Content type: `application/json`
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
-    "email": "developer@example.com",
+    "email": "ops@example.com",
     "events": [
       "document_ready",
       "signer_signed_document"
@@ -21031,7 +22290,7 @@ Change a webhook endpoint. Only the fields sent are updated; `url` cannot be one
     "email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "ops@example.com"
     },
     "events": {
       "type": "array",
@@ -21064,7 +22323,7 @@ Change a webhook endpoint. Only the fields sent are updated; `url` cannot be one
 ```json
 {
   "url": "https://example.com/webhooks/assinafy",
-  "email": "developer@example.com",
+  "email": "ops@example.com",
   "events": [
     "document_ready"
   ],
@@ -21108,7 +22367,7 @@ Content type: `application/json`
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
-    "email": "developer@example.com",
+    "email": "ops@example.com",
     "events": [
       "document_ready",
       "signer_signed_document"
@@ -21471,7 +22730,7 @@ function GetWebhookEndpointSigningSecret(const AAccountId: string; const Endpoin
 
 `GET /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}/secret`
 
-Return the secret used to sign deliveries to this endpoint (see **Webhook Payloads → Verifying signatures**). Returns `400` when signing is disabled. Not available to OAuth applications.
+Return the secret used to sign deliveries to this endpoint (see **Webhook Payloads → Verifying signatures**). Returns `400` when signing is disabled. Not available to OAuth applications, which receive the secret in the **Create webhook endpoint** response instead.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -21531,7 +22790,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** One or more fields failed validation.
+**Response `400`:** Signing is not enabled for this endpoint.
 
 Content type: `application/json`
 
@@ -21695,7 +22954,7 @@ function RotateWebhookEndpointSigningSecret(const AAccountId: string; const Endp
 
 `POST /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}/secret/rotate`
 
-Replace the endpoint's signing secret and return the new one. The old secret stops working immediately, so update your receiver right away. Returns `400` when signing is disabled. Not available to OAuth applications.
+Replace the endpoint's signing secret and return the new one. The old secret stops working immediately, so update your receiver right away. Returns `400` when signing is disabled. Not available to OAuth applications, which delete the endpoint and create a new one instead.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -21755,7 +23014,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** One or more fields failed validation.
+**Response `400`:** Signing is not enabled for this endpoint.
 
 Content type: `application/json`
 
@@ -22187,3 +23446,3884 @@ Content type: `application/json`
   "data": null
 }
 ```
+
+
+## Webhook deliveries
+
+Assinafy sends these HTTP POST requests to subscribed endpoints. Verify the raw bytes with [VerifyWebhookHeaders](SDK.md#webhook-verification) before parsing, deduplicate `webhook-id`, and acknowledge with `2xx`. Headers and payload examples below come from the published contract.
+
+### document_uploaded
+
+A user uploaded a document. **Subject:** User · **Object:** Document · **Payload:** none.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184400,
+  "event": "document_uploaded",
+  "message": null,
+  "payload": null,
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790000000,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "uploaded",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000000,
+    "assignment": null,
+    "pages": [],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_metadata_ready
+
+The document was normalized to PDF and its pages are available, so it can be prepared. **Subject:** User · **Object:** Document · **Payload:** none.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184401,
+  "event": "document_metadata_ready",
+  "message": null,
+  "payload": [],
+  "origin": null,
+  "created_at": 1790000020,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "metadata_ready",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000020,
+    "assignment": null,
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_prepared
+
+A user prepared the document (assigned its fields to signers). **Subject:** User · **Object:** Document · **Payload:** none.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184402,
+  "event": "document_prepared",
+  "message": null,
+  "payload": null,
+  "origin": null,
+  "created_at": 1790000300,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### assignment_created
+
+A user created an assignment (a signature request) for the document. The payload is a snapshot of the creator profile. **Subject:** User · **Object:** Document · **Payload:** `user_name`, `user_email`, `user_telephone`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184403,
+  "event": "assignment_created",
+  "message": null,
+  "payload": {
+    "user_name": "Mariana Costa",
+    "user_email": "developer@example.com",
+    "user_telephone": "+5511987654321"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790000300,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signature_requested
+
+A signer was asked to sign the document; sent once per signer. **Subject:** User · **Object:** Document · **Payload:** `signer_full_name`, `signer_email`, `signer_whatsapp_phone_number`, `notification_method` (`email`, `whatsapp` or `bypass`).
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184404,
+  "event": "signature_requested",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "signer_email": "joao.silva@example.com",
+    "signer_whatsapp_phone_number": "+5548999990000",
+    "notification_method": "email"
+  },
+  "origin": null,
+  "created_at": 1790000301,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_created
+
+A user created a signer. **Subject:** User · **Object:** Signer · **Payload:** `signer_full_name`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184405,
+  "event": "signer_created",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1789999400,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": false,
+    "has_signature": false,
+    "has_initial": false,
+    "is_signature_reusable": false,
+    "type": "Signer"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_email_verified
+
+The signer confirmed their email with the verification code sent for this document. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, `signer_email`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184407,
+  "event": "signer_email_verified",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "signer_email": "joao.silva@example.com"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790003700,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_whatsapp_verified
+
+The signer confirmed their WhatsApp number with the verification code sent for this document. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, `signer_whatsapp_phone_number`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184408,
+  "event": "signer_whatsapp_verified",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "signer_whatsapp_phone_number": "+5548999990000"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790003700,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_data_confirmed
+
+The signer confirmed their data before signing. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, `signer_email`, `signer_whatsapp_phone_number`, `verification_method`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184409,
+  "event": "signer_data_confirmed",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "signer_email": "joao.silva@example.com",
+    "signer_whatsapp_phone_number": "+5548999990000",
+    "verification_method": "Email"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790003800,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_viewed_document
+
+The signer opened the document for the first time. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184406,
+  "event": "signer_viewed_document",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790003600,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_identity_verified
+
+The signer passed identity-document verification (directly, or approved by the account after review). **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, and `evidence` when the provider keeps one: what was read off the document (`document_type`, `document_name`), `cpf_match`, `name_similarity` (0-1), for each check its `name`, `result` and `score`, and `evidence_sha256`. No images.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184406,
+  "event": "signer_identity_verified",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "evidence": {
+      "document_type": "CNH",
+      "document_name": "JOAO DA SILVA",
+      "cpf_match": true,
+      "name_similarity": 1,
+      "checks": [
+        {
+          "name": "name",
+          "result": "pass",
+          "score": 1
+        },
+        {
+          "name": "face_match",
+          "result": "pass",
+          "score": 0.94
+        },
+        {
+          "name": "liveness",
+          "result": "pass",
+          "score": 0.98
+        }
+      ],
+      "evidence_sha256": "9f2c0d6e4b1a8c3f5e7d9b0a2c4e6f8a1b3d5f7091e2c4a6b8d0f2e4a6c8e0b2"
+    }
+  },
+  "origin": null,
+  "created_at": 1790003600,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_identity_verification_failed
+
+The signer's identity-document verification ended without approval. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, `reason` (`provider_declined`, `identity_binding_failed`, `workflow_capability_mismatch`, `reviewer_rejected`).
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184406,
+  "event": "signer_identity_verification_failed",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "reason": "provider_declined"
+  },
+  "origin": null,
+  "created_at": 1790003600,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_identity_review_required
+
+The provider could not decide the signer's identity verification and it awaits the account's review. The signer can still sign; the document is certificated only after the account approves (status `pending_identity_review` once every signer has signed). **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, `reason_codes`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184406,
+  "event": "signer_identity_review_required",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "reason_codes": [
+      "NAME_MISMATCH",
+      "LIVENESS_UNCERTAIN"
+    ]
+  },
+  "origin": null,
+  "created_at": 1790003600,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_identity_review_approved
+
+A user of the account approved the signer's identity after review. `reason_codes` are the differences the provider found and the reviewer accepted. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, `reviewer_id`, `reviewer_name`, `reason_codes`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184406,
+  "event": "signer_identity_review_approved",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "reviewer_id": "Kx9pQ2",
+    "reviewer_name": "Mariana Costa",
+    "reason_codes": [
+      "NAME_MISMATCH",
+      "LIVENESS_UNCERTAIN"
+    ]
+  },
+  "origin": null,
+  "created_at": 1790003600,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_identity_review_rejected
+
+A user of the account rejected the signer's identity after review. The document is cancelled (`user_rejected_document` follows, with the reviewer as the user). `note` is the reviewer's optional note, HTML-escaped (`&` arrives as `&amp;`). **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`, `reviewer_id`, `reviewer_name`, `note`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184406,
+  "event": "signer_identity_review_rejected",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva",
+    "reviewer_id": "Kx9pQ2",
+    "reviewer_name": "Mariana Costa",
+    "note": "Pessoa diferente da foto do documento."
+  },
+  "origin": null,
+  "created_at": 1790003600,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "pending_signature",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000300,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_signed_document
+
+The signer signed the document. Signers using a digital certificate add the certificate details to the payload. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184410,
+  "event": "signer_signed_document",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790003900,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "certificating",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": false,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790003900,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": true,
+          "completed": true,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": true
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 1,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true,
+            "completed": true
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### signer_rejected_document
+
+The signer declined to sign the document. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184411,
+  "event": "signer_rejected_document",
+  "message": null,
+  "payload": {
+    "signer_full_name": "João da Silva"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790003900,
+  "subject": {
+    "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+    "full_name": "João da Silva",
+    "email": "joao.silva@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": null,
+    "has_accepted_terms": true,
+    "type": "Signer"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "rejected_by_signer",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790003900,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### user_rejected_document
+
+A user of the account cancelled the document. **Subject:** User · **Object:** Document · **Payload:** `user_name`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184412,
+  "event": "user_rejected_document",
+  "message": null,
+  "payload": {
+    "user_name": "Mariana Costa"
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790003900,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "rejected_by_user",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790003900,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_ready
+
+The last signer signed and the signed document is available: its status is `certificated` and `artifacts` holds the signed files. **Subject:** Account · **Object:** Document · **Payload:** none.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184413,
+  "event": "document_ready",
+  "message": null,
+  "payload": null,
+  "origin": null,
+  "created_at": 1790003960,
+  "subject": {
+    "id": "65f1c2a9b3e4d5f6",
+    "name": "ACME Contabilidade",
+    "primary_color": "1d4ed8",
+    "secondary_color": null,
+    "notification_sender_type": "User",
+    "created_at": 1772720000,
+    "users": [
+      {
+        "id": "d6zqpbyog2v3xvxerwn8la94",
+        "name": "Mariana Costa",
+        "email": "developer@example.com",
+        "telephone": "+5511987654321",
+        "government_id": "12345678909",
+        "is_email_verified": true,
+        "has_accepted_terms": true,
+        "is_password_set": true,
+        "created_at": 1772720000,
+        "to_be_deleted_at": null
+      }
+    ],
+    "type": "Account"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "certificated",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790003960,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "sender_email": "developer@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": true,
+          "completed": true,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": true
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 1,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true,
+            "completed": true
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_processing_failed
+
+The document could not be processed (invalid or unreadable file). **Subject:** Account · **Object:** Document · **Payload:** `error_message`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184414,
+  "event": "document_processing_failed",
+  "message": null,
+  "payload": {
+    "error_message": "The file could not be converted to PDF."
+  },
+  "origin": null,
+  "created_at": 1790000015,
+  "subject": {
+    "id": "65f1c2a9b3e4d5f6",
+    "name": "ACME Contabilidade",
+    "primary_color": "1d4ed8",
+    "secondary_color": null,
+    "notification_sender_type": "User",
+    "created_at": 1772720000,
+    "users": [
+      {
+        "id": "d6zqpbyog2v3xvxerwn8la94",
+        "name": "Mariana Costa",
+        "email": "developer@example.com",
+        "telephone": "+5511987654321",
+        "government_id": "12345678909",
+        "is_email_verified": true,
+        "has_accepted_terms": true,
+        "is_password_set": true,
+        "created_at": 1772720000,
+        "to_be_deleted_at": null
+      }
+    ],
+    "type": "Account"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "failed",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000015,
+    "assignment": null,
+    "pages": [],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### template_created
+
+A user created a template. **Subject:** User · **Object:** Template · **Payload:** none.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184415,
+  "event": "template_created",
+  "message": null,
+  "payload": null,
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790000000,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f1a7d8e9f0a1b2c3d4e5",
+    "name": "Contrato padrão",
+    "document_name": "Contrato padrão.pdf",
+    "message": null,
+    "status": "Uploaded",
+    "pages": [],
+    "roles": [],
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000000,
+    "default_document_tags": [],
+    "type": "Template"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### template_processed
+
+The template was processed and is ready to use. **Subject:** User · **Object:** Template · **Payload:** none.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184416,
+  "event": "template_processed",
+  "message": null,
+  "payload": [],
+  "origin": null,
+  "created_at": 1790000060,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "developer@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f1a7d8e9f0a1b2c3d4e5",
+    "name": "Contrato padrão",
+    "document_name": "Contrato padrão.pdf",
+    "message": null,
+    "status": "Ready",
+    "pages": [
+      {
+        "id": "66b2f1b8e9f0a1b2c3d4e5f6",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/templates/66b2f1a7d8e9f0a1b2c3d4e5/pages/66b2f1b8e9f0a1b2c3d4e5f6/download",
+        "fields": []
+      }
+    ],
+    "roles": [
+      {
+        "id": "66b2f1c9f0a1b2c3d4e5f6a7",
+        "name": "Contratante",
+        "assignment_type": "Signer",
+        "created_at": 1790000000,
+        "updated_at": 1790000000
+      }
+    ],
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000060,
+    "default_document_tags": [],
+    "type": "Template"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### template_processing_failed
+
+The template could not be processed. **Subject:** Account · **Object:** Template · **Payload:** `error_message`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184417,
+  "event": "template_processing_failed",
+  "message": null,
+  "payload": {
+    "error_message": "The file could not be converted to PDF."
+  },
+  "origin": null,
+  "created_at": 1790000060,
+  "subject": {
+    "id": "65f1c2a9b3e4d5f6",
+    "name": "ACME Contabilidade",
+    "primary_color": "1d4ed8",
+    "secondary_color": null,
+    "notification_sender_type": "User",
+    "created_at": 1772720000,
+    "users": [
+      {
+        "id": "d6zqpbyog2v3xvxerwn8la94",
+        "name": "Mariana Costa",
+        "email": "developer@example.com",
+        "telephone": "+5511987654321",
+        "government_id": "12345678909",
+        "is_email_verified": true,
+        "has_accepted_terms": true,
+        "is_password_set": true,
+        "created_at": 1772720000,
+        "to_be_deleted_at": null
+      }
+    ],
+    "type": "Account"
+  },
+  "object": {
+    "id": "66b2f1a7d8e9f0a1b2c3d4e5",
+    "name": "Contrato padrão",
+    "document_name": "Contrato padrão.pdf",
+    "message": null,
+    "status": "Failed",
+    "pages": [],
+    "roles": [],
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790000000,
+    "default_document_tags": [],
+    "type": "Template"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.

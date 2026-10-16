@@ -16,7 +16,7 @@ end;
 var
   Client, TLSClient: TAssinafyClient;
   Response: TAssinafyResponse;
-  Body: TJSONObject;
+  Body, IdentityBody: TJSONObject;
   Query: TStringList;
   Transport: TAssinafyDefaultTransport;
   Request: TAssinafyRequest;
@@ -29,6 +29,7 @@ var
   MediaTypes: array[0..1] of string = ('image/png', 'image/jpeg');
   CompleteModes: array[0..1] of string = ('complete-chunked', 'complete-close');
   SlowModes: array[0..2] of string = ('slow-chunked', 'slow-close', 'slow-encoded');
+  IdentityImages: array[0..1] of string = ('face', 'document_pdf');
 begin
   Client := TAssinafyClient.Create('test-key', 'account', ParamStr(1));
   Body := JSONObj(['name', 'João 😀 & space', 'enabled', False]);
@@ -60,6 +61,32 @@ begin
     Query.Values['search'] := 'João';
     Response := Client.ListDocuments('account', Query);
     try Check(Pos('search=Jo%C3%A3o', JSONString(JSONFind(Response.Data, 'path'))) > 0, 'Unicode query bytes reach server'); finally Response.Free; end;
+    Response := Client.GetIdentityVerificationStatus('code & private');
+    try Check(JSONString(JSONFind(Response.Data, 'status')) = 'InReview', 'Identity status through HTTP'); finally Response.Free; end;
+    IdentityBody := JSONObj(['consent', True]);
+    try
+      Response := Client.StartIdentityVerification('code & private', IdentityBody);
+      try Check(JSONString(JSONFind(Response.Data, 'url')) = 'https://verify.example.com/c/session#t=private-token', 'Biometric capture URL through HTTP'); finally Response.Free; end;
+    finally IdentityBody.Free; end;
+    Response := Client.GetSignerIdentityReview('review-doc', 'assignment', 'signer');
+    try Check(JSONString(JSONFind(Response.Data, 'status')) = 'InReview', 'Workspace identity review through HTTP'); finally Response.Free; end;
+    for Mode in IdentityImages do
+    begin
+      Response := Client.DownloadSignerIdentityReviewImage('review-doc', 'assignment', 'signer', Mode);
+      try
+        Check((Length(Response.Body) = 15) and (Response.JSON = nil), 'Identity evidence binary response through HTTP');
+        Check(Base64Encode(Response.Body) = 'JVBERi0A/2ZpeHR1cmUh', 'Identity evidence bytes unchanged');
+      finally Response.Free; end;
+    end;
+    IdentityBody := JSONObj(['decision', 'Approved', 'note', nil]);
+    try
+      Response := Client.DecideSignerIdentityReview('review-doc', 'assignment', 'signer', IdentityBody);
+      try Check(JSONString(JSONFind(Response.Data, 'status')) = 'Approved', 'Identity review decision through HTTP'); finally Response.Free; end;
+    finally IdentityBody.Free; end;
+    Query.Clear;
+    Query.Add('url=https://app.example.com/hook?tenant=a&next=/x');
+    Response := Client.DeleteWebhookEndpointByURL('account', Query);
+    Response.Free;
     Response := Client.UploadDocument('account', ParamStr(2));
     try
       Check(JSONString(JSONFind(Response.Data, 'file_field')) = 'file', 'Multipart field name');
@@ -234,7 +261,7 @@ begin
           Check(E.Message = 'HTTP transfer exceeded TimeoutMS; response completion is indeterminate', 'Indeterminate framing is explicit');
         end;
       end;
-    WriteLn('PASS: native HTTP JSON, multipart, binary, authentication, errors and TLS verification');
+    WriteLn('PASS: native HTTP JSON, multipart, binary, identity verification, webhooks, authentication, errors and TLS verification');
   finally
     Query.Free;
     Body.Free;

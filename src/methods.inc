@@ -101,6 +101,25 @@ begin
     nil, Body, '', '', 'application/json', '');
 end;
 
+function TAssinafyClient.GetSignerIdentityReview(const DocumentId: string; const AssignmentId: string; const SignerId: string): TAssinafyResponse;
+begin
+  Result := Call('GET', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/assignments/' + PathValue(AssignmentId, 'AssignmentId') + '/signers/' + PathValue(SignerId, 'SignerId') + '/identity-verification', aaAPI,
+    nil, nil, '', '', '', '');
+end;
+
+function TAssinafyClient.DownloadSignerIdentityReviewImage(const DocumentId: string; const AssignmentId: string; const SignerId: string; const Name: string): TAssinafyResponse;
+begin
+  Result := Call('GET', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/assignments/' + PathValue(AssignmentId, 'AssignmentId') + '/signers/' + PathValue(SignerId, 'SignerId') + '/identity-verification/images/' + PathValue(Name, 'Name'), aaAPI,
+    nil, nil, '', '', '', '');
+end;
+
+function TAssinafyClient.DecideSignerIdentityReview(const DocumentId: string; const AssignmentId: string; const SignerId: string; Body: TJSONData): TAssinafyResponse;
+begin
+  if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  Result := Call('POST', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/assignments/' + PathValue(AssignmentId, 'AssignmentId') + '/signers/' + PathValue(SignerId, 'SignerId') + '/identity-verification/review', aaAPI,
+    nil, Body, '', '', 'application/json', '');
+end;
+
 function TAssinafyClient.Login(Body: TJSONData): TAssinafyResponse;
 begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
@@ -399,6 +418,19 @@ begin
     nil, nil, '', '', '', SignerAccessCode);
 end;
 
+function TAssinafyClient.GetIdentityVerificationStatus(const SignerAccessCode: string): TAssinafyResponse;
+begin
+  Result := Call('GET', '/signers/identity-verification', aaSigner,
+    nil, nil, '', '', '', SignerAccessCode);
+end;
+
+function TAssinafyClient.StartIdentityVerification(const SignerAccessCode: string; Body: TJSONData): TAssinafyResponse;
+begin
+  if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  Result := Call('POST', '/signers/identity-verification', aaSigner,
+    nil, Body, '', '', 'application/json', SignerAccessCode);
+end;
+
 function TAssinafyClient.GetSignerDocument(const SignerId: string; const SignerAccessCode: string): TAssinafyResponse;
 begin
   Result := Call('GET', '/signers/' + PathValue(SignerId, 'SignerId') + '/document', aaSigner,
@@ -636,10 +668,10 @@ begin
     nil, nil, '', '', '', '');
 end;
 
-function TAssinafyClient.ListWebhookEndpoints(const AAccountId: string): TAssinafyResponse;
+function TAssinafyClient.ListWebhookEndpoints(const AAccountId: string; Query: TStrings): TAssinafyResponse;
 begin
   Result := Call('GET', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/webhooks/endpoints', aaAPI,
-    nil, nil, '', '', '', '');
+    Query, nil, '', '', '', '');
 end;
 
 function TAssinafyClient.CreateWebhookEndpoint(const AAccountId: string; Body: TJSONData): TAssinafyResponse;
@@ -647,6 +679,12 @@ begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
   Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/webhooks/endpoints', aaAPI,
     nil, Body, '', '', 'application/json', '');
+end;
+
+function TAssinafyClient.DeleteWebhookEndpointByURL(const AAccountId: string; Query: TStrings): TAssinafyResponse;
+begin
+  Result := Call('DELETE', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/webhooks/endpoints', aaAPI,
+    Query, nil, '', '', '', '');
 end;
 
 function TAssinafyClient.GetWebhookEndpoint(const AAccountId: string; const EndpointId: string): TAssinafyResponse;
