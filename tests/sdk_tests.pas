@@ -808,6 +808,28 @@ var
   Body, TemplateBody, Signer: TJSONObject;
   Signers: TJSONArray;
   I: Integer;
+  procedure ExpectCertificateMethodError(Action: Integer; RequestBody: TJSONData);
+  var PriorCalls: Integer;
+  begin
+    PriorCalls := Fake.Calls;
+    try
+      case Action of
+        1: Response := Client.CreateAssignment('document', RequestBody);
+        2: Response := Client.EstimateAssignmentCost('document', RequestBody);
+        3: Response := Client.CreateDocumentFromTemplate('', 'template', RequestBody);
+        4: Response := Client.EstimateDocumentFromTemplateCost('', 'template', RequestBody);
+      end;
+      Response.Free;
+      raise Exception.Create('Expected certificate method error');
+    except
+      on E: EAssinafyInputError do
+      begin
+        Check(E.ErrorCode = AssinafyDigitalCertificateRequiresVirtualMethodCode,
+          'Certificate method error code remains stable');
+        Check(Fake.Calls = PriorCalls, 'Invalid certificate method rejected before transport');
+      end;
+    end;
+  end;
 begin
   Fake.NextBody := '{"status":200,"message":"ok","data":{}}';
   for I := 0 to High(Methods) do
@@ -830,15 +852,29 @@ begin
       JSONAdd(Signer, 'role_id', 'role');
       TemplateBody := JSONObj(['signers', Signers.Clone]);
       try
-        Response := Client.EstimateDocumentFromTemplateCost('', 'template', TemplateBody);
-        Response.Free;
-        Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template estimate retained');
-        Response := Client.CreateDocumentFromTemplate('', 'template', TemplateBody);
-        Response.Free;
-        Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template creation retained');
+        if Method = 'DigitalCertificate' then
+        begin
+          ExpectCertificateMethodError(3, TemplateBody);
+          ExpectCertificateMethodError(4, TemplateBody);
+        end
+        else
+        begin
+          Response := Client.EstimateDocumentFromTemplateCost('', 'template', TemplateBody);
+          Response.Free;
+          Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template estimate retained');
+          Response := Client.CreateDocumentFromTemplate('', 'template', TemplateBody);
+          Response.Free;
+          Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template creation retained');
+        end;
       finally TemplateBody.Free; end;
     finally Body.Free; end;
   end;
+  Body := JSONObj(['method', 'collect', 'signers', JSONArr([
+    JSONObj(['id', 'signer', 'verification_method', 'DigitalCertificate'])])]);
+  try
+    ExpectCertificateMethodError(1, Body);
+    ExpectCertificateMethodError(2, Body);
+  finally Body.Free; end;
   Body := JSONObj(['verification-code', '123456']);
   try
     Response := Client.VerifySignerCode('signer-code', Body);

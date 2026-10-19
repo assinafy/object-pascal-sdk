@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.1] - 2026-10-19
+
+- Require `method: virtual` for `DigitalCertificate` signers and reject direct `collect` assignment creation and cost estimation before transport with the stable `digital_certificate_requires_virtual_method` input-error code.
+- Temporarily reject certificate signers from template creation and cost estimation because those requests do not expose the template-derived assignment method.
+
 ## [0.4.0] - 2026-10-16
 
 - Add signer identity-verification status and consent-based session creation for `IdDocumentFaceMatchBasic`.

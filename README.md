@@ -272,7 +272,7 @@ A estimativa informa `has_sufficient_resources`, `blocking_reason`, saldo e deta
 | --- | --- | --- |
 | `Email` | `Email` | O signatário possui e-mail; um código de uso único é exigido antes da assinatura. |
 | `Whatsapp` | `Whatsapp` | O signatário possui número WhatsApp em E.164; a conta possui assinatura paga. |
-| `DigitalCertificate` | `Email` ou `Whatsapp` | A conta possui o recurso de certificado digital; o signatário possui o CPF/CNPJ exigido e fica sozinho em sua etapa de assinatura. |
+| `DigitalCertificate` | `Email` ou `Whatsapp` | Use somente `method: virtual`; a conta possui o recurso de certificado digital; o signatário possui o CPF/CNPJ exigido e fica sozinho em sua etapa de assinatura. |
 | `IdDocumentFaceMatchBasic` | `Email` ou `Whatsapp` | A conta possui o recurso de documento de identidade e comparação facial; o signatário possui CPF válido em `government_id` e consente com o tratamento biométrico. |
 
 `notification_methods` aceita exatamente uma entrada. Omita verificação e notificação para usar e-mail como padrão, ou informe uma delas para que a API deduza a outra. O servidor rejeita combinações incompatíveis. Consulte as estimativas para obter preços atuais e verificar os recursos habilitados para a conta.
@@ -292,6 +292,8 @@ Uma solicitação com certificado usa o mesmo formato JSON de criação:
 ```
 
 A página de assinatura da Assinafy utiliza o certificado ICP-Brasil A1/A3 do signatário pela extensão Web PKI do navegador. A1 e A3 usam o mesmo valor `DigitalCertificate`; o que muda é o armazenamento da chave privada no dispositivo. Um CPF exige o certificado da pessoa correspondente; um CNPJ exige o e-CNPJ da empresa. O SDK cria e acompanha essas solicitações e obtém o documento PAdES resultante. Os certificados e as chaves privadas permanecem com o signatário. A especificação publicada menciona rotas de início e conclusão da assinatura com certificado, mas não define seus contratos de requisição e resposta; use a URL de assinatura retornada para concluir esse processo.
+
+O fluxo de certificado conclui somente o item virtual do signatário, enquanto a assinatura comum de campos recusa signatários `DigitalCertificate`. Por isso, `CreateAssignment` e `EstimateAssignmentCost` recusam a combinação com `method: collect` antes do envio. Como os métodos de template não informam se os campos posicionados produzirão uma solicitação `collect`, `CreateDocumentFromTemplate` e `EstimateDocumentFromTemplateCost` recusam temporariamente qualquer signatário `DigitalCertificate`. Nesses casos, `EAssinafyInputError.ErrorCode` contém `AssinafyDigitalCertificateRequiresVirtualMethodCode` (`digital_certificate_requires_virtual_method`).
 
 Para biometria, use `IdDocumentFaceMatchBasic` no mesmo campo `verification_method`. A verificação utiliza o documento de identidade, uma foto do signatário com o documento e uma prova de vida no provedor. Consulte a estimativa antes de criar a solicitação: o recurso depende da conta e tem custo por signatário, além da notificação escolhida.
 
@@ -532,7 +534,7 @@ Os cabeçalhos de paginação são `X-Pagination-Current-Page`, `X-Pagination-To
 
 | Exceção | Significado |
 | --- | --- |
-| `EAssinafyInputError` | Falha de validação de entrada obrigatória, URL, credencial, arquivo ou segurança antes do envio. |
+| `EAssinafyInputError` | Falha de validação de entrada obrigatória, URL, credencial, arquivo ou segurança antes do envio. Consulte `ErrorCode`; erros comuns usam vazio e a restrição de certificado usa `AssinafyDigitalCertificateRequiresVirtualMethodCode`. |
 | `EAssinafyTransportError` | Falha de DNS, conexão, TLS, timeout ou criptografia nativa. A requisição pode já ter chegado ao servidor. |
 | `EAssinafyProtocolError` | Uma resposta JSON não pôde ser decodificada ou uma resposta OAuth não passou pela validação. `StatusCode` e `ResponseBody` preservam o resultado HTTP e os bytes recebidos. |
 | `EAssinafyAPIError` | Resposta HTTP fora de `2xx`, incluindo erros OAuth. Consulte `StatusCode`, `ErrorCode`, `ResponseBody`, `RetryAfter`, `Authenticate`, `RateLimitLimit`, `RateLimitRemaining` e `RateLimitReset`. |

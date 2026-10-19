@@ -2171,6 +2171,8 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
 
 `step` controls signing order: signers sharing a step sign in parallel, and the next step is notified only after the previous step completes. If supplied, every signer must supply it and values must be contiguous starting at 1.
 
+`DigitalCertificate` signers require `method: virtual`; certificate completion handles the signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. The SDK rejects `method: collect` before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
+
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
@@ -2580,6 +2582,8 @@ Per-unit costs (in credits) used to build the estimate:
 | Digital certificate signature (per signer) | 0.5 credits |
 
 Verification methods are not priced separately — every line in the `breakdown` is a notification or a signature. A `Whatsapp`-verified signer therefore shows up as a WhatsApp notification, because that channel is mandatory for that verification method. A `DigitalCertificate` signer adds the digital-certificate signature cost **on top of** its notification cost; it appears in the `breakdown` under the `SignatureDigitalCertificate` code.
+
+`DigitalCertificate` signers require `method: virtual`; certificate completion handles the signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. The SDK rejects `method: collect` before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -19019,6 +19023,8 @@ function CreateDocumentFromTemplate(const AAccountId: string; const TemplateId: 
 
 Generate a new document from a template, creating its assignment in the same call. Provide one signer entry per template role; the signers must already exist in the account.
 
+The API derives the assignment method from the template and does not include it in this request. Until the API rejects certificate signers when a template has placed fields, the SDK refuses every `DigitalCertificate` signer on this route before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
+
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
@@ -19447,6 +19453,8 @@ function EstimateDocumentFromTemplateCost(const AAccountId: string; const Templa
 `POST /v1/accounts/{accountId}/templates/{templateId}/documents/estimate-cost`
 
 Estimate the cost of creating a document from a template without creating it. Contact information is not required — only the role_id and optionally a verification or notification method are needed. Each document always consumes 1 document from the plan's monthly allowance; if exhausted, the ExtraDocument cost is charged from credits (needs_extra_document = true). blocking_reason may be PendingPayment, InsufficientDocuments, or InsufficientCredits.
+
+The API derives the assignment method from the template and does not include it in this request. Until the API rejects certificate signers when a template has placed fields, the SDK refuses every `DigitalCertificate` signer on this route before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 

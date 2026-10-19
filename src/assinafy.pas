@@ -9,7 +9,7 @@ uses
   Classes, SysUtils, AssinafyJson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.4.0';
+  AssinafyVersion = '0.4.1';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 
@@ -23,6 +23,8 @@ type
     FOwnsTransport: Boolean;
     FTimeoutMS: LongInt;
     function PathValue(const Value, Name: string): string;
+    procedure ValidateDigitalCertificateMethod(Body: TJSONData;
+      TemplateMethodUnknown: Boolean);
     procedure SetAccessToken(const Value: string);
     function Call(const Method, Path: string; Auth: TAssinafyAuth;
       Query: TStrings; Body: TJSONData; const FileName, FileField, ContentType,
@@ -104,6 +106,34 @@ begin
   if (Resolved = '.') or (Resolved = '..') then
     raise EAssinafyInputError.Create(Name + ' cannot be a relative path segment');
   Result := PercentEncode(Resolved);
+end;
+
+procedure TAssinafyClient.ValidateDigitalCertificateMethod(Body: TJSONData;
+  TemplateMethodUnknown: Boolean);
+var
+  MethodValue, Signers, Signer, VerificationMethod: TJSONData;
+  I: Integer;
+begin
+  if JSONKind(Body) <> jtObject then Exit;
+  if not TemplateMethodUnknown then
+  begin
+    MethodValue := JSONFind(Body, 'method');
+    if JSONKind(MethodValue) <> jtString then Exit;
+    if JSONString(MethodValue) <> 'collect' then Exit;
+  end;
+  Signers := JSONFind(Body, 'signers');
+  if JSONKind(Signers) <> jtArray then Exit;
+  for I := 0 to TJSONArray(Signers).Count - 1 do
+  begin
+    Signer := TJSONArray(Signers).Items[I];
+    if JSONKind(Signer) <> jtObject then Continue;
+    VerificationMethod := JSONFind(Signer, 'verification_method');
+    if (JSONKind(VerificationMethod) = jtString) and
+       (JSONString(VerificationMethod) = 'DigitalCertificate') then
+      raise EAssinafyInputError.Create(
+        'DigitalCertificate signers require method: virtual',
+        AssinafyDigitalCertificateRequiresVirtualMethodCode);
+  end;
 end;
 
 function TAssinafyClient.Call(const Method, Path: string; Auth: TAssinafyAuth;

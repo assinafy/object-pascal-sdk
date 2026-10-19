@@ -20,6 +20,30 @@ SECURITY_MODES = {
 }
 MULTIPART_MEDIA = {'/v1/accounts/{accountId}/documents': 'application/pdf',
                    '/v1/accounts/{accountId}/logo': 'application/octet-stream'}
+CERTIFICATE_METHOD_VALIDATION = {
+    'CreateAssignment': False,
+    'EstimateAssignmentCost': False,
+    'CreateDocumentFromTemplate': True,
+    'EstimateDocumentFromTemplateCost': True,
+}
+DIRECT_CERTIFICATE_NOTE = (
+    '`DigitalCertificate` signers require `method: virtual`; certificate completion handles the '
+    "signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. "
+    'The SDK rejects `method: collect` before transport with '
+    '`EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.'
+)
+TEMPLATE_CERTIFICATE_NOTE = (
+    'The API derives the assignment method from the template and does not include it in this request. '
+    'Until the API rejects certificate signers when a template has placed fields, the SDK refuses every '
+    '`DigitalCertificate` signer on this route before transport with '
+    '`EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.'
+)
+SDK_OPERATION_NOTES = {
+    'CreateAssignment': DIRECT_CERTIFICATE_NOTE,
+    'EstimateAssignmentCost': DIRECT_CERTIFICATE_NOTE,
+    'CreateDocumentFromTemplate': TEMPLATE_CERTIFICATE_NOTE,
+    'EstimateDocumentFromTemplateCost': TEMPLATE_CERTIFICATE_NOTE,
+}
 OVERRIDES = {
     'Exchange a code, refresh token, or subject token for an access token': 'ExchangeOAuthToken',
     'Revoke a token': 'RevokeOAuthToken',
@@ -192,6 +216,9 @@ def generate_methods(ops):
         impl = [f"function TAssinafyClient.{op['name']}{signature(op, False)}: TAssinafyResponse;", 'begin']
         if op['body'] and op['required_body']:
             impl.append("  if Body = nil then raise EAssinafyInputError.Create('Request body is required');")
+        if op['name'] in CERTIFICATE_METHOD_VALIDATION:
+            template_unknown = str(CERTIFICATE_METHOD_VALIDATION[op['name']])
+            impl.append(f'  ValidateDigitalCertificateMethod(Body, {template_unknown});')
         if op['file']:
             impl.append("  RequireValue(FileName, 'File name');")
         if op['custom_media']:
@@ -293,6 +320,8 @@ def generate_docs(ops):
     lines += [f"| [{op['name']}](#{op['name'].lower()}) | `{op['verb']} {op['path']}` |" for op in ops]
     for op in ops:
         lines += ['', f"## {op['name']}", '', code(f"function {op['name']}{signature(op)}: TAssinafyResponse;", 'pascal'), f"`{op['verb']} {op['path']}`", '', op['op'].get('description', op['op']['summary']), '']
+        if op['name'] in SDK_OPERATION_NOTES:
+            lines += [SDK_OPERATION_NOTES[op['name']], '']
         if op['workspace_of']:
             lines += [f"Workspace-credential form of [{op['workspace_of']}](#{op['workspace_of'].lower()}): it sends the API key or bearer token and never a signer access code.", '']
         auth = {'aaPublic': 'Public: workspace credentials are omitted.', 'aaAPI': 'API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.', 'aaSigner': 'Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.', 'aaSignerOrAPI': f"Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [{op['name']}AsWorkspace](#{op['name'].lower()}asworkspace).", 'aaBearer': 'Required bearer access token (`Client.AccessToken`).'}[op['auth']]

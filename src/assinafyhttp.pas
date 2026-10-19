@@ -9,9 +9,17 @@ interface
 uses
   Classes, SysUtils, AssinafyJson;
 
+const
+  AssinafyDigitalCertificateRequiresVirtualMethodCode =
+    'digital_certificate_requires_virtual_method';
+
 type
   EAssinafyError = class(Exception);
-  EAssinafyInputError = class(EAssinafyError);
+  EAssinafyInputError = class(EAssinafyError)
+  public
+    ErrorCode: string;
+    constructor Create(const MessageText: string; const AErrorCode: string = '');
+  end;
   EAssinafyTransportError = class(EAssinafyError);
 
   TAssinafyResponse = class
@@ -97,6 +105,12 @@ uses
 
 const
   MaxUploadBytes = 25 * 1024 * 1024;
+
+constructor EAssinafyInputError.Create(const MessageText, AErrorCode: string);
+begin
+  ErrorCode := AErrorCode;
+  inherited Create(MessageText);
+end;
 
 {$IFDEF FPC}
 const

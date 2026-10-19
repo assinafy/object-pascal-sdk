@@ -122,6 +122,11 @@ class GeneratorTests(unittest.TestCase):
         code = generate.generate_methods([operation])['src/methods.inc']
         self.assertIn("if Body = nil then raise EAssinafyInputError", code)
 
+    def test_certificate_method_validation_is_generated(self):
+        code = generate.generate_methods(list(generate.operations()))['src/methods.inc']
+        self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body, False);'), 2)
+        self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body, True);'), 2)
+
 
 class GateTests(unittest.TestCase):
     def setUp(self):

@@ -71,6 +71,7 @@ end;
 function TAssinafyClient.CreateAssignment(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
 begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  ValidateDigitalCertificateMethod(Body, False);
   Result := Call('POST', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/assignments', aaAPI,
     nil, Body, '', '', 'application/json', '');
 end;
@@ -78,6 +79,7 @@ end;
 function TAssinafyClient.EstimateAssignmentCost(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
 begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  ValidateDigitalCertificateMethod(Body, False);
   Result := Call('POST', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/assignments/estimate-cost', aaAPI,
     nil, Body, '', '', 'application/json', '');
 end;
@@ -595,6 +597,7 @@ end;
 function TAssinafyClient.CreateDocumentFromTemplate(const AAccountId: string; const TemplateId: string; Body: TJSONData): TAssinafyResponse;
 begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  ValidateDigitalCertificateMethod(Body, True);
   Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/templates/' + PathValue(TemplateId, 'TemplateId') + '/documents', aaAPI,
     nil, Body, '', '', 'application/json', '');
 end;
@@ -602,6 +605,7 @@ end;
 function TAssinafyClient.EstimateDocumentFromTemplateCost(const AAccountId: string; const TemplateId: string; Body: TJSONData): TAssinafyResponse;
 begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  ValidateDigitalCertificateMethod(Body, True);
   Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/templates/' + PathValue(TemplateId, 'TemplateId') + '/documents/estimate-cost', aaAPI,
     nil, Body, '', '', 'application/json', '');
 end;
