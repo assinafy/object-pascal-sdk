@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0] - 2026-10-28
+
+- Add contract listing, terms, related-document, renewal and termination methods, with all published contract schemas and lifecycle webhook payloads.
+- Support inline template signers and allow `DigitalCertificate` signers when the template has no placed signer fields; direct `collect` assignments remain rejected before transport.
+- Add sorting and pagination published for document activities and refresh the parameters, responses and shared schemas of existing operations.
+- Preserve REST error `code` values in `EAssinafyAPIError.ErrorCode`, including optimistic-concurrency conflicts.
+- Document one-time webhook secrets returned when endpoint updates enable signing.
+- Include all 118 published operations, 49 shared schemas and 31 webhook event payloads in the generated reference.
+
 ## [0.4.1] - 2026-10-19
 
 - Require `method: virtual` for `DigitalCertificate` signers and reject direct `collect` assignment creation and cost estimation before transport with the stable `digital_certificate_requires_virtual_method` input-error code.

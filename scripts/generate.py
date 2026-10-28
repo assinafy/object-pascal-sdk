@@ -20,29 +20,16 @@ SECURITY_MODES = {
 }
 MULTIPART_MEDIA = {'/v1/accounts/{accountId}/documents': 'application/pdf',
                    '/v1/accounts/{accountId}/logo': 'application/octet-stream'}
-CERTIFICATE_METHOD_VALIDATION = {
-    'CreateAssignment': False,
-    'EstimateAssignmentCost': False,
-    'CreateDocumentFromTemplate': True,
-    'EstimateDocumentFromTemplateCost': True,
-}
+CERTIFICATE_METHOD_VALIDATION = {'CreateAssignment', 'EstimateAssignmentCost'}
 DIRECT_CERTIFICATE_NOTE = (
     '`DigitalCertificate` signers require `method: virtual`; certificate completion handles the '
     "signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. "
     'The SDK rejects `method: collect` before transport with '
     '`EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.'
 )
-TEMPLATE_CERTIFICATE_NOTE = (
-    'The API derives the assignment method from the template and does not include it in this request. '
-    'Until the API rejects certificate signers when a template has placed fields, the SDK refuses every '
-    '`DigitalCertificate` signer on this route before transport with '
-    '`EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.'
-)
 SDK_OPERATION_NOTES = {
     'CreateAssignment': DIRECT_CERTIFICATE_NOTE,
     'EstimateAssignmentCost': DIRECT_CERTIFICATE_NOTE,
-    'CreateDocumentFromTemplate': TEMPLATE_CERTIFICATE_NOTE,
-    'EstimateDocumentFromTemplateCost': TEMPLATE_CERTIFICATE_NOTE,
 }
 OVERRIDES = {
     'Exchange a code, refresh token, or subject token for an access token': 'ExchangeOAuthToken',
@@ -63,6 +50,11 @@ OVERRIDES = {
     'Start identity document verification': 'StartIdentityVerification',
     'Signer identity review': 'GetSignerIdentityReview',
     'Signer identity review image': 'DownloadSignerIdentityReviewImage',
+    "Get a document's contract terms": 'GetDocumentContract',
+    "Set a document's contract terms": 'SetDocumentContract',
+    'List the contracts related to a document': 'ListRelatedDocumentContracts',
+    'Renew a contract': 'RenewDocumentContract',
+    'Terminate a contract': 'TerminateDocumentContract',
 }
 
 
@@ -217,8 +209,7 @@ def generate_methods(ops):
         if op['body'] and op['required_body']:
             impl.append("  if Body = nil then raise EAssinafyInputError.Create('Request body is required');")
         if op['name'] in CERTIFICATE_METHOD_VALIDATION:
-            template_unknown = str(CERTIFICATE_METHOD_VALIDATION[op['name']])
-            impl.append(f'  ValidateDigitalCertificateMethod(Body, {template_unknown});')
+            impl.append('  ValidateDigitalCertificateMethod(Body);')
         if op['file']:
             impl.append("  RequireValue(FileName, 'File name');")
         if op['custom_media']:
@@ -241,9 +232,7 @@ def generate_methods(ops):
         for key in re.findall(r'\{([^}]+)\}', expected_path):
             value = 'default-account' if key == 'accountId' else key[:1].upper() + key[1:]
             expected_path = expected_path.replace('{' + key + '}', value)
-        query = {x['name']: str(example(x.get('schema', {}))).lower()
-                 if x.get('schema', {}).get('type') == 'boolean'
-                 else str(example(x.get('schema', {})))
+        query = {x['name']: query_value(x.get('schema', {}))
                  for x in op['parameters'] if x['in'] == 'query'}
         if query:
             checks.append('  TestQuery.Clear;')
@@ -313,6 +302,15 @@ def example(schema, trail=()):
 def code(value, language='json'):
     text = json.dumps(value, indent=2, ensure_ascii=False) if language == 'json' else value
     return f'```{language}\n{text}\n```\n'
+
+
+def query_value(schema):
+    value = example(schema)
+    if isinstance(value, list):
+        return ','.join(str(item).lower() if isinstance(item, bool) else str(item) for item in value)
+    if isinstance(value, bool):
+        return str(value).lower()
+    return str(value)
 
 
 def generate_docs(ops):

@@ -1,6 +1,6 @@
 # Assinafy Object Pascal SDK
 
-Cliente nativo em Object Pascal para a [API Assinafy v1](https://api.assinafy.com.br/v1/docs), com suporte às 112 operações REST publicadas. Use o SDK em serviços Free Pascal ou aplicações Lazarus para gerenciar documentos, signatários, solicitações de assinatura, modelos, campos, etiquetas, espaços de trabalho e webhooks.
+Cliente nativo em Object Pascal para a [API Assinafy v1](https://api.assinafy.com.br/v1/docs), com suporte às 118 operações REST publicadas. Use o SDK em serviços Free Pascal ou aplicações Lazarus para gerenciar documentos, contratos, signatários, solicitações de assinatura, modelos, campos, etiquetas, espaços de trabalho e webhooks.
 
 Este guia acompanha um documento do envio do PDF até a assinatura e o download dos arquivos finais. A [referência da API](docs/API.md) documenta cada método com os esquemas completos de requisição e resposta, exemplos de estrutura, parâmetros, autenticação e erros. Os [esquemas de dados](docs/SCHEMAS.md) definem os modelos compartilhados; a [referência do SDK](docs/SDK.md) explica tipos, gerenciamento de memória, transportes e funções auxiliares. O [contrato OpenAPI](docs/openapi.json) está disponível para ferramentas e consulta offline.
 
@@ -10,6 +10,7 @@ Este guia acompanha um documento do envio do PDF até a assinatura e o download 
 - [Ambientes e configuração](#ambientes-e-configuração)
 - [Escolha da autenticação](#escolha-da-autenticação)
 - [Fluxo completo do documento](#fluxo-completo-do-documento)
+- [Ciclo de contratos](#ciclo-de-contratos)
 - [Aplicativos de marketplace e OAuth2](#aplicativos-de-marketplace-e-oauth2)
 - [Webhooks assinados](#webhooks-assinados)
 - [Modelos, campos e etiquetas](#modelos-campos-e-etiquetas)
@@ -55,7 +56,7 @@ A integração contínua executa os testes em Linux e macOS. No Windows, são ne
 
 ### Delphi no Windows
 
-A implementação Delphi é **experimental**: os alvos previstos são Delphi 12 ou superior, Win32 e Win64, e a compilação e os testes nesse compilador ainda precisam ser executados. O mesmo código mantém as 112 operações e utiliza `System.JSON` e `System.Net.HttpClient`; Delphi não depende de libcurl. O TLS usa o armazenamento de certificados do Windows, com TLS 1.2/1.3 e redirecionamentos desabilitados.
+A implementação Delphi é **experimental**: os alvos previstos são Delphi 12 ou superior, Win32 e Win64, e a compilação e os testes nesse compilador ainda precisam ser executados. O mesmo código mantém as 118 operações e utiliza `System.JSON` e `System.Net.HttpClient`; Delphi não depende de libcurl. O TLS usa o armazenamento de certificados do Windows, com TLS 1.2/1.3 e redirecionamentos desabilitados.
 
 O [Delphi Community Edition](https://www.embarcadero.com/products/delphi/starter) fornece o compilador para usuários elegíveis. Consulte os [requisitos de licença](https://www.embarcadero.com/products/delphi/starter/faq). A instalação requer Windows; Free Pascal em modo Delphi não substitui essa ferramenta para validar compatibilidade.
 
@@ -76,7 +77,7 @@ Para executar a verificação Delphi em uma máquina Windows isolada, abra o ter
 .\delphi\check.ps1 -Platform Win64 -CryptoDirectory C:\OpenSSL-Win64\bin -TrustTestCertificate
 ```
 
-O comando reconstrói o pacote, os testes e os exemplos; confere as 112 operações; executa os testes de JSON, autenticação, OAuth, webhooks, HTTP e TLS; e compila os trechos Pascal do README. `-TrustTestCertificate` permite confiar temporariamente no certificado local gerado para o teste de TLS, no armazenamento **CurrentUser → Root**. O comando remove esse certificado ao concluir, inclusive quando um teste falha. Um segundo certificado permanece não confiável para verificar a rejeição; o teste também verifica hostname incorreto, redirecionamentos e timeout durante uma resposta contínua. Não execute esse teste interrompendo o processo durante a alteração temporária do armazenamento.
+O comando reconstrói o pacote, os testes e os exemplos; confere as 118 operações; executa os testes de JSON, autenticação, OAuth, webhooks, HTTP e TLS; e compila os trechos Pascal do README. `-TrustTestCertificate` permite confiar temporariamente no certificado local gerado para o teste de TLS, no armazenamento **CurrentUser → Root**. O comando remove esse certificado ao concluir, inclusive quando um teste falha. Um segundo certificado permanece não confiável para verificar a rejeição; o teste também verifica hostname incorreto, redirecionamentos e timeout durante uma resposta contínua. Não execute esse teste interrompendo o processo durante a alteração temporária do armazenamento.
 
 ## Ambientes e configuração
 
@@ -293,7 +294,7 @@ Uma solicitação com certificado usa o mesmo formato JSON de criação:
 
 A página de assinatura da Assinafy utiliza o certificado ICP-Brasil A1/A3 do signatário pela extensão Web PKI do navegador. A1 e A3 usam o mesmo valor `DigitalCertificate`; o que muda é o armazenamento da chave privada no dispositivo. Um CPF exige o certificado da pessoa correspondente; um CNPJ exige o e-CNPJ da empresa. O SDK cria e acompanha essas solicitações e obtém o documento PAdES resultante. Os certificados e as chaves privadas permanecem com o signatário. A especificação publicada menciona rotas de início e conclusão da assinatura com certificado, mas não define seus contratos de requisição e resposta; use a URL de assinatura retornada para concluir esse processo.
 
-O fluxo de certificado conclui somente o item virtual do signatário, enquanto a assinatura comum de campos recusa signatários `DigitalCertificate`. Por isso, `CreateAssignment` e `EstimateAssignmentCost` recusam a combinação com `method: collect` antes do envio. Como os métodos de template não informam se os campos posicionados produzirão uma solicitação `collect`, `CreateDocumentFromTemplate` e `EstimateDocumentFromTemplateCost` recusam temporariamente qualquer signatário `DigitalCertificate`. Nesses casos, `EAssinafyInputError.ErrorCode` contém `AssinafyDigitalCertificateRequiresVirtualMethodCode` (`digital_certificate_requires_virtual_method`).
+O fluxo de certificado conclui somente o item virtual do signatário, enquanto a assinatura comum de campos recusa signatários `DigitalCertificate`. Por isso, `CreateAssignment` e `EstimateAssignmentCost` recusam a combinação com `method: collect` antes do envio; `EAssinafyInputError.ErrorCode` contém `AssinafyDigitalCertificateRequiresVirtualMethodCode` (`digital_certificate_requires_virtual_method`). Em documentos criados de modelos, certificados são aceitos quando o modelo não possui campos de signatário posicionados. O servidor conhece essa configuração e rejeita com `400` a combinação incompatível.
 
 Para biometria, use `IdDocumentFaceMatchBasic` no mesmo campo `verification_method`. A verificação utiliza o documento de identidade, uma foto do signatário com o documento e uma prova de vida no provedor. Consulte a estimativa antes de criar a solicitação: o recurso depende da conta e tem custo por signatário, além da notificação escolhida.
 
@@ -372,6 +373,37 @@ end;
 As respostas de download preservam os bytes e o tipo de conteúdo. O SDK mantém as respostas em memória; considere o tamanho dos documentos e a quantidade de downloads simultâneos. Abra o arquivo de destino após a requisição ter sucesso para impedir que um erro HTTP sobrescreva um arquivo existente. Para substituir um arquivo com segurança em caso de interrupção, grave em um arquivo temporário e renomeie-o na aplicação.
 
 [examples/workflow.pas](examples/workflow.pas) reúne envio do PDF, criação do signatário, estimativa e solicitação. Compile com `make examples` e execute `build/workflow contrato.pdf signer@example.com`. Configure chave de API e ID do espaço de trabalho **ou** um token OAuth. O exemplo descobre o espaço de trabalho quando utiliza OAuth. Executá-lo cria recursos e envia uma solicitação de assinatura ao destinatário informado.
+
+## Ciclo de contratos
+
+O acompanhamento de contratos registra termos sobre um documento existente. Depois do envio, use `SetDocumentContract` para criar ou alterar somente os atributos informados:
+
+```pascal
+ContractBody := JSONObj([
+  'status', 'active',
+  'start_date', '2026-11-01',
+  'end_date', '2027-10-31',
+  'auto_renew', True,
+  'renewal_term_months', 12,
+  'notice_period_days', 30
+]);
+try
+  Response := Client.SetDocumentContract(AccountID, DocumentID, ContractBody);
+  try
+    ContractUpdatedAt := JSONString(JSONFind(Response.Data, 'updated_at'));
+  finally
+    Response.Free;
+  end;
+finally
+  ContractBody.Free;
+end;
+```
+
+`GetDocumentContract` retorna os termos atuais e os aditivos; `ListContracts` aceita filtros de estado, contraparte, datas, referências externas, ordenação, expansão do documento e paginação. `ListRelatedDocumentContracts` percorre documentos da mesma família contratual. Um documento pode ser vinculado ao contrato principal por `parent_document_id` e `relation_type` como aditivo, renovação ou término; as alterações entram em vigor quando o instrumento é certificado.
+
+Para impedir sobrescritas concorrentes, envie em `updated_at` o valor lido anteriormente. Uma alteração intermediária retorna `409` e `EAssinafyAPIError.ErrorCode = 'ContractChanged'`; leia novamente e confirme a mudança antes de reenviar. `RenewDocumentContract` usa o `term` atual para impedir que a mesma renovação avance duas vezes. `TerminateDocumentContract` aceita motivo e a mesma precondição de atualização. Não repita automaticamente uma resposta de resultado incerto.
+
+O ciclo publica eventos de atualização, aditivo, aviso de renovação, proximidade do vencimento, renovação, vencimento e término. A disponibilidade e os limites do recurso são definidos pelo plano e podem diferir entre sandbox e produção. Os corpos completos, valores nulos, limites, respostas `403/404/409` e exemplos estão em [ListContracts](docs/API.md#listcontracts), [SetDocumentContract](docs/API.md#setdocumentcontract) e nos esquemas [DocumentContract](docs/SCHEMAS.md#documentcontract) e [DocumentContractInput](docs/SCHEMAS.md#documentcontractinput).
 
 ## Aplicativos de marketplace e OAuth2
 
@@ -465,7 +497,7 @@ Use `CreateWebhookEndpoint` para cadastrar a URL de entrega, o e-mail de contato
 }
 ```
 
-Quando `signing_enabled` é verdadeiro, `CreateWebhookEndpoint` retorna o segredo em `Response.Data.secret`, inclusive para aplicações OAuth. Salve-o com segurança nesse momento; listagens e consultas do endpoint não o retornam. `GetWebhookEndpointSigningSecret` permite recuperá-lo usando chave de API ou token de usuário autorizado, mas aplicações OAuth não podem consultá-lo: se perderem o segredo, precisam excluir o endpoint e criá-lo novamente. A rotação invalida o segredo anterior imediatamente; coordene `RotateWebhookEndpointSigningSecret` com o receptor das entregas.
+Quando `signing_enabled` é verdadeiro, `CreateWebhookEndpoint` retorna o segredo em `Response.Data.secret`, inclusive para aplicações OAuth. `UpdateWebhookEndpoint` também o retorna uma única vez quando habilita a assinatura. Salve o valor com segurança; listagens e consultas do endpoint não o retornam. `GetWebhookEndpointSigningSecret` permite recuperá-lo usando chave de API ou token de usuário autorizado, mas aplicações OAuth não podem consultá-lo: se perderem o segredo, use `RotateWebhookEndpointSigningSecret`. A rotação invalida o segredo anterior imediatamente; coordene a troca com o receptor das entregas.
 
 `ListWebhookEndpoints` aceita um `Query` opcional com `url` para localizar a URL exata registrada. `DeleteWebhookEndpointByURL` recebe o mesmo parâmetro obrigatório em `Query` e libera o slot do endpoint. Passe a URL completa como valor decodificado, incluindo sua query string; o SDK faz a codificação. A exclusão retorna `404` quando não existe correspondência, e exige `webhooks:write` em conexões OAuth.
 
@@ -478,13 +510,13 @@ if not VerifyWebhookHeaders(EndpointSecret, RequestHeaders, RawRequestBody) then
 
 `RequestHeaders` aceita linhas HTTP `nome: valor` ou pares `nome=valor`. Os nomes dos cabeçalhos não diferenciam maiúsculas e minúsculas. A verificação usa os bytes originais do corpo, `webhook-id`, `webhook-timestamp`, uma chave `whsec_` decodificada de base64 e HMAC-SHA256. Aceita uma assinatura `v1` válida entre múltiplas entradas, compara em tempo constante e exige uma diferença máxima de cinco minutos entre o horário da entrega e o relógio local. Mantenha o relógio do servidor sincronizado. Identificadores ou timestamps duplicados, cabeçalhos ausentes, chaves malformadas, corpos alterados e entregas fora da janela são rejeitados.
 
-Persista os eventos válidos e elimine duplicatas por `webhook-id`, encaminhe o processamento para uma fila e retorne `2xx` rapidamente. Cada endpoint recebe entregas independentes. O corpo contém `id`, `event`, `message`, `payload`, `origin`, `created_at`, `subject`, `object` e `account_id`; `subject` e `object` podem representar diferentes tipos de recurso. [WebhookEvent](docs/SCHEMAS.md#webhookevent) define o envelope completo; a [referência de entregas](docs/API.md#webhook-deliveries) inclui cabeçalhos e exemplos completos dos 23 eventos. Não dependa de uma ordem fixa entre `assignment_created` e `document_metadata_ready`.
+Persista os eventos válidos e elimine duplicatas por `webhook-id`, encaminhe o processamento para uma fila e retorne `2xx` rapidamente. Cada endpoint recebe entregas independentes. O corpo contém `id`, `event`, `message`, `payload`, `origin`, `created_at`, `subject`, `object` e `account_id`; `subject` e `object` podem representar diferentes tipos de recurso. [WebhookEvent](docs/SCHEMAS.md#webhookevent) define o envelope completo; a [referência de entregas](docs/API.md#webhook-deliveries) inclui cabeçalhos e exemplos completos dos 31 eventos. Não dependa de uma ordem fixa entre `assignment_created` e `document_metadata_ready`.
 
 Use `ListWebhookEventTypes` para o catálogo de eventos, `ListWebhookDeliveries` para os resultados das entregas e `RetryWebhookDelivery` para solicitar uma nova tentativa. Reenvios podem entregar o mesmo evento novamente; mantenha a eliminação de duplicatas ativa.
 
 ## Modelos, campos e etiquetas
 
-`ListTemplates` consulta modelos reutilizáveis. `EstimateDocumentFromTemplateCost` e `CreateDocumentFromTemplate` estimam o custo e criam um documento com o identificador do modelo, o vínculo entre papéis e signatários e os valores dos campos. A referência da API inclui todos os campos aninhados; utilize os papéis e páginas retornados pelo modelo. A especificação atual publica a listagem de modelos e a criação de documentos a partir deles, sem um contrato de criação, alteração ou exclusão de modelos.
+`ListTemplates` consulta modelos reutilizáveis. `EstimateDocumentFromTemplateCost` e `CreateDocumentFromTemplate` estimam o custo e criam um documento com o identificador do modelo, o vínculo entre papéis e signatários e os valores dos campos. Cada papel pode usar o `id` de um signatário existente ou um `email`; nesse segundo caso, a API reutiliza o contato da conta ou cria um com `name`, telefone, verificação e notificação informados. Modelos sem campos de signatário aceitam `DigitalCertificate`; modelos com esses campos geram uma solicitação `collect` e retornam `400` para certificados. A referência da API inclui todos os campos aninhados; utilize os papéis e páginas retornados pelo modelo. A especificação atual publica a listagem de modelos e a criação de documentos a partir deles, sem um contrato de criação, alteração ou exclusão de modelos.
 
 `ListFields`, `CreateField`, `GetField`, `UpdateField`, `DeleteField`, `ValidateFieldValue`, `ValidateMultipleFieldValues` e `ListFieldTypes` gerenciam definições de campos e validações de valores no servidor. Essas validações de campos são independentes da verificação de identidade por e-mail ou WhatsApp.
 
@@ -537,7 +569,7 @@ Os cabeçalhos de paginação são `X-Pagination-Current-Page`, `X-Pagination-To
 | `EAssinafyInputError` | Falha de validação de entrada obrigatória, URL, credencial, arquivo ou segurança antes do envio. Consulte `ErrorCode`; erros comuns usam vazio e a restrição de certificado usa `AssinafyDigitalCertificateRequiresVirtualMethodCode`. |
 | `EAssinafyTransportError` | Falha de DNS, conexão, TLS, timeout ou criptografia nativa. A requisição pode já ter chegado ao servidor. |
 | `EAssinafyProtocolError` | Uma resposta JSON não pôde ser decodificada ou uma resposta OAuth não passou pela validação. `StatusCode` e `ResponseBody` preservam o resultado HTTP e os bytes recebidos. |
-| `EAssinafyAPIError` | Resposta HTTP fora de `2xx`, incluindo erros OAuth. Consulte `StatusCode`, `ErrorCode`, `ResponseBody`, `RetryAfter`, `Authenticate`, `RateLimitLimit`, `RateLimitRemaining` e `RateLimitReset`. |
+| `EAssinafyAPIError` | Resposta HTTP fora de `2xx`, incluindo erros OAuth. `ErrorCode` recebe `error` do OAuth ou `code` das respostas REST. Consulte também `StatusCode`, `ResponseBody`, `RetryAfter`, `Authenticate`, `RateLimitLimit`, `RateLimitRemaining` e `RateLimitReset`. |
 
 Exceções comuns do sistema de arquivos podem ocorrer ao ler um arquivo para envio ou gravar o destino. Corpos de erro podem conter dados pessoais; aplique a política de ocultação de dados sensíveis da aplicação antes de registrá-los. O SDK não registra credenciais, corpos de requisição ou URLs de assinatura.
 
@@ -553,7 +585,7 @@ O SDK não repete requisições automaticamente. Uma resposta `429` informa o in
 make check
 ```
 
-O comando verifica os arquivos gerados contra o contrato incluído, a cobertura das operações, os links de documentação e a consistência dos arquivos. Compila tratando avisos como erros, executa as verificações dos 112 métodos e os testes de respostas, segurança e funções auxiliares, exercita requisições HTTP reais locais com multipart, dados binários e TLS, e compila os dois exemplos. Também compila os trechos Pascal deste guia e verifica a sintaxe dos exemplos JSON e shell, sem executá-los. Os testes ativam verificações de faixa, overflow, entrada/saída, asserções e memória. A integração contínua executa em Linux e macOS. Os testes HTTP locais precisam de permissão para abrir portas de loopback.
+O comando verifica os arquivos gerados contra o contrato incluído, a cobertura das operações, os links de documentação e a consistência dos arquivos. Compila tratando avisos como erros, executa as verificações dos 118 métodos e os testes de respostas, segurança e funções auxiliares, exercita requisições HTTP reais locais com multipart, dados binários e TLS, e compila os dois exemplos. Também compila os trechos Pascal deste guia e verifica a sintaxe dos exemplos JSON e shell, sem executá-los. Os testes ativam verificações de faixa, overflow, entrada/saída, asserções e memória. A integração contínua executa em Linux e macOS. Os testes HTTP locais precisam de permissão para abrir portas de loopback.
 
 As verificações Python também testam falhas de contrato com otimização ativada (`python3 -O`), validam a autenticação independentemente dos testes gerados e rejeitam parâmetros ou formatos de envio incompatíveis.
 

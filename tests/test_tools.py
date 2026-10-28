@@ -32,7 +32,13 @@ class GeneratorTests(unittest.TestCase):
             with self.subTest(event=name):
                 self.assertIn('\n### ' + name + '\n', docs)
                 content = item['post']['requestBody']['content']['application/json']
-                self.assertIn(generate.code(content['example']), docs)
+                self.assertIn(generate.code(content.get(
+                    'example', generate.example(content.get('schema', {})))), docs)
+
+    def test_query_array_examples_use_wire_format(self):
+        checks = generate.generate_methods(list(generate.operations()))['tests/operations.inc']
+        self.assertIn("TestQuery.Add('status=draft');", checks)
+        self.assertNotIn("status=['draft']", checks)
 
     def operation(self, security, **changes):
         spec = copy.deepcopy(generate.SPEC)
@@ -124,8 +130,7 @@ class GeneratorTests(unittest.TestCase):
 
     def test_certificate_method_validation_is_generated(self):
         code = generate.generate_methods(list(generate.operations()))['src/methods.inc']
-        self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body, False);'), 2)
-        self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body, True);'), 2)
+        self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body);'), 2)
 
 
 class GateTests(unittest.TestCase):

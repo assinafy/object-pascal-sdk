@@ -61,19 +61,25 @@
   Check(Fake.LastBody = JSONText(TestBody), 'CreateAccount body');
   Check(Fake.LastContentType = 'application/json', 'CreateAccount content type');
 
-  Response := Client.ListDocumentActivities('DocumentId');
+  TestQuery.Clear;
+  TestQuery.Add('sort=<string>');
+  TestQuery.Add('page=1');
+  TestQuery.Add('per-page=25');
+  Response := Client.ListDocumentActivities('DocumentId', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListDocumentActivities verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/activities', 'ListDocumentActivities URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/activities?sort=%3Cstring%3E&page=1&per-page=25', 'ListDocumentActivities URL');
   Check(Fake.LastAuth = 'bearer', 'ListDocumentActivities authentication');
 
   TestQuery.Clear;
+  TestQuery.Add('accountId=<string>');
+  TestQuery.Add('sort=-created_at');
   TestQuery.Add('page=1');
   TestQuery.Add('per-page=25');
   Response := Client.ListAssignments(TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListAssignments verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/assignments?page=1&per-page=25', 'ListAssignments URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/assignments?accountId=%3Cstring%3E&sort=-created_at&page=1&per-page=25', 'ListAssignments URL');
   Check(Fake.LastAuth = 'bearer', 'ListAssignments authentication');
 
   Response := Client.CreateAssignment('DocumentId', TestBody);
@@ -173,17 +179,72 @@
   Check(Fake.LastContentType = 'application/json', 'CompleteATwoFactorLogin content type');
 
   TestQuery.Clear;
+  TestQuery.Add('status=draft');
+  TestQuery.Add('counterparty=<string>');
+  TestQuery.Add('search=Prestação de serviços');
+  TestQuery.Add('end_date_from=<string>');
+  TestQuery.Add('end_date_to=<string>');
+  TestQuery.Add('ending_within_days=30');
+  TestQuery.Add('external_system=<string>');
+  TestQuery.Add('external_id=<string>');
+  TestQuery.Add('sort=end_date');
+  TestQuery.Add('expand=<string>');
+  TestQuery.Add('page=1');
+  TestQuery.Add('per-page=25');
+  Response := Client.ListContracts('', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListContracts verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/contracts?status=draft&counterparty=%3Cstring%3E&search=Presta%C3%A7%C3%A3o%20de%20servi%C3%A7os&end_date_from=%3Cstring%3E&end_date_to=%3Cstring%3E&ending_within_days=30&external_system=%3Cstring%3E&external_id=%3Cstring%3E&sort=end_date&expand=%3Cstring%3E&page=1&per-page=25', 'ListContracts URL');
+  Check(Fake.LastAuth = 'bearer', 'ListContracts authentication');
+
+  Response := Client.GetDocumentContract('', 'DocumentId');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetDocumentContract verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/contract', 'GetDocumentContract URL');
+  Check(Fake.LastAuth = 'bearer', 'GetDocumentContract authentication');
+
+  Response := Client.SetDocumentContract('', 'DocumentId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'SetDocumentContract verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/contract', 'SetDocumentContract URL');
+  Check(Fake.LastAuth = 'bearer', 'SetDocumentContract authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'SetDocumentContract body');
+  Check(Fake.LastContentType = 'application/json', 'SetDocumentContract content type');
+
+  Response := Client.ListRelatedDocumentContracts('', 'DocumentId');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListRelatedDocumentContracts verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/contract/related', 'ListRelatedDocumentContracts URL');
+  Check(Fake.LastAuth = 'bearer', 'ListRelatedDocumentContracts authentication');
+
+  Response := Client.RenewDocumentContract('', 'DocumentId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'RenewDocumentContract verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/contract/renew', 'RenewDocumentContract URL');
+  Check(Fake.LastAuth = 'bearer', 'RenewDocumentContract authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'RenewDocumentContract body');
+  Check(Fake.LastContentType = 'application/json', 'RenewDocumentContract content type');
+
+  Response := Client.TerminateDocumentContract('', 'DocumentId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'TerminateDocumentContract verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/contract/terminate', 'TerminateDocumentContract URL');
+  Check(Fake.LastAuth = 'bearer', 'TerminateDocumentContract authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'TerminateDocumentContract body');
+  Check(Fake.LastContentType = 'application/json', 'TerminateDocumentContract content type');
+
+  TestQuery.Clear;
   TestQuery.Add('status=<string>');
   TestQuery.Add('method=virtual');
   TestQuery.Add('search=<string>');
   TestQuery.Add('tags=<string>');
-  TestQuery.Add('sort=<string>');
+  TestQuery.Add('sort=-updated_at');
   TestQuery.Add('page=1');
   TestQuery.Add('per-page=25');
   Response := Client.ListDocuments('', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListDocuments verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents?status=%3Cstring%3E&method=virtual&search=%3Cstring%3E&tags=%3Cstring%3E&sort=%3Cstring%3E&page=1&per-page=25', 'ListDocuments URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents?status=%3Cstring%3E&method=virtual&search=%3Cstring%3E&tags=%3Cstring%3E&sort=-updated_at&page=1&per-page=25', 'ListDocuments URL');
   Check(Fake.LastAuth = 'bearer', 'ListDocuments authentication');
 
   Response := Client.UploadDocument('', FixtureFile);
@@ -198,12 +259,13 @@
   TestQuery.Clear;
   TestQuery.Add('search=<string>');
   TestQuery.Add('status=<string>');
+  TestQuery.Add('sort=-updated_at');
   TestQuery.Add('page=1');
   TestQuery.Add('per-page=25');
   Response := Client.SearchDocuments('', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'SearchDocuments verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/search?search=%3Cstring%3E&status=%3Cstring%3E&page=1&per-page=25', 'SearchDocuments URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/search?search=%3Cstring%3E&status=%3Cstring%3E&sort=-updated_at&page=1&per-page=25', 'SearchDocuments URL');
   Check(Fake.LastAuth = 'bearer', 'SearchDocuments authentication');
 
   Response := Client.ListDocumentStatuses;

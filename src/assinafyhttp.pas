@@ -285,6 +285,7 @@ begin
   begin
     Obj := TJSONObject(Response.JSON);
     ErrorCode := StringField('error');
+    if ErrorCode = '' then ErrorCode := StringField('code');
     Detail := StringField('error_description');
     if Detail = '' then Detail := StringField('message');
   end;

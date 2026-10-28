@@ -9,7 +9,7 @@ uses
   Classes, SysUtils, AssinafyJson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.4.1';
+  AssinafyVersion = '0.5.0';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 
@@ -23,8 +23,7 @@ type
     FOwnsTransport: Boolean;
     FTimeoutMS: LongInt;
     function PathValue(const Value, Name: string): string;
-    procedure ValidateDigitalCertificateMethod(Body: TJSONData;
-      TemplateMethodUnknown: Boolean);
+    procedure ValidateDigitalCertificateMethod(Body: TJSONData);
     procedure SetAccessToken(const Value: string);
     function Call(const Method, Path: string; Auth: TAssinafyAuth;
       Query: TStrings; Body: TJSONData; const FileName, FileField, ContentType,
@@ -108,19 +107,15 @@ begin
   Result := PercentEncode(Resolved);
 end;
 
-procedure TAssinafyClient.ValidateDigitalCertificateMethod(Body: TJSONData;
-  TemplateMethodUnknown: Boolean);
+procedure TAssinafyClient.ValidateDigitalCertificateMethod(Body: TJSONData);
 var
   MethodValue, Signers, Signer, VerificationMethod: TJSONData;
   I: Integer;
 begin
   if JSONKind(Body) <> jtObject then Exit;
-  if not TemplateMethodUnknown then
-  begin
-    MethodValue := JSONFind(Body, 'method');
-    if JSONKind(MethodValue) <> jtString then Exit;
-    if JSONString(MethodValue) <> 'collect' then Exit;
-  end;
+  MethodValue := JSONFind(Body, 'method');
+  if JSONKind(MethodValue) <> jtString then Exit;
+  if JSONString(MethodValue) <> 'collect' then Exit;
   Signers := JSONFind(Body, 'signers');
   if JSONKind(Signers) <> jtArray then Exit;
   for I := 0 to TJSONArray(Signers).Count - 1 do

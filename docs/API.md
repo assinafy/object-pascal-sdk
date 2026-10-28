@@ -2,7 +2,7 @@
 
 Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).
 
-The client exposes all 112 published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).
+The client exposes all 118 published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).
 
 ## Ownership and payloads
 
@@ -40,6 +40,12 @@ Payload examples show the documented fields, including optional fields. They ill
 | [ResetPassword](#resetpassword) | `PUT /v1/authentication/reset-password` |
 | [ChangePassword](#changepassword) | `PUT /v1/authentication/change-password` |
 | [CompleteATwoFactorLogin](#completeatwofactorlogin) | `POST /v1/authentication/mfa/verify` |
+| [ListContracts](#listcontracts) | `GET /v1/accounts/{accountId}/contracts` |
+| [GetDocumentContract](#getdocumentcontract) | `GET /v1/accounts/{accountId}/documents/{documentId}/contract` |
+| [SetDocumentContract](#setdocumentcontract) | `PUT /v1/accounts/{accountId}/documents/{documentId}/contract` |
+| [ListRelatedDocumentContracts](#listrelateddocumentcontracts) | `GET /v1/accounts/{accountId}/documents/{documentId}/contract/related` |
+| [RenewDocumentContract](#renewdocumentcontract) | `POST /v1/accounts/{accountId}/documents/{documentId}/contract/renew` |
+| [TerminateDocumentContract](#terminatedocumentcontract) | `POST /v1/accounts/{accountId}/documents/{documentId}/contract/terminate` |
 | [ListDocuments](#listdocuments) | `GET /v1/accounts/{accountId}/documents` |
 | [UploadDocument](#uploaddocument) | `POST /v1/accounts/{accountId}/documents` |
 | [SearchDocuments](#searchdocuments) | `GET /v1/accounts/{accountId}/documents/search` |
@@ -195,6 +201,9 @@ Content type: `application/json`
       "owner"
     ],
     "is_delete_allowed": true,
+    "limits": {
+      "webhook_endpoints": 1
+    },
     "created_at": "2026-06-03T03:54:16Z"
   }
 }
@@ -413,6 +422,9 @@ Content type: `application/json`
       "owner"
     ],
     "is_delete_allowed": true,
+    "limits": {
+      "webhook_endpoints": 1
+    },
     "created_at": "2026-06-03T03:54:16Z"
   }
 }
@@ -1484,6 +1496,9 @@ Content type: `application/json`
         "owner"
       ],
       "is_delete_allowed": true,
+      "limits": {
+        "webhook_endpoints": 1
+      },
       "created_at": "2026-06-03T03:54:16Z"
     }
   ]
@@ -1661,6 +1676,9 @@ Content type: `application/json`
       "owner"
     ],
     "is_delete_allowed": true,
+    "limits": {
+      "webhook_endpoints": 1
+    },
     "created_at": "2026-06-03T03:54:16Z"
   }
 }
@@ -1787,12 +1805,12 @@ Content type: `application/json`
 ## ListDocumentActivities
 
 ```pascal
-function ListDocumentActivities(const DocumentId: string): TAssinafyResponse;
+function ListDocumentActivities(const DocumentId: string; Query: TStrings = nil): TAssinafyResponse;
 ```
 
 `GET /v1/documents/{documentId}/activities`
 
-List the activities recorded for a document. Each entry carries an event-specific `payload` snapshot (keys vary per event) and the request `origin` (`ip`, `user-agent`).
+List the activities recorded for a document, newest first (`sort=id` for oldest first). Paged: 20 per page by default; the `X-Pagination-Total-Count`, `X-Pagination-Page-Count`, `X-Pagination-Current-Page` and `X-Pagination-Per-Page` headers describe the full list, and a page past the end returns an empty `data`. Each entry carries an event-specific `payload` snapshot (keys vary per event) and the request `origin` (`ip`, `user-agent`).
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -1802,6 +1820,34 @@ List the activities recorded for a document. Each entry carries an event-specifi
 ```json
 {
   "type": "string"
+}
+```
+
+
+- `sort` (query, optional): `-id` (default, newest first) or `id`.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `page` (query, optional): Page number.
+```json
+{
+  "type": "integer",
+  "minimum": 1,
+  "example": 1
+}
+```
+
+
+- `per-page` (query, optional): Records per page (max 100).
+```json
+{
+  "type": "integer",
+  "maximum": 100,
+  "example": 25
 }
 ```
 
@@ -1943,11 +1989,28 @@ function ListAssignments(Query: TStrings = nil): TAssinafyResponse;
 
 `GET /v1/assignments`
 
-List the assignments belonging to the authenticated user's current account.
+List the workspace's assignments, oldest first. With an OAuth token the workspace is the token's; otherwise pass `accountId`. Each assignment carries its `document_id`.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
+
+- `accountId` (query, optional): The workspace ID. Required unless the request uses an OAuth token.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `sort` (query, optional): `created_at` (default, oldest first), `expires_at` or `id`; prefix with `-` for descending (`-created_at`, newest first). Unknown values are ignored.
+```json
+{
+  "type": "string",
+  "example": "-created_at"
+}
+```
+
 
 - `page` (query, optional): Page number.
 ```json
@@ -2007,6 +2070,8 @@ Content type: `application/json`
     {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -2016,7 +2081,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -2167,6 +2232,8 @@ function CreateAssignment(const DocumentId: string; Body: TJSONData): TAssinafyR
 
 Request signatures on a document. Use `method: virtual` to sign without input fields, or `method: collect` to place input fields on specific pages.
 
+**Digital certificate signing works only on `virtual` assignments.** A `DigitalCertificate` signer cannot sign placed fields, so a `collect` assignment with one is refused with `400` before anything is charged.
+
 For **virtual**, the document may be in `uploaded`, `metadata_processing` or `metadata_ready`; it is promoted to `pending_signature` automatically once metadata processing completes. For **collect**, the document must be in `metadata_ready` (fields reference specific pages).
 
 `step` controls signing order: signers sharing a step sign in parallel, and the next step is notified only after the previous step completes. If supplied, every signer must supply it and values must be contiguous starting at 1.
@@ -2195,6 +2262,7 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
   ],
   "properties": {
     "method": {
+      "description": "`virtual` signs without input fields; `collect` places input fields on pages. Signers with `DigitalCertificate` verification need `virtual` (`collect` returns `400`).",
       "type": "string",
       "enum": [
         "virtual",
@@ -2214,7 +2282,7 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
             "example": "615605f50e968054a5b7c9b8"
           },
           "verification_method": {
-            "description": "How the signer's identity is verified before signing. `Email` (default) sends a one-time code to the signer's email; `Whatsapp` sends the code over WhatsApp — the verification itself is not billed, but it requires the WhatsApp notification channel, so the signer costs 0.45 credits (available only on paid subscriptions); `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate (A1/A3) — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id`, must be alone in its signing step, and is charged 0.5 credits per signer. A CPF requires that person's certificate (an e-CPF, or an e-CNPJ naming them as legal representative); a CNPJ requires an e-CNPJ for that company, from any of its representatives. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Omit to default to `Email`.",
+            "description": "How the signer's identity is verified before signing. `Email` (default) sends a one-time code to the signer's email; `Whatsapp` sends the code over WhatsApp — the verification itself is not billed, but it requires the WhatsApp notification channel, so the signer costs 0.45 credits (available only on paid subscriptions); `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate (A1/A3) — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id`, must be alone in its signing step, needs `method: virtual` (a `collect` assignment with a `DigitalCertificate` signer returns `400`), and is charged 0.5 credits per signer. A CPF requires that person's certificate (an e-CPF, or an e-CNPJ naming them as legal representative); a CNPJ requires an e-CNPJ for that company, from any of its representatives. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Omit to default to `Email`.",
             "type": "string",
             "enum": [
               "Email",
@@ -2247,7 +2315,7 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
       }
     },
     "entries": {
-      "description": "Required for `collect`: field placements per page.",
+      "description": "Required for `collect`: field placements per page. In `collect`, every signer listed in `signers` must appear once and own at least one field here; otherwise `400`.",
       "type": "array",
       "items": {
         "properties": {
@@ -2280,7 +2348,7 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
       "type": "string"
     },
     "expires_at": {
-      "description": "ISO 8601; default is no expiration. Must be at least one hour in the future.",
+      "description": "ISO 8601; default is no expiration. Must be at least one hour in the future. A UTC offset in the value is honored (`2026-12-31T23:59:59-03:00` is `2027-01-01T02:59:59Z`); a value without one is read as UTC, and a date alone (`2026-12-31`) means 23:59 UTC that day.",
       "type": "string",
       "format": "date-time"
     },
@@ -2372,6 +2440,8 @@ Content type: `application/json`
   "data": {
     "resource": "assignment",
     "id": "615606ef81d199996981dbce",
+    "document_id": "615601fab04c0a3147bb1246",
+    "created_at": "2026-06-03T03:54:16Z",
     "sender_email": "sender@example.com",
     "method": "virtual",
     "expires_at": null,
@@ -2381,7 +2451,7 @@ Content type: `application/json`
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false,
@@ -2580,8 +2650,16 @@ Per-unit costs (in credits) used to build the estimate:
 | Email notification | 0 credits |
 | WhatsApp notification | 0.45 credits |
 | Digital certificate signature (per signer) | 0.5 credits |
+| Identity document verification (per signer) | depends on the plan, see the table below |
 
-Verification methods are not priced separately — every line in the `breakdown` is a notification or a signature. A `Whatsapp`-verified signer therefore shows up as a WhatsApp notification, because that channel is mandatory for that verification method. A `DigitalCertificate` signer adds the digital-certificate signature cost **on top of** its notification cost; it appears in the `breakdown` under the `SignatureDigitalCertificate` code.
+| Plan | Price per signer |
+|------|------------------|
+| Free | 1.5 credits |
+| Standard | 1 credit |
+| Pro | 0.5 credits |
+| Other plans and enterprise contracts | 0.25 credits |
+
+`Email` and `Whatsapp` verification are not priced separately — their only line in the `breakdown` is their notification. A `Whatsapp`-verified signer therefore shows up as a WhatsApp notification, because that channel is mandatory for that verification method. A `DigitalCertificate` signer adds the digital-certificate signature cost **on top of** its notification cost; it appears in the `breakdown` under the `SignatureDigitalCertificate` code. An `IdDocumentFaceMatchBasic` signer likewise adds your plan's verification price on top of its notification, under the `VerificationIdDocumentFaceMatchBasic` code.
 
 `DigitalCertificate` signers require `method: virtual`; certificate completion handles the signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. The SDK rejects `method: collect` before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
 
@@ -2603,6 +2681,7 @@ Verification methods are not priced separately — every line in the `breakdown`
 {
   "properties": {
     "method": {
+      "description": "Send the method you will create the assignment with. With `collect`, a `DigitalCertificate` signer returns `400`, because certificate signing works only on `virtual` assignments.",
       "type": "string",
       "enum": [
         "virtual",
@@ -2616,7 +2695,7 @@ Verification methods are not priced separately — every line in the `breakdown`
       "items": {
         "properties": {
           "verification_method": {
-            "description": "Verification method to price. `Whatsapp` forces the WhatsApp notification, so it prices at 0.45 credits per signer; `DigitalCertificate` adds the per-signer signature cost on top of its notification. `IdDocumentFaceMatchBasic` requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged a per-signer fee.",
+            "description": "Verification method to price. `Whatsapp` forces the WhatsApp notification, so it prices at 0.45 credits per signer; `DigitalCertificate` adds the per-signer signature cost on top of its notification, and with `method: collect` returns `400` (certificate signers sign only virtual assignments). `IdDocumentFaceMatchBasic` requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged your plan's per-signer verification price on top of its notification.",
             "type": "string",
             "enum": [
               "Email",
@@ -2704,10 +2783,10 @@ Content type: `application/json`
   "message": "",
   "data": {
     "documents": 1,
-    "credits": 1,
-    "needs_extra_document": false,
+    "credits": 0.9,
+    "needs_extra_document": true,
     "extra_document_cost": 1,
-    "total_credits": 1,
+    "total_credits": 1.9,
     "breakdown": [
       {
         "code": "NotificationWhatsapp",
@@ -2717,9 +2796,9 @@ Content type: `application/json`
         "unit_cost": 0.45
       }
     ],
-    "document_balance": 1,
-    "credit_balance": 1,
-    "has_sufficient_resources": false,
+    "document_balance": 0,
+    "credit_balance": 10,
+    "has_sufficient_resources": true,
     "blocking_reason": null,
     "message": "<string>"
   }
@@ -2852,7 +2931,7 @@ function ResendSignatureRequest(const DocumentId: string; const AssignmentId: st
 
 `PUT /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/resend`
 
-Resend the signature-request notification to a specific signer of an assignment.
+Resend the signature-request notification to a signer of the assignment who has not signed yet, while the document is pending signature. Paid notification methods are charged for each message that goes out.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -2932,6 +3011,10 @@ Content type: `application/json`
 }
 ```
 
+
+**Response `400`:** The document is not pending signature, the signer is not part of the assignment, has already signed, or waits for an earlier signing step; or the account lacks credits for the reminder.
+
+**Response `404`:** The assignment or signer was not found on this document.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -3019,7 +3102,7 @@ function EstimateResendCost(const DocumentId: string; const AssignmentId: string
 
 `POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/estimate-resend-cost`
 
-Estimate the cost of resending the signature request to a signer.
+Estimate the cost of resending the signature request to a signer. The response has its own shape (`total`, not `total_credits`), because a reminder uses no document.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -3065,7 +3148,7 @@ Content type: `application/json`
     {
       "properties": {
         "data": {
-          "$ref": "#/components/schemas/CostEstimate"
+          "$ref": "#/components/schemas/ResendCostEstimate"
         }
       },
       "type": "object"
@@ -3081,25 +3164,16 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
-    "documents": 1,
-    "credits": 1,
-    "needs_extra_document": false,
-    "extra_document_cost": 1,
-    "total_credits": 1,
+    "total": 0.45,
     "breakdown": [
       {
-        "code": "NotificationWhatsapp",
-        "name": "Whatsapp Notification",
-        "cost": 0.9,
-        "quantity": 2,
-        "unit_cost": 0.45
+        "code": "NotificationWhatsappResend",
+        "name": "Whatsapp Notification Resend",
+        "cost": 0.45
       }
     ],
-    "document_balance": 1,
-    "credit_balance": 1,
-    "has_sufficient_resources": false,
-    "blocking_reason": null,
-    "message": "<string>"
+    "credit_balance": 10,
+    "has_sufficient_credits": true
   }
 }
 ```
@@ -3222,7 +3296,7 @@ Set a new expiration date for an assignment, or remove its expiration by sending
   ],
   "properties": {
     "expires_at": {
-      "description": "New expiration date (ISO 8601). Must be at least one hour in the future. Send `null` to remove the expiration — the key itself is required.",
+      "description": "New expiration date (ISO 8601). Must be at least one hour in the future. Send `null` to remove the expiration — the key itself is required. A UTC offset in the value is honored (`2026-12-31T23:59:59-03:00` is `2027-01-01T02:59:59Z`); a value without one is read as UTC, and a date alone (`2026-12-31`) means 23:59 UTC that day.",
       "type": [
         "string",
         "null"
@@ -3276,6 +3350,8 @@ Content type: `application/json`
   "data": {
     "resource": "assignment",
     "id": "615606ef81d199996981dbce",
+    "document_id": "615601fab04c0a3147bb1246",
+    "created_at": "2026-06-03T03:54:16Z",
     "sender_email": "sender@example.com",
     "method": "virtual",
     "expires_at": null,
@@ -3285,7 +3361,7 @@ Content type: `application/json`
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false,
@@ -3512,7 +3588,7 @@ function GetSignerIdentityReview(const DocumentId: string; const AssignmentId: s
 `GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification`
 
 The signer's identity-document verification as the account's reviewer sees it. When the provider sends a verification to review, the account decides it with **Decide signer identity review**. The signer can still view and sign meanwhile; the review holds the document's certification instead (status `pending_identity_review` once every signer has signed).
-Evidence is a summary kept by Assinafy (no images or biometrics). `evidence_available` is false when the provider keeps none or it could not be fetched yet. While the review is open, `images` lists the evidence images the reviewer can open with **Signer identity review image**. A verification the provider approved directly, without a review, shows no evidence here (`evidence_available` is false); its evidence is on the `signer_identity_verified` activity.
+Evidence is a summary kept by Assinafy (no images or biometrics). `evidence_available` is false when the provider keeps none or it could not be fetched yet. While the review is open, `images` lists the evidence images the reviewer can open with **Signer identity review image**. A verification the provider approved directly, without a review, shows no evidence here (`evidence_available` is false); its evidence is on the `signer_identity_verified` activity. Reachable with the `documents:read` OAuth scope, but the images and the decision are not available to OAuth applications (`403`): the review is made by a person in Assinafy.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -3716,7 +3792,7 @@ function DownloadSignerIdentityReviewImage(const DocumentId: string; const Assig
 
 `GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/images/{name}`
 
-One evidence image of a signer identity verification that is `InReview`, for the account's reviewer: the document photos (or the digital document PDF) and the face photo. Fetched from the verification provider on each request and never stored by Assinafy. Available only while the review is open; once it is decided, every image returns 404. `name` must be one of the review's `images`.
+One evidence image of a signer identity verification that is `InReview`, for the account's reviewer: the document photos (or the digital document PDF) and the face photo. Fetched from the verification provider on each request and never stored by Assinafy. Available only while the review is open; once it is decided, every image returns 404. `name` must be one of the review's `images`. Not available to OAuth applications (`403`): the images are for the person reviewing.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -3885,7 +3961,7 @@ function DecideSignerIdentityReview(const DocumentId: string; const AssignmentId
 
 `POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/review`
 
-Approves or rejects a signer whose identity verification is `InReview`, while the document is `pending_signature` or `pending_identity_review`. Approved: once every signer has signed and no other signer is under review, the document is certificated; the certificate states the approval by review and every difference found. Rejected: the document is cancelled (`rejected_by_user`, with the reviewer as the user) and every signer and copy receiver gets the cancellation notice; the note is never shown to them. The signer gets no message about the decision itself. The decision is also reported to the verification provider.
+Approves or rejects a signer whose identity verification is `InReview`, while the document is `pending_signature` or `pending_identity_review`. Approved: once every signer has signed and no other signer is under review, the document is certificated; the certificate states the approval by review and every difference found. Rejected: the document is cancelled (`rejected_by_user`, with the reviewer as the user) and every signer and copy receiver gets the cancellation notice; the note is never shown to them. The signer gets no message about the decision itself. The decision is also reported to the verification provider. Not available to OAuth applications (`403`): the certificate names the person who reviewed, so the decision is made in Assinafy.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -5015,6 +5091,3297 @@ Content type: `application/json`
 ```
 
 
+## ListContracts
+
+```pascal
+function ListContracts(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
+```
+
+`GET /v1/accounts/{accountId}/contracts`
+
+List the contract terms tracked on the workspace's documents, most recently updated first. Every filter is optional and only narrows the list. To catch up after a webhook that never arrived, page this list until the contracts are older than your last sync: every change to the terms, by a user or by the hourly run, moves `updated_at`. Each document's history of contract events is at `GET /v1/documents/{documentId}/activities`.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `status` (query, optional): Contract status; several, comma-separated, match any of them.
+```json
+{
+  "type": "array",
+  "items": {
+    "type": "string",
+    "enum": [
+      "draft",
+      "active",
+      "expired",
+      "terminated"
+    ]
+  }
+}
+```
+
+
+- `counterparty` (query, optional): Part of the counterparty name, or its exact CPF/CNPJ.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `search` (query, optional): Part of the document's name.
+```json
+{
+  "type": "string",
+  "example": "Prestação de serviços"
+}
+```
+
+
+- `end_date_from` (query, optional): Contracts ending on or after this date.
+```json
+{
+  "type": "string",
+  "format": "date"
+}
+```
+
+
+- `end_date_to` (query, optional): Contracts ending on or before this date.
+```json
+{
+  "type": "string",
+  "format": "date"
+}
+```
+
+
+- `ending_within_days` (query, optional): Contracts ending from today (the API's calendar day, Brasília time) to that many days later, both included; `0` is today. Any status: add `status=active` for the ones still in force.
+```json
+{
+  "type": "integer",
+  "maximum": 3650,
+  "minimum": 0,
+  "example": 30
+}
+```
+
+
+- `external_system` (query, optional): System of an external reference, e.g. `hubspot`.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `external_id` (query, optional): ID of an external reference in that system.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `sort` (query, optional): `end_date` or `updated_at`; prefix with `-` for descending (`-updated_at`, the default). Contracts without an end date come last either way.
+```json
+{
+  "type": "string",
+  "example": "end_date"
+}
+```
+
+
+- `expand` (query, optional): `document` embeds each contract's document.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `page` (query, optional): Page number.
+```json
+{
+  "type": "integer",
+  "minimum": 1,
+  "example": 1
+}
+```
+
+
+- `per-page` (query, optional): Records per page (max 100).
+```json
+{
+  "type": "integer",
+  "maximum": 100,
+  "example": 25
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** A page of contracts
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/DocumentContract"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "resource": "document_contract",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "status": "active",
+      "counterparty_name": "Acme Ltda",
+      "counterparty_taxpayer_id": "11222333000181",
+      "value": 120000.5,
+      "currency": "BRL",
+      "start_date": "2026-11-01",
+      "end_date": "2027-10-31",
+      "auto_renew": true,
+      "renewal_term_months": 12,
+      "notice_period_days": 30,
+      "term": 1,
+      "owner_id": "d6zqpbyog2v3xvxerwn8la94",
+      "metadata": {
+        "crm_stage": "won"
+      },
+      "external_references": [
+        {
+          "system": "hubspot",
+          "id": "98765"
+        }
+      ],
+      "document": {
+        "resource": "document",
+        "id": "615601fab04c0a3147bb1246",
+        "account_id": "d199996981dbd199996981db",
+        "template_id": null,
+        "name": "document.pdf",
+        "status": "metadata_ready",
+        "artifacts": {
+          "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        },
+        "is_closed": false,
+        "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+        "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+        "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+        "decline_reason": null,
+        "declined_by": {
+          "resource": "signer",
+          "id": "62d6ee35c7741ca4006b9e11",
+          "full_name": "John Signer",
+          "email": "john@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": "39053344705",
+          "has_accepted_terms": false
+        },
+        "tags": [
+          {
+            "id": "<string>",
+            "name": "<string>"
+          }
+        ],
+        "assignment": {
+          "resource": "assignment",
+          "id": "615606ef81d199996981dbce",
+          "document_id": "615601fab04c0a3147bb1246",
+          "created_at": "2026-06-03T03:54:16Z",
+          "sender_email": "sender@example.com",
+          "method": "virtual",
+          "expires_at": null,
+          "message": "<string>",
+          "signers": [
+            {
+              "resource": "signer",
+              "id": "62d6ee35c7741ca4006b9e11",
+              "full_name": "John Signer",
+              "email": "john@example.com",
+              "whatsapp_phone_number": "+5548999990000",
+              "government_id": "39053344705",
+              "has_accepted_terms": false,
+              "verification_method": "Email",
+              "notification_methods": [
+                "Email"
+              ],
+              "step": 1,
+              "notified": false,
+              "identity_verification_status": "InReview",
+              "completed": false,
+              "notification_history": [
+                {
+                  "event": "signature_request",
+                  "status": "sent",
+                  "error_code": "<string>",
+                  "error_message": "<string>",
+                  "sent_at": "2026-07-07T12:00:00Z",
+                  "failed_at": null
+                }
+              ]
+            }
+          ],
+          "copy_receivers": [
+            {}
+          ],
+          "items": [
+            {
+              "id": "<string>",
+              "page": {
+                "id": "615601faf166d6d1d8e7dc30",
+                "number": 1,
+                "height": 2100,
+                "width": 1275,
+                "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              },
+              "signer": {},
+              "field": {},
+              "display_settings": "<string>",
+              "value": "<string>",
+              "completed": false
+            }
+          ],
+          "summary": {
+            "signer_count": 1,
+            "completed_count": 1,
+            "signers": [
+              {}
+            ]
+          },
+          "signing_urls": [
+            {
+              "signer_id": "<string>",
+              "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "615601faf166d6d1d8e7dc30",
+            "number": 1,
+            "height": 2100,
+            "width": 1275,
+            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          }
+        ],
+        "has_contract": true,
+        "created_at": "2026-06-03T03:54:16Z",
+        "updated_at": "2026-06-03T03:54:16Z"
+      },
+      "amendments": [
+        {
+          "resource": "document_contract_amendment",
+          "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+          "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+          "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+          "relation_type": "amendment",
+          "number": 1,
+          "status": "pending",
+          "document_status": "pending_signature",
+          "apply_error": "<string>",
+          "currency": "BRL",
+          "terms": {
+            "value": 130000,
+            "end_date": "2028-06-30"
+          },
+          "changes": {
+            "value": {
+              "from": 120000.5,
+              "to": 130000
+            },
+            "end_date": {
+              "from": "2027-10-31",
+              "to": "2028-06-30"
+            },
+            "term": {
+              "from": 1,
+              "to": 2
+            }
+          },
+          "applied_at": "2030-01-01T12:00:00Z",
+          "created_at": "2026-10-23T12:00:00Z",
+          "updated_at": "2026-10-23T12:00:00Z"
+        }
+      ],
+      "created_at": "2026-10-23T12:00:00Z",
+      "updated_at": "2026-10-23T12:00:00Z"
+    }
+  ]
+}
+```
+
+
+**Response `400`:** The request breaks a contract rule. `errors` has one entry per problem found: the `field` as sent (`null` when the request as a whole is refused), a stable `code` to translate, and the `message` in the platform's language; `message` at the top is the first entry's. The contract's own rules on the terms, and the external references' items, report every field that breaks one, an entry per field (its first problem); the other checks (the body, its fields, the contract's state, a renewal's or a link's conditions) stop at the first problem they find.
+
+| Code | Field | Refused when |
+|------|-------|--------------|
+| `InvalidBody` | — | The body is not a JSON object (a list, a bare value), or a `PUT` of contract terms sends no attribute. |
+| `UnknownField` | the attribute | The endpoint does not take the attribute; one entry per attribute. |
+| `NotSingleValue` | the attribute | On a `PUT` of contract terms, a list sent for a term that takes one value (every term but `metadata` and `external_references`). On a link, the same list answers the term's own code. |
+| `Required` | `parent_document_id`, `relation_type`, `external_references[i].system`, `external_references[i].id` | A first link without `parent_document_id` (a pending link that was removed meanwhile) or `relation_type`; an `external_references` item without `system` or `id` (`i` is its place in the list sent, from 0). |
+| `Invalid` | the field | The value is not of the field's type or form: `status` not one of the four; `currency` not three letters; `auto_renew` not a boolean; `owner_id` not a user id; `value` not a number; `counterparty_name` holding HTML; `metadata` not an object; `external_references` not a list, an item's `system` (`external_references[i].system`) with characters other than letters, digits, `_`, `-` and `.`, or its `id` (`external_references[i].id`) with an emoji or another 4-byte character; `parent_document_id` not text; `relation_type` not `amendment`, `renewal` or `termination`; `term` not a whole number from 1; `reason` not text. On the list: a filter sent as a list, a `status` not one of the four, `ending_within_days` not a whole number. |
+| `TooSmall`, `TooBig` | the field | `value` below 0 or above 9999999999999.99; `renewal_term_months` outside 1 to 600; `notice_period_days` (and the list's `ending_within_days`) outside 0 to 3650. |
+| `TooLong` | the field | `counterparty_name` over 255 characters, counting each emoji as stored (several characters); `counterparty_taxpayer_id` over 20; `reason` over 500; `external_references[i].system` over 64 or `external_references[i].id` over 255. |
+| `TooMany` | `external_references` | More than 20 items. |
+| `TooManyDecimals` | `value` | More than two decimal places. |
+| `InvalidDate` | `start_date`, `end_date`, `updated_at`; the list's `end_date_from`, `end_date_to` | Not a date as `YYYY-MM-DD` (an impossible one such as `2026-02-30` included); `updated_at` not a date and time as the API writes it (`2026-10-23T12:00:00Z`, or with an offset). |
+| `DateTooEarly` | `start_date`, `end_date` | Before the year 1000. |
+| `DateTooLate` | `end_date` | A renewal by the term would pass 9999-12-31. |
+| `EndBeforeStart` | `end_date` | Before `start_date`. |
+| `InvalidTaxpayerId` | `counterparty_taxpayer_id` | Not a valid CPF or CNPJ (formatted or not). |
+| `NotAMember` | `owner_id` | Not an active member of the workspace. |
+| `TooManyKeys` | `metadata` | More than 50 keys. |
+| `InvalidKey` | `metadata` | A key that is not 1 to 40 letters, digits, `_`, `-` or `.`. |
+| `InvalidValue` | `metadata` | A value that is not plain text of at most 500 characters. |
+| `NumberUnderDateKey` | `metadata` | A number under a key ending in `_at`, or `stuck_since`, which the API would return as a date. |
+| `ListKeys` | `metadata` | Keys `0`, `1`, `2`…, which would read back as a list. |
+| `DuplicateReference` | `external_references` | Two items the database takes for one (accents, `ß` and `ss`); items equal case aside are merged, not refused. |
+| `StatusNotSettable` | `status` | A tracked contract sent `expired` or `terminated`, or a closed one sent `draft` or `active`: a contract is closed by terminating it and reopened by renewing it. |
+| `CannotReturnToDraft` | `status` | An `active` contract sent `draft`. |
+| `ExpiredNeedsPastEndDate` | `end_date` | New terms with status `expired` and no `end_date` before today. |
+| `TerminatedNeedsEndDate` | `end_date` | New terms with status `terminated` and no `end_date`. |
+| `UnsignableDocument` | — | New terms, or a first link, on a cancelled, declined or expired document. Terms or a link already on one stay editable. |
+| `DocumentIsAmendment` | — | Terms of its own for a document linked as an amendment: its terms are the changes it makes. |
+| `DocumentHasOwnTerms` | — | A link for a document that tracks a contract of its own: a document is a contract or an amendment, never both. |
+| `ParentHasNoTerms` | `parent_document_id` | The parent named has no contract terms, nor amends a contract that has. |
+| `ParentTerminated` | `parent_document_id` | The parent contract is terminated. |
+| `NoTermChanged` | — | An `amendment` that changes no term, also by dropping its last one. A `renewal` or `termination` may change none. |
+| `TermNotAllowed` | the term | A term the relation type cannot change: a `renewal` changes only `end_date` and `value`, a `termination` only `end_date`. |
+| `AmendmentApplied` | — | The amendment applied when its document was signed and can no longer change. |
+| `TermOrEndDateRequired` | — | A renewal sends neither `term` nor `end_date`. |
+| `TermMismatch` | `term` | Not the contract's current term: the renewal already happened. |
+| `ContractTerminated` | — | A renewal of a terminated contract. |
+| `EndDateRequired` | `end_date` | A renewal by the term, or a `renewal` link without `end_date`, of a contract without an end date. |
+| `EndDateNotAfterCurrent` | `end_date` | A renewal, or a `renewal` link, to a date not after the current end date. |
+| `AlreadyTerminated` | — | A termination of a contract already terminated. |
+
+A body that is not valid JSON is refused before it reaches these endpoints, with the platform's `400` and no `errors`. A link is also checked against what applying it today would give the parent, so a delta the contract would refuse comes back with the contract's own codes.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 400
+        },
+        "message": {
+          "description": "The first entry's message.",
+          "type": "string",
+          "example": "value must be no less than 0."
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "required": [
+              "field",
+              "code",
+              "message"
+            ],
+            "properties": {
+              "field": {
+                "description": "The attribute or filter as sent; `null` when the request as a whole is refused.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "example": "value"
+              },
+              "code": {
+                "description": "Stable, in English, one of the codes above.",
+                "type": "string",
+                "example": "TooSmall"
+              },
+              "message": {
+                "description": "In the platform's language.",
+                "type": "string",
+                "example": "value must be no less than 0."
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "value must be no less than 0.",
+  "data": null,
+  "errors": [
+    {
+      "field": "value",
+      "code": "TooSmall",
+      "message": "value must be no less than 0."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## GetDocumentContract
+
+```pascal
+function GetDocumentContract(const AAccountId: string; const DocumentId: string): TAssinafyResponse;
+```
+
+`GET /v1/accounts/{accountId}/documents/{documentId}/contract`
+
+The contract terms tracked on a document, with `amendments`: the documents that amend, renew or terminate it. For a document that is itself an amendment, its link and delta (`DocumentContractAmendment`) instead. Readable even after the workspace's plan stops including contract tracking.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The contract terms, or the amendment
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/DocumentContract"
+            },
+            {
+              "$ref": "#/components/schemas/DocumentContractAmendment"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "document_contract",
+    "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "status": "active",
+    "counterparty_name": "Acme Ltda",
+    "counterparty_taxpayer_id": "11222333000181",
+    "value": 120000.5,
+    "currency": "BRL",
+    "start_date": "2026-11-01",
+    "end_date": "2027-10-31",
+    "auto_renew": true,
+    "renewal_term_months": 12,
+    "notice_period_days": 30,
+    "term": 1,
+    "owner_id": "d6zqpbyog2v3xvxerwn8la94",
+    "metadata": {
+      "crm_stage": "won"
+    },
+    "external_references": [
+      {
+        "system": "hubspot",
+        "id": "98765"
+      }
+    ],
+    "document": {
+      "resource": "document",
+      "id": "615601fab04c0a3147bb1246",
+      "account_id": "d199996981dbd199996981db",
+      "template_id": null,
+      "name": "document.pdf",
+      "status": "metadata_ready",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      },
+      "is_closed": false,
+      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "decline_reason": null,
+      "declined_by": {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "john@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false
+      },
+      "tags": [
+        {
+          "id": "<string>",
+          "name": "<string>"
+        }
+      ],
+      "assignment": {
+        "resource": "assignment",
+        "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
+        "sender_email": "sender@example.com",
+        "method": "virtual",
+        "expires_at": null,
+        "message": "<string>",
+        "signers": [
+          {
+            "resource": "signer",
+            "id": "62d6ee35c7741ca4006b9e11",
+            "full_name": "John Signer",
+            "email": "john@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": "39053344705",
+            "has_accepted_terms": false,
+            "verification_method": "Email",
+            "notification_methods": [
+              "Email"
+            ],
+            "step": 1,
+            "notified": false,
+            "identity_verification_status": "InReview",
+            "completed": false,
+            "notification_history": [
+              {
+                "event": "signature_request",
+                "status": "sent",
+                "error_code": "<string>",
+                "error_message": "<string>",
+                "sent_at": "2026-07-07T12:00:00Z",
+                "failed_at": null
+              }
+            ]
+          }
+        ],
+        "copy_receivers": [
+          {}
+        ],
+        "items": [
+          {
+            "id": "<string>",
+            "page": {
+              "id": "615601faf166d6d1d8e7dc30",
+              "number": 1,
+              "height": 2100,
+              "width": 1275,
+              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            },
+            "signer": {},
+            "field": {},
+            "display_settings": "<string>",
+            "value": "<string>",
+            "completed": false
+          }
+        ],
+        "summary": {
+          "signer_count": 1,
+          "completed_count": 1,
+          "signers": [
+            {}
+          ]
+        },
+        "signing_urls": [
+          {
+            "signer_id": "<string>",
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+          }
+        ]
+      },
+      "pages": [
+        {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        }
+      ],
+      "has_contract": true,
+      "created_at": "2026-06-03T03:54:16Z",
+      "updated_at": "2026-06-03T03:54:16Z"
+    },
+    "amendments": [
+      {
+        "resource": "document_contract_amendment",
+        "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+        "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+        "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+        "relation_type": "amendment",
+        "number": 1,
+        "status": "pending",
+        "document_status": "pending_signature",
+        "apply_error": "<string>",
+        "currency": "BRL",
+        "terms": {
+          "value": 130000,
+          "end_date": "2028-06-30"
+        },
+        "changes": {
+          "value": {
+            "from": 120000.5,
+            "to": 130000
+          },
+          "end_date": {
+            "from": "2027-10-31",
+            "to": "2028-06-30"
+          },
+          "term": {
+            "from": 1,
+            "to": 2
+          }
+        },
+        "applied_at": "2030-01-01T12:00:00Z",
+        "created_at": "2026-10-23T12:00:00Z",
+        "updated_at": "2026-10-23T12:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-23T12:00:00Z",
+    "updated_at": "2026-10-23T12:00:00Z"
+  }
+}
+```
+
+
+**Response `404`:** The document is not in the workspace (`Document not found.`), or carries no contract terms (on a read: neither its own nor those of a contract it amends whose document still exists). Only the second has a `code`, `NoContractTerms`, so a document without terms can be told from one that is not there.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "This document has no contract terms."
+        },
+        "code": {
+          "description": "Present only when the document is in the workspace but carries no contract terms.",
+          "type": "string",
+          "enum": [
+            "NoContractTerms"
+          ],
+          "example": "NoContractTerms"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "This document has no contract terms.",
+  "data": null,
+  "code": "NoContractTerms"
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## SetDocumentContract
+
+```pascal
+function SetDocumentContract(const AAccountId: string; const DocumentId: string; Body: TJSONData): TAssinafyResponse;
+```
+
+`PUT /v1/accounts/{accountId}/documents/{documentId}/contract`
+
+Creates the document's contract terms, or changes only the attributes sent (see the request body for what `null` does). `external_references`, when sent, replaces the whole list. Records a `document_contract_updated` event when the terms change; a retry that changes nothing records none. The body must be a JSON object with at least one attribute. With `parent_document_id`, the document is instead linked as an amendment, renewal or termination of that contract (or of any document in its family, resolved to the root) and the other attributes are the terms it changes; a later `PUT` on a pending amendment merges into that delta (a `null` drops a key) and `parent_document_id: null` unlinks it; every change to the link records `document_contract_amendment_updated` on this document. The delta applies to the parent once the document is certificated (at once, if it already is), in signing order (the order the documents' certifications were recorded in, fixed for each once it is; a certificated document with none recorded waits, and is placed by its certification time an hour on): instruments signed earlier apply first, one that cannot holds the later ones back, and an instrument signed before one already applied is blocked instead of applied over it. Applying records `document_contract_amended`; an applied amendment is read-only. A cancelled, declined or expired document takes no new terms and no new link; terms or a link already on one stay and can still change. Send the `updated_at` you read with the write to have it refused (`409`) if the contract or link changed meanwhile. Needs a plan with contract tracking (`403` otherwise).
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (required)**
+
+```json
+{
+  "description": "Every attribute is optional and only the ones sent change. `null` clears an attribute, except `auto_renew` (back to `false`) and `currency` (back to `BRL` while a `value` is set); `status` does not accept `null`. A changed `end_date` starts a new `term`.",
+  "properties": {
+    "status": {
+      "description": "On creation any status, so a contract that ended before it was tracked is registered as it ended: `expired` needs an `end_date` in the past, `terminated` its `end_date`; neither is walked by the lifecycle. Afterwards only `draft` or `active` (a contract in force never goes back to `draft`): `expired` and `terminated` are set by the lifecycle and the terminate endpoint; a closed contract is reopened by renewing it.",
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "expired",
+        "terminated"
+      ]
+    },
+    "counterparty_name": {
+      "description": "Emoji are kept; other characters outside the 3-byte range are dropped.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 255
+    },
+    "counterparty_taxpayer_id": {
+      "description": "A valid CPF or CNPJ, formatted or not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "value": {
+      "description": "Two decimal places at most.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "maximum": 9999999999999.99,
+      "minimum": 0
+    },
+    "currency": {
+      "description": "Three letters, such as `BRL` or `USD`, stored in capitals; `BRL` when a `value` is set without one.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "BRL"
+    },
+    "start_date": {
+      "description": "`YYYY-MM-DD`, from the year 1000.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "end_date": {
+      "description": "`YYYY-MM-DD`, on or after `start_date`.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "auto_renew": {
+      "description": "Whether the hourly run starts the next term the day after `end_date`, by `renewal_term_months`, instead of expiring the contract.",
+      "type": "boolean"
+    },
+    "renewal_term_months": {
+      "description": "How far a renewal by the term moves `end_date`; 12 when unset.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "maximum": 600,
+      "minimum": 1
+    },
+    "notice_period_days": {
+      "description": "Days before `end_date` the notice period starts (`document_contract_renewal_notice`); none when unset.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "maximum": 3650,
+      "minimum": 0
+    },
+    "owner_id": {
+      "description": "An active member of this workspace.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "metadata": {
+      "description": "Your own fields: up to 50 keys of 1 to 40 letters, digits, `_`, `-` or `.`, each holding plain text of at most 500 characters; no number under a key ending in `_at`, or `stuck_since`.",
+      "maxProperties": 50,
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "external_references": {
+      "description": "Replaces the whole list; `[]` or `null` clears it. Two items whose `system` and `id` compare equal case aside are one reference (the first sent is kept); a pair the database takes for one beyond that (accents, `ß` and `ss`) answers `400`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "required": [
+          "system",
+          "id"
+        ],
+        "properties": {
+          "system": {
+            "description": "Letters, digits, `_`, `-` and `.`; stored in lower case.",
+            "type": "string",
+            "maxLength": 64,
+            "example": "hubspot"
+          },
+          "id": {
+            "description": "Kept as sent; must not contain emoji or other 4-byte characters.",
+            "type": "string",
+            "maxLength": 255,
+            "example": "98765"
+          }
+        },
+        "type": "object"
+      },
+      "maxItems": 20
+    },
+    "parent_document_id": {
+      "description": "Links the document as an amendment of this contract document, or of any document in its family (resolved to the root); `null` unlinks a pending amendment. With it, the other attributes are the terms the instrument changes, not terms of its own; on a pending amendment a `null` value drops that term from the delta rather than clearing it on the parent.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "relation_type": {
+      "description": "Required on the first link. `amendment` may change `value`, `currency`, `start_date` (effective from, display only), `end_date`, `auto_renew`, `renewal_term_months`, `notice_period_days`, `counterparty_name`, `counterparty_taxpayer_id` and `metadata`; `renewal` only `end_date` and `value`; `termination` only `end_date` (the effective date).",
+      "type": "string",
+      "enum": [
+        "amendment",
+        "renewal",
+        "termination"
+      ]
+    },
+    "updated_at": {
+      "description": "Optional precondition: the `updated_at` the client read the contract (or this document's amendment link) with, as the API returned it. If the contract or link changed since, nothing is written and the answer is `409` with `code: ContractChanged`. Not sent, or `null`: the write applies whatever changed meanwhile (last write wins). Compared to the second; a fraction of a second, as a JavaScript date prints it, is read and ignored. New terms and a first link have nothing to have read, so sending one answers `409`; on a pending amendment, send the link's own `updated_at` (the GET on that document).",
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": "draft",
+  "counterparty_name": "<string>",
+  "counterparty_taxpayer_id": "<string>",
+  "value": 0,
+  "currency": "BRL",
+  "start_date": "<string>",
+  "end_date": "<string>",
+  "auto_renew": false,
+  "renewal_term_months": 1,
+  "notice_period_days": 0,
+  "owner_id": "<string>",
+  "metadata": {},
+  "external_references": [
+    {
+      "system": "hubspot",
+      "id": "98765"
+    }
+  ],
+  "parent_document_id": "<string>",
+  "relation_type": "amendment",
+  "updated_at": "2026-10-23T12:00:00Z"
+}
+```
+
+
+**Response `200`:** The contract terms as saved, or the amendment as linked
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/DocumentContract"
+            },
+            {
+              "$ref": "#/components/schemas/DocumentContractAmendment"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "document_contract",
+    "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "status": "active",
+    "counterparty_name": "Acme Ltda",
+    "counterparty_taxpayer_id": "11222333000181",
+    "value": 120000.5,
+    "currency": "BRL",
+    "start_date": "2026-11-01",
+    "end_date": "2027-10-31",
+    "auto_renew": true,
+    "renewal_term_months": 12,
+    "notice_period_days": 30,
+    "term": 1,
+    "owner_id": "d6zqpbyog2v3xvxerwn8la94",
+    "metadata": {
+      "crm_stage": "won"
+    },
+    "external_references": [
+      {
+        "system": "hubspot",
+        "id": "98765"
+      }
+    ],
+    "document": {
+      "resource": "document",
+      "id": "615601fab04c0a3147bb1246",
+      "account_id": "d199996981dbd199996981db",
+      "template_id": null,
+      "name": "document.pdf",
+      "status": "metadata_ready",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      },
+      "is_closed": false,
+      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "decline_reason": null,
+      "declined_by": {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "john@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false
+      },
+      "tags": [
+        {
+          "id": "<string>",
+          "name": "<string>"
+        }
+      ],
+      "assignment": {
+        "resource": "assignment",
+        "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
+        "sender_email": "sender@example.com",
+        "method": "virtual",
+        "expires_at": null,
+        "message": "<string>",
+        "signers": [
+          {
+            "resource": "signer",
+            "id": "62d6ee35c7741ca4006b9e11",
+            "full_name": "John Signer",
+            "email": "john@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": "39053344705",
+            "has_accepted_terms": false,
+            "verification_method": "Email",
+            "notification_methods": [
+              "Email"
+            ],
+            "step": 1,
+            "notified": false,
+            "identity_verification_status": "InReview",
+            "completed": false,
+            "notification_history": [
+              {
+                "event": "signature_request",
+                "status": "sent",
+                "error_code": "<string>",
+                "error_message": "<string>",
+                "sent_at": "2026-07-07T12:00:00Z",
+                "failed_at": null
+              }
+            ]
+          }
+        ],
+        "copy_receivers": [
+          {}
+        ],
+        "items": [
+          {
+            "id": "<string>",
+            "page": {
+              "id": "615601faf166d6d1d8e7dc30",
+              "number": 1,
+              "height": 2100,
+              "width": 1275,
+              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            },
+            "signer": {},
+            "field": {},
+            "display_settings": "<string>",
+            "value": "<string>",
+            "completed": false
+          }
+        ],
+        "summary": {
+          "signer_count": 1,
+          "completed_count": 1,
+          "signers": [
+            {}
+          ]
+        },
+        "signing_urls": [
+          {
+            "signer_id": "<string>",
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+          }
+        ]
+      },
+      "pages": [
+        {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        }
+      ],
+      "has_contract": true,
+      "created_at": "2026-06-03T03:54:16Z",
+      "updated_at": "2026-06-03T03:54:16Z"
+    },
+    "amendments": [
+      {
+        "resource": "document_contract_amendment",
+        "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+        "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+        "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+        "relation_type": "amendment",
+        "number": 1,
+        "status": "pending",
+        "document_status": "pending_signature",
+        "apply_error": "<string>",
+        "currency": "BRL",
+        "terms": {
+          "value": 130000,
+          "end_date": "2028-06-30"
+        },
+        "changes": {
+          "value": {
+            "from": 120000.5,
+            "to": 130000
+          },
+          "end_date": {
+            "from": "2027-10-31",
+            "to": "2028-06-30"
+          },
+          "term": {
+            "from": 1,
+            "to": 2
+          }
+        },
+        "applied_at": "2030-01-01T12:00:00Z",
+        "created_at": "2026-10-23T12:00:00Z",
+        "updated_at": "2026-10-23T12:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-23T12:00:00Z",
+    "updated_at": "2026-10-23T12:00:00Z"
+  }
+}
+```
+
+
+**Response `400`:** The request breaks a contract rule. `errors` has one entry per problem found: the `field` as sent (`null` when the request as a whole is refused), a stable `code` to translate, and the `message` in the platform's language; `message` at the top is the first entry's. The contract's own rules on the terms, and the external references' items, report every field that breaks one, an entry per field (its first problem); the other checks (the body, its fields, the contract's state, a renewal's or a link's conditions) stop at the first problem they find.
+
+| Code | Field | Refused when |
+|------|-------|--------------|
+| `InvalidBody` | — | The body is not a JSON object (a list, a bare value), or a `PUT` of contract terms sends no attribute. |
+| `UnknownField` | the attribute | The endpoint does not take the attribute; one entry per attribute. |
+| `NotSingleValue` | the attribute | On a `PUT` of contract terms, a list sent for a term that takes one value (every term but `metadata` and `external_references`). On a link, the same list answers the term's own code. |
+| `Required` | `parent_document_id`, `relation_type`, `external_references[i].system`, `external_references[i].id` | A first link without `parent_document_id` (a pending link that was removed meanwhile) or `relation_type`; an `external_references` item without `system` or `id` (`i` is its place in the list sent, from 0). |
+| `Invalid` | the field | The value is not of the field's type or form: `status` not one of the four; `currency` not three letters; `auto_renew` not a boolean; `owner_id` not a user id; `value` not a number; `counterparty_name` holding HTML; `metadata` not an object; `external_references` not a list, an item's `system` (`external_references[i].system`) with characters other than letters, digits, `_`, `-` and `.`, or its `id` (`external_references[i].id`) with an emoji or another 4-byte character; `parent_document_id` not text; `relation_type` not `amendment`, `renewal` or `termination`; `term` not a whole number from 1; `reason` not text. On the list: a filter sent as a list, a `status` not one of the four, `ending_within_days` not a whole number. |
+| `TooSmall`, `TooBig` | the field | `value` below 0 or above 9999999999999.99; `renewal_term_months` outside 1 to 600; `notice_period_days` (and the list's `ending_within_days`) outside 0 to 3650. |
+| `TooLong` | the field | `counterparty_name` over 255 characters, counting each emoji as stored (several characters); `counterparty_taxpayer_id` over 20; `reason` over 500; `external_references[i].system` over 64 or `external_references[i].id` over 255. |
+| `TooMany` | `external_references` | More than 20 items. |
+| `TooManyDecimals` | `value` | More than two decimal places. |
+| `InvalidDate` | `start_date`, `end_date`, `updated_at`; the list's `end_date_from`, `end_date_to` | Not a date as `YYYY-MM-DD` (an impossible one such as `2026-02-30` included); `updated_at` not a date and time as the API writes it (`2026-10-23T12:00:00Z`, or with an offset). |
+| `DateTooEarly` | `start_date`, `end_date` | Before the year 1000. |
+| `DateTooLate` | `end_date` | A renewal by the term would pass 9999-12-31. |
+| `EndBeforeStart` | `end_date` | Before `start_date`. |
+| `InvalidTaxpayerId` | `counterparty_taxpayer_id` | Not a valid CPF or CNPJ (formatted or not). |
+| `NotAMember` | `owner_id` | Not an active member of the workspace. |
+| `TooManyKeys` | `metadata` | More than 50 keys. |
+| `InvalidKey` | `metadata` | A key that is not 1 to 40 letters, digits, `_`, `-` or `.`. |
+| `InvalidValue` | `metadata` | A value that is not plain text of at most 500 characters. |
+| `NumberUnderDateKey` | `metadata` | A number under a key ending in `_at`, or `stuck_since`, which the API would return as a date. |
+| `ListKeys` | `metadata` | Keys `0`, `1`, `2`…, which would read back as a list. |
+| `DuplicateReference` | `external_references` | Two items the database takes for one (accents, `ß` and `ss`); items equal case aside are merged, not refused. |
+| `StatusNotSettable` | `status` | A tracked contract sent `expired` or `terminated`, or a closed one sent `draft` or `active`: a contract is closed by terminating it and reopened by renewing it. |
+| `CannotReturnToDraft` | `status` | An `active` contract sent `draft`. |
+| `ExpiredNeedsPastEndDate` | `end_date` | New terms with status `expired` and no `end_date` before today. |
+| `TerminatedNeedsEndDate` | `end_date` | New terms with status `terminated` and no `end_date`. |
+| `UnsignableDocument` | — | New terms, or a first link, on a cancelled, declined or expired document. Terms or a link already on one stay editable. |
+| `DocumentIsAmendment` | — | Terms of its own for a document linked as an amendment: its terms are the changes it makes. |
+| `DocumentHasOwnTerms` | — | A link for a document that tracks a contract of its own: a document is a contract or an amendment, never both. |
+| `ParentHasNoTerms` | `parent_document_id` | The parent named has no contract terms, nor amends a contract that has. |
+| `ParentTerminated` | `parent_document_id` | The parent contract is terminated. |
+| `NoTermChanged` | — | An `amendment` that changes no term, also by dropping its last one. A `renewal` or `termination` may change none. |
+| `TermNotAllowed` | the term | A term the relation type cannot change: a `renewal` changes only `end_date` and `value`, a `termination` only `end_date`. |
+| `AmendmentApplied` | — | The amendment applied when its document was signed and can no longer change. |
+| `TermOrEndDateRequired` | — | A renewal sends neither `term` nor `end_date`. |
+| `TermMismatch` | `term` | Not the contract's current term: the renewal already happened. |
+| `ContractTerminated` | — | A renewal of a terminated contract. |
+| `EndDateRequired` | `end_date` | A renewal by the term, or a `renewal` link without `end_date`, of a contract without an end date. |
+| `EndDateNotAfterCurrent` | `end_date` | A renewal, or a `renewal` link, to a date not after the current end date. |
+| `AlreadyTerminated` | — | A termination of a contract already terminated. |
+
+A body that is not valid JSON is refused before it reaches these endpoints, with the platform's `400` and no `errors`. A link is also checked against what applying it today would give the parent, so a delta the contract would refuse comes back with the contract's own codes.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 400
+        },
+        "message": {
+          "description": "The first entry's message.",
+          "type": "string",
+          "example": "value must be no less than 0."
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "required": [
+              "field",
+              "code",
+              "message"
+            ],
+            "properties": {
+              "field": {
+                "description": "The attribute or filter as sent; `null` when the request as a whole is refused.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "example": "value"
+              },
+              "code": {
+                "description": "Stable, in English, one of the codes above.",
+                "type": "string",
+                "example": "TooSmall"
+              },
+              "message": {
+                "description": "In the platform's language.",
+                "type": "string",
+                "example": "value must be no less than 0."
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "value must be no less than 0.",
+  "data": null,
+  "errors": [
+    {
+      "field": "value",
+      "code": "TooSmall",
+      "message": "value must be no less than 0."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** The workspace's plan does not include contract tracking.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "Contract tracking is not available for your current plan."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "Contract tracking is not available for your current plan.",
+  "data": null
+}
+```
+
+
+**Response `409`:** The write sent the `updated_at` it read the contract (or the amendment link) with, and the contract changed since: by another user, an integration or the hourly run. Nothing was written. Read it again, check the change still applies, and send it with the new `updated_at`.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 409
+        },
+        "message": {
+          "type": "string",
+          "example": "The contract changed after it was read; read it again and resend the change."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "ContractChanged"
+          ],
+          "example": "ContractChanged"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 409,
+  "message": "The contract changed after it was read; read it again and resend the change.",
+  "data": null,
+  "code": "ContractChanged"
+}
+```
+
+
+**Response `404`:** The document is not in the workspace, the `parent_document_id` names a document outside it, or `parent_document_id: null` is sent for a document that is not an amendment.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "Document not found."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "Document not found.",
+  "data": null
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## ListRelatedDocumentContracts
+
+```pascal
+function ListRelatedDocumentContracts(const AAccountId: string; const DocumentId: string): TAssinafyResponse;
+```
+
+`GET /v1/accounts/{accountId}/documents/{documentId}/contract/related`
+
+The family the document belongs to, seen from its root: the contract terms with every amendment, renewal and termination document linked to them (`amendments`). Works from the contract document and from any of its amendments alike.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The root contract and its family
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/DocumentContract"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "document_contract",
+    "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "status": "active",
+    "counterparty_name": "Acme Ltda",
+    "counterparty_taxpayer_id": "11222333000181",
+    "value": 120000.5,
+    "currency": "BRL",
+    "start_date": "2026-11-01",
+    "end_date": "2027-10-31",
+    "auto_renew": true,
+    "renewal_term_months": 12,
+    "notice_period_days": 30,
+    "term": 1,
+    "owner_id": "d6zqpbyog2v3xvxerwn8la94",
+    "metadata": {
+      "crm_stage": "won"
+    },
+    "external_references": [
+      {
+        "system": "hubspot",
+        "id": "98765"
+      }
+    ],
+    "document": {
+      "resource": "document",
+      "id": "615601fab04c0a3147bb1246",
+      "account_id": "d199996981dbd199996981db",
+      "template_id": null,
+      "name": "document.pdf",
+      "status": "metadata_ready",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      },
+      "is_closed": false,
+      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "decline_reason": null,
+      "declined_by": {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "john@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false
+      },
+      "tags": [
+        {
+          "id": "<string>",
+          "name": "<string>"
+        }
+      ],
+      "assignment": {
+        "resource": "assignment",
+        "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
+        "sender_email": "sender@example.com",
+        "method": "virtual",
+        "expires_at": null,
+        "message": "<string>",
+        "signers": [
+          {
+            "resource": "signer",
+            "id": "62d6ee35c7741ca4006b9e11",
+            "full_name": "John Signer",
+            "email": "john@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": "39053344705",
+            "has_accepted_terms": false,
+            "verification_method": "Email",
+            "notification_methods": [
+              "Email"
+            ],
+            "step": 1,
+            "notified": false,
+            "identity_verification_status": "InReview",
+            "completed": false,
+            "notification_history": [
+              {
+                "event": "signature_request",
+                "status": "sent",
+                "error_code": "<string>",
+                "error_message": "<string>",
+                "sent_at": "2026-07-07T12:00:00Z",
+                "failed_at": null
+              }
+            ]
+          }
+        ],
+        "copy_receivers": [
+          {}
+        ],
+        "items": [
+          {
+            "id": "<string>",
+            "page": {
+              "id": "615601faf166d6d1d8e7dc30",
+              "number": 1,
+              "height": 2100,
+              "width": 1275,
+              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            },
+            "signer": {},
+            "field": {},
+            "display_settings": "<string>",
+            "value": "<string>",
+            "completed": false
+          }
+        ],
+        "summary": {
+          "signer_count": 1,
+          "completed_count": 1,
+          "signers": [
+            {}
+          ]
+        },
+        "signing_urls": [
+          {
+            "signer_id": "<string>",
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+          }
+        ]
+      },
+      "pages": [
+        {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        }
+      ],
+      "has_contract": true,
+      "created_at": "2026-06-03T03:54:16Z",
+      "updated_at": "2026-06-03T03:54:16Z"
+    },
+    "amendments": [
+      {
+        "resource": "document_contract_amendment",
+        "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+        "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+        "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+        "relation_type": "amendment",
+        "number": 1,
+        "status": "pending",
+        "document_status": "pending_signature",
+        "apply_error": "<string>",
+        "currency": "BRL",
+        "terms": {
+          "value": 130000,
+          "end_date": "2028-06-30"
+        },
+        "changes": {
+          "value": {
+            "from": 120000.5,
+            "to": 130000
+          },
+          "end_date": {
+            "from": "2027-10-31",
+            "to": "2028-06-30"
+          },
+          "term": {
+            "from": 1,
+            "to": 2
+          }
+        },
+        "applied_at": "2030-01-01T12:00:00Z",
+        "created_at": "2026-10-23T12:00:00Z",
+        "updated_at": "2026-10-23T12:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-23T12:00:00Z",
+    "updated_at": "2026-10-23T12:00:00Z"
+  }
+}
+```
+
+
+**Response `404`:** The document is not in the workspace (`Document not found.`), or carries no contract terms (on a read: neither its own nor those of a contract it amends whose document still exists). Only the second has a `code`, `NoContractTerms`, so a document without terms can be told from one that is not there.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "This document has no contract terms."
+        },
+        "code": {
+          "description": "Present only when the document is in the workspace but carries no contract terms.",
+          "type": "string",
+          "enum": [
+            "NoContractTerms"
+          ],
+          "example": "NoContractTerms"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "This document has no contract terms.",
+  "data": null,
+  "code": "NoContractTerms"
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## RenewDocumentContract
+
+```pascal
+function RenewDocumentContract(const AAccountId: string; const DocumentId: string; Body: TJSONData = nil): TAssinafyResponse;
+```
+
+`POST /v1/accounts/{accountId}/documents/{documentId}/contract/renew`
+
+Starts the contract's next term: `end_date` moves by `renewal_term_months` (12 when unset), or to the `end_date` sent, which must be after the current one. A `value` sent replaces the current one. Reopens an expired contract; a terminated one returns `400`. Steps `term`, so the lifecycle alerts run again for the new term. Records a `document_contract_renewed` event. Needs a plan with contract tracking (`403` otherwise). The body names the `term` the renewal starts from (the contract's current one) or the `end_date` it renews to, so a renewal answered with a `5xx` error, or whose answer was lost, is safe to send again: the repeat is refused with `400`, as the contract is then in its next term and that date is no longer after the current one (or with `409`, when it sends the `updated_at` it read).
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (optional)**
+
+```json
+{
+  "properties": {
+    "end_date": {
+      "description": "The new end date, after the current one. Absent, empty or `null`: the current end date plus the renewal term, stepped until it is in the future; `term` is then required.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "value": {
+      "description": "The new value; unchanged when not sent, cleared by `null`.",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "term": {
+      "description": "The term this renewal starts from, the contract's current `term`. Required unless `end_date` is sent; for a contract in another term the renewal is refused, so a repeated request never renews twice.",
+      "type": "integer",
+      "minimum": 1,
+      "example": 1
+    },
+    "updated_at": {
+      "description": "Optional precondition: the contract's `updated_at` as read. Changed since: `409`, nothing renewed.",
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "end_date": "<string>",
+  "value": 1,
+  "term": 1,
+  "updated_at": "2026-10-23T12:00:00Z"
+}
+```
+
+
+**Response `200`:** The renewed contract
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/DocumentContract"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "document_contract",
+    "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "status": "active",
+    "counterparty_name": "Acme Ltda",
+    "counterparty_taxpayer_id": "11222333000181",
+    "value": 120000.5,
+    "currency": "BRL",
+    "start_date": "2026-11-01",
+    "end_date": "2027-10-31",
+    "auto_renew": true,
+    "renewal_term_months": 12,
+    "notice_period_days": 30,
+    "term": 1,
+    "owner_id": "d6zqpbyog2v3xvxerwn8la94",
+    "metadata": {
+      "crm_stage": "won"
+    },
+    "external_references": [
+      {
+        "system": "hubspot",
+        "id": "98765"
+      }
+    ],
+    "document": {
+      "resource": "document",
+      "id": "615601fab04c0a3147bb1246",
+      "account_id": "d199996981dbd199996981db",
+      "template_id": null,
+      "name": "document.pdf",
+      "status": "metadata_ready",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      },
+      "is_closed": false,
+      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "decline_reason": null,
+      "declined_by": {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "john@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false
+      },
+      "tags": [
+        {
+          "id": "<string>",
+          "name": "<string>"
+        }
+      ],
+      "assignment": {
+        "resource": "assignment",
+        "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
+        "sender_email": "sender@example.com",
+        "method": "virtual",
+        "expires_at": null,
+        "message": "<string>",
+        "signers": [
+          {
+            "resource": "signer",
+            "id": "62d6ee35c7741ca4006b9e11",
+            "full_name": "John Signer",
+            "email": "john@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": "39053344705",
+            "has_accepted_terms": false,
+            "verification_method": "Email",
+            "notification_methods": [
+              "Email"
+            ],
+            "step": 1,
+            "notified": false,
+            "identity_verification_status": "InReview",
+            "completed": false,
+            "notification_history": [
+              {
+                "event": "signature_request",
+                "status": "sent",
+                "error_code": "<string>",
+                "error_message": "<string>",
+                "sent_at": "2026-07-07T12:00:00Z",
+                "failed_at": null
+              }
+            ]
+          }
+        ],
+        "copy_receivers": [
+          {}
+        ],
+        "items": [
+          {
+            "id": "<string>",
+            "page": {
+              "id": "615601faf166d6d1d8e7dc30",
+              "number": 1,
+              "height": 2100,
+              "width": 1275,
+              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            },
+            "signer": {},
+            "field": {},
+            "display_settings": "<string>",
+            "value": "<string>",
+            "completed": false
+          }
+        ],
+        "summary": {
+          "signer_count": 1,
+          "completed_count": 1,
+          "signers": [
+            {}
+          ]
+        },
+        "signing_urls": [
+          {
+            "signer_id": "<string>",
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+          }
+        ]
+      },
+      "pages": [
+        {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        }
+      ],
+      "has_contract": true,
+      "created_at": "2026-06-03T03:54:16Z",
+      "updated_at": "2026-06-03T03:54:16Z"
+    },
+    "amendments": [
+      {
+        "resource": "document_contract_amendment",
+        "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+        "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+        "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+        "relation_type": "amendment",
+        "number": 1,
+        "status": "pending",
+        "document_status": "pending_signature",
+        "apply_error": "<string>",
+        "currency": "BRL",
+        "terms": {
+          "value": 130000,
+          "end_date": "2028-06-30"
+        },
+        "changes": {
+          "value": {
+            "from": 120000.5,
+            "to": 130000
+          },
+          "end_date": {
+            "from": "2027-10-31",
+            "to": "2028-06-30"
+          },
+          "term": {
+            "from": 1,
+            "to": 2
+          }
+        },
+        "applied_at": "2030-01-01T12:00:00Z",
+        "created_at": "2026-10-23T12:00:00Z",
+        "updated_at": "2026-10-23T12:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-23T12:00:00Z",
+    "updated_at": "2026-10-23T12:00:00Z"
+  }
+}
+```
+
+
+**Response `400`:** The request breaks a contract rule. `errors` has one entry per problem found: the `field` as sent (`null` when the request as a whole is refused), a stable `code` to translate, and the `message` in the platform's language; `message` at the top is the first entry's. The contract's own rules on the terms, and the external references' items, report every field that breaks one, an entry per field (its first problem); the other checks (the body, its fields, the contract's state, a renewal's or a link's conditions) stop at the first problem they find.
+
+| Code | Field | Refused when |
+|------|-------|--------------|
+| `InvalidBody` | — | The body is not a JSON object (a list, a bare value), or a `PUT` of contract terms sends no attribute. |
+| `UnknownField` | the attribute | The endpoint does not take the attribute; one entry per attribute. |
+| `NotSingleValue` | the attribute | On a `PUT` of contract terms, a list sent for a term that takes one value (every term but `metadata` and `external_references`). On a link, the same list answers the term's own code. |
+| `Required` | `parent_document_id`, `relation_type`, `external_references[i].system`, `external_references[i].id` | A first link without `parent_document_id` (a pending link that was removed meanwhile) or `relation_type`; an `external_references` item without `system` or `id` (`i` is its place in the list sent, from 0). |
+| `Invalid` | the field | The value is not of the field's type or form: `status` not one of the four; `currency` not three letters; `auto_renew` not a boolean; `owner_id` not a user id; `value` not a number; `counterparty_name` holding HTML; `metadata` not an object; `external_references` not a list, an item's `system` (`external_references[i].system`) with characters other than letters, digits, `_`, `-` and `.`, or its `id` (`external_references[i].id`) with an emoji or another 4-byte character; `parent_document_id` not text; `relation_type` not `amendment`, `renewal` or `termination`; `term` not a whole number from 1; `reason` not text. On the list: a filter sent as a list, a `status` not one of the four, `ending_within_days` not a whole number. |
+| `TooSmall`, `TooBig` | the field | `value` below 0 or above 9999999999999.99; `renewal_term_months` outside 1 to 600; `notice_period_days` (and the list's `ending_within_days`) outside 0 to 3650. |
+| `TooLong` | the field | `counterparty_name` over 255 characters, counting each emoji as stored (several characters); `counterparty_taxpayer_id` over 20; `reason` over 500; `external_references[i].system` over 64 or `external_references[i].id` over 255. |
+| `TooMany` | `external_references` | More than 20 items. |
+| `TooManyDecimals` | `value` | More than two decimal places. |
+| `InvalidDate` | `start_date`, `end_date`, `updated_at`; the list's `end_date_from`, `end_date_to` | Not a date as `YYYY-MM-DD` (an impossible one such as `2026-02-30` included); `updated_at` not a date and time as the API writes it (`2026-10-23T12:00:00Z`, or with an offset). |
+| `DateTooEarly` | `start_date`, `end_date` | Before the year 1000. |
+| `DateTooLate` | `end_date` | A renewal by the term would pass 9999-12-31. |
+| `EndBeforeStart` | `end_date` | Before `start_date`. |
+| `InvalidTaxpayerId` | `counterparty_taxpayer_id` | Not a valid CPF or CNPJ (formatted or not). |
+| `NotAMember` | `owner_id` | Not an active member of the workspace. |
+| `TooManyKeys` | `metadata` | More than 50 keys. |
+| `InvalidKey` | `metadata` | A key that is not 1 to 40 letters, digits, `_`, `-` or `.`. |
+| `InvalidValue` | `metadata` | A value that is not plain text of at most 500 characters. |
+| `NumberUnderDateKey` | `metadata` | A number under a key ending in `_at`, or `stuck_since`, which the API would return as a date. |
+| `ListKeys` | `metadata` | Keys `0`, `1`, `2`…, which would read back as a list. |
+| `DuplicateReference` | `external_references` | Two items the database takes for one (accents, `ß` and `ss`); items equal case aside are merged, not refused. |
+| `StatusNotSettable` | `status` | A tracked contract sent `expired` or `terminated`, or a closed one sent `draft` or `active`: a contract is closed by terminating it and reopened by renewing it. |
+| `CannotReturnToDraft` | `status` | An `active` contract sent `draft`. |
+| `ExpiredNeedsPastEndDate` | `end_date` | New terms with status `expired` and no `end_date` before today. |
+| `TerminatedNeedsEndDate` | `end_date` | New terms with status `terminated` and no `end_date`. |
+| `UnsignableDocument` | — | New terms, or a first link, on a cancelled, declined or expired document. Terms or a link already on one stay editable. |
+| `DocumentIsAmendment` | — | Terms of its own for a document linked as an amendment: its terms are the changes it makes. |
+| `DocumentHasOwnTerms` | — | A link for a document that tracks a contract of its own: a document is a contract or an amendment, never both. |
+| `ParentHasNoTerms` | `parent_document_id` | The parent named has no contract terms, nor amends a contract that has. |
+| `ParentTerminated` | `parent_document_id` | The parent contract is terminated. |
+| `NoTermChanged` | — | An `amendment` that changes no term, also by dropping its last one. A `renewal` or `termination` may change none. |
+| `TermNotAllowed` | the term | A term the relation type cannot change: a `renewal` changes only `end_date` and `value`, a `termination` only `end_date`. |
+| `AmendmentApplied` | — | The amendment applied when its document was signed and can no longer change. |
+| `TermOrEndDateRequired` | — | A renewal sends neither `term` nor `end_date`. |
+| `TermMismatch` | `term` | Not the contract's current term: the renewal already happened. |
+| `ContractTerminated` | — | A renewal of a terminated contract. |
+| `EndDateRequired` | `end_date` | A renewal by the term, or a `renewal` link without `end_date`, of a contract without an end date. |
+| `EndDateNotAfterCurrent` | `end_date` | A renewal, or a `renewal` link, to a date not after the current end date. |
+| `AlreadyTerminated` | — | A termination of a contract already terminated. |
+
+A body that is not valid JSON is refused before it reaches these endpoints, with the platform's `400` and no `errors`. A link is also checked against what applying it today would give the parent, so a delta the contract would refuse comes back with the contract's own codes.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 400
+        },
+        "message": {
+          "description": "The first entry's message.",
+          "type": "string",
+          "example": "value must be no less than 0."
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "required": [
+              "field",
+              "code",
+              "message"
+            ],
+            "properties": {
+              "field": {
+                "description": "The attribute or filter as sent; `null` when the request as a whole is refused.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "example": "value"
+              },
+              "code": {
+                "description": "Stable, in English, one of the codes above.",
+                "type": "string",
+                "example": "TooSmall"
+              },
+              "message": {
+                "description": "In the platform's language.",
+                "type": "string",
+                "example": "value must be no less than 0."
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "value must be no less than 0.",
+  "data": null,
+  "errors": [
+    {
+      "field": "value",
+      "code": "TooSmall",
+      "message": "value must be no less than 0."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** The workspace's plan does not include contract tracking.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "Contract tracking is not available for your current plan."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "Contract tracking is not available for your current plan.",
+  "data": null
+}
+```
+
+
+**Response `409`:** The write sent the `updated_at` it read the contract (or the amendment link) with, and the contract changed since: by another user, an integration or the hourly run. Nothing was written. Read it again, check the change still applies, and send it with the new `updated_at`.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 409
+        },
+        "message": {
+          "type": "string",
+          "example": "The contract changed after it was read; read it again and resend the change."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "ContractChanged"
+          ],
+          "example": "ContractChanged"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 409,
+  "message": "The contract changed after it was read; read it again and resend the change.",
+  "data": null,
+  "code": "ContractChanged"
+}
+```
+
+
+**Response `404`:** The document is not in the workspace (`Document not found.`), or carries no contract terms (on a read: neither its own nor those of a contract it amends whose document still exists). Only the second has a `code`, `NoContractTerms`, so a document without terms can be told from one that is not there.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "This document has no contract terms."
+        },
+        "code": {
+          "description": "Present only when the document is in the workspace but carries no contract terms.",
+          "type": "string",
+          "enum": [
+            "NoContractTerms"
+          ],
+          "example": "NoContractTerms"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "This document has no contract terms.",
+  "data": null,
+  "code": "NoContractTerms"
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
+## TerminateDocumentContract
+
+```pascal
+function TerminateDocumentContract(const AAccountId: string; const DocumentId: string; Body: TJSONData = nil): TAssinafyResponse;
+```
+
+`POST /v1/accounts/{accountId}/documents/{documentId}/contract/terminate`
+
+Closes the contract: its status becomes `terminated` and the lifecycle job stops alerting on it. Records a `document_contract_terminated` event carrying the `reason`. Needs a plan with contract tracking (`403` otherwise).
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (optional)**
+
+```json
+{
+  "properties": {
+    "reason": {
+      "description": "Kept in the `document_contract_terminated` event; HTML is stripped.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 500
+    },
+    "updated_at": {
+      "description": "Optional precondition: the contract's `updated_at` as read. Changed since: `409`, nothing terminated.",
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "reason": "<string>",
+  "updated_at": "2026-10-23T12:00:00Z"
+}
+```
+
+
+**Response `200`:** The terminated contract
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/DocumentContract"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "document_contract",
+    "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "status": "active",
+    "counterparty_name": "Acme Ltda",
+    "counterparty_taxpayer_id": "11222333000181",
+    "value": 120000.5,
+    "currency": "BRL",
+    "start_date": "2026-11-01",
+    "end_date": "2027-10-31",
+    "auto_renew": true,
+    "renewal_term_months": 12,
+    "notice_period_days": 30,
+    "term": 1,
+    "owner_id": "d6zqpbyog2v3xvxerwn8la94",
+    "metadata": {
+      "crm_stage": "won"
+    },
+    "external_references": [
+      {
+        "system": "hubspot",
+        "id": "98765"
+      }
+    ],
+    "document": {
+      "resource": "document",
+      "id": "615601fab04c0a3147bb1246",
+      "account_id": "d199996981dbd199996981db",
+      "template_id": null,
+      "name": "document.pdf",
+      "status": "metadata_ready",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      },
+      "is_closed": false,
+      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "decline_reason": null,
+      "declined_by": {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "john@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false
+      },
+      "tags": [
+        {
+          "id": "<string>",
+          "name": "<string>"
+        }
+      ],
+      "assignment": {
+        "resource": "assignment",
+        "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
+        "sender_email": "sender@example.com",
+        "method": "virtual",
+        "expires_at": null,
+        "message": "<string>",
+        "signers": [
+          {
+            "resource": "signer",
+            "id": "62d6ee35c7741ca4006b9e11",
+            "full_name": "John Signer",
+            "email": "john@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": "39053344705",
+            "has_accepted_terms": false,
+            "verification_method": "Email",
+            "notification_methods": [
+              "Email"
+            ],
+            "step": 1,
+            "notified": false,
+            "identity_verification_status": "InReview",
+            "completed": false,
+            "notification_history": [
+              {
+                "event": "signature_request",
+                "status": "sent",
+                "error_code": "<string>",
+                "error_message": "<string>",
+                "sent_at": "2026-07-07T12:00:00Z",
+                "failed_at": null
+              }
+            ]
+          }
+        ],
+        "copy_receivers": [
+          {}
+        ],
+        "items": [
+          {
+            "id": "<string>",
+            "page": {
+              "id": "615601faf166d6d1d8e7dc30",
+              "number": 1,
+              "height": 2100,
+              "width": 1275,
+              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            },
+            "signer": {},
+            "field": {},
+            "display_settings": "<string>",
+            "value": "<string>",
+            "completed": false
+          }
+        ],
+        "summary": {
+          "signer_count": 1,
+          "completed_count": 1,
+          "signers": [
+            {}
+          ]
+        },
+        "signing_urls": [
+          {
+            "signer_id": "<string>",
+            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+          }
+        ]
+      },
+      "pages": [
+        {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        }
+      ],
+      "has_contract": true,
+      "created_at": "2026-06-03T03:54:16Z",
+      "updated_at": "2026-06-03T03:54:16Z"
+    },
+    "amendments": [
+      {
+        "resource": "document_contract_amendment",
+        "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+        "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+        "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+        "relation_type": "amendment",
+        "number": 1,
+        "status": "pending",
+        "document_status": "pending_signature",
+        "apply_error": "<string>",
+        "currency": "BRL",
+        "terms": {
+          "value": 130000,
+          "end_date": "2028-06-30"
+        },
+        "changes": {
+          "value": {
+            "from": 120000.5,
+            "to": 130000
+          },
+          "end_date": {
+            "from": "2027-10-31",
+            "to": "2028-06-30"
+          },
+          "term": {
+            "from": 1,
+            "to": 2
+          }
+        },
+        "applied_at": "2030-01-01T12:00:00Z",
+        "created_at": "2026-10-23T12:00:00Z",
+        "updated_at": "2026-10-23T12:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-23T12:00:00Z",
+    "updated_at": "2026-10-23T12:00:00Z"
+  }
+}
+```
+
+
+**Response `400`:** The request breaks a contract rule. `errors` has one entry per problem found: the `field` as sent (`null` when the request as a whole is refused), a stable `code` to translate, and the `message` in the platform's language; `message` at the top is the first entry's. The contract's own rules on the terms, and the external references' items, report every field that breaks one, an entry per field (its first problem); the other checks (the body, its fields, the contract's state, a renewal's or a link's conditions) stop at the first problem they find.
+
+| Code | Field | Refused when |
+|------|-------|--------------|
+| `InvalidBody` | — | The body is not a JSON object (a list, a bare value), or a `PUT` of contract terms sends no attribute. |
+| `UnknownField` | the attribute | The endpoint does not take the attribute; one entry per attribute. |
+| `NotSingleValue` | the attribute | On a `PUT` of contract terms, a list sent for a term that takes one value (every term but `metadata` and `external_references`). On a link, the same list answers the term's own code. |
+| `Required` | `parent_document_id`, `relation_type`, `external_references[i].system`, `external_references[i].id` | A first link without `parent_document_id` (a pending link that was removed meanwhile) or `relation_type`; an `external_references` item without `system` or `id` (`i` is its place in the list sent, from 0). |
+| `Invalid` | the field | The value is not of the field's type or form: `status` not one of the four; `currency` not three letters; `auto_renew` not a boolean; `owner_id` not a user id; `value` not a number; `counterparty_name` holding HTML; `metadata` not an object; `external_references` not a list, an item's `system` (`external_references[i].system`) with characters other than letters, digits, `_`, `-` and `.`, or its `id` (`external_references[i].id`) with an emoji or another 4-byte character; `parent_document_id` not text; `relation_type` not `amendment`, `renewal` or `termination`; `term` not a whole number from 1; `reason` not text. On the list: a filter sent as a list, a `status` not one of the four, `ending_within_days` not a whole number. |
+| `TooSmall`, `TooBig` | the field | `value` below 0 or above 9999999999999.99; `renewal_term_months` outside 1 to 600; `notice_period_days` (and the list's `ending_within_days`) outside 0 to 3650. |
+| `TooLong` | the field | `counterparty_name` over 255 characters, counting each emoji as stored (several characters); `counterparty_taxpayer_id` over 20; `reason` over 500; `external_references[i].system` over 64 or `external_references[i].id` over 255. |
+| `TooMany` | `external_references` | More than 20 items. |
+| `TooManyDecimals` | `value` | More than two decimal places. |
+| `InvalidDate` | `start_date`, `end_date`, `updated_at`; the list's `end_date_from`, `end_date_to` | Not a date as `YYYY-MM-DD` (an impossible one such as `2026-02-30` included); `updated_at` not a date and time as the API writes it (`2026-10-23T12:00:00Z`, or with an offset). |
+| `DateTooEarly` | `start_date`, `end_date` | Before the year 1000. |
+| `DateTooLate` | `end_date` | A renewal by the term would pass 9999-12-31. |
+| `EndBeforeStart` | `end_date` | Before `start_date`. |
+| `InvalidTaxpayerId` | `counterparty_taxpayer_id` | Not a valid CPF or CNPJ (formatted or not). |
+| `NotAMember` | `owner_id` | Not an active member of the workspace. |
+| `TooManyKeys` | `metadata` | More than 50 keys. |
+| `InvalidKey` | `metadata` | A key that is not 1 to 40 letters, digits, `_`, `-` or `.`. |
+| `InvalidValue` | `metadata` | A value that is not plain text of at most 500 characters. |
+| `NumberUnderDateKey` | `metadata` | A number under a key ending in `_at`, or `stuck_since`, which the API would return as a date. |
+| `ListKeys` | `metadata` | Keys `0`, `1`, `2`…, which would read back as a list. |
+| `DuplicateReference` | `external_references` | Two items the database takes for one (accents, `ß` and `ss`); items equal case aside are merged, not refused. |
+| `StatusNotSettable` | `status` | A tracked contract sent `expired` or `terminated`, or a closed one sent `draft` or `active`: a contract is closed by terminating it and reopened by renewing it. |
+| `CannotReturnToDraft` | `status` | An `active` contract sent `draft`. |
+| `ExpiredNeedsPastEndDate` | `end_date` | New terms with status `expired` and no `end_date` before today. |
+| `TerminatedNeedsEndDate` | `end_date` | New terms with status `terminated` and no `end_date`. |
+| `UnsignableDocument` | — | New terms, or a first link, on a cancelled, declined or expired document. Terms or a link already on one stay editable. |
+| `DocumentIsAmendment` | — | Terms of its own for a document linked as an amendment: its terms are the changes it makes. |
+| `DocumentHasOwnTerms` | — | A link for a document that tracks a contract of its own: a document is a contract or an amendment, never both. |
+| `ParentHasNoTerms` | `parent_document_id` | The parent named has no contract terms, nor amends a contract that has. |
+| `ParentTerminated` | `parent_document_id` | The parent contract is terminated. |
+| `NoTermChanged` | — | An `amendment` that changes no term, also by dropping its last one. A `renewal` or `termination` may change none. |
+| `TermNotAllowed` | the term | A term the relation type cannot change: a `renewal` changes only `end_date` and `value`, a `termination` only `end_date`. |
+| `AmendmentApplied` | — | The amendment applied when its document was signed and can no longer change. |
+| `TermOrEndDateRequired` | — | A renewal sends neither `term` nor `end_date`. |
+| `TermMismatch` | `term` | Not the contract's current term: the renewal already happened. |
+| `ContractTerminated` | — | A renewal of a terminated contract. |
+| `EndDateRequired` | `end_date` | A renewal by the term, or a `renewal` link without `end_date`, of a contract without an end date. |
+| `EndDateNotAfterCurrent` | `end_date` | A renewal, or a `renewal` link, to a date not after the current end date. |
+| `AlreadyTerminated` | — | A termination of a contract already terminated. |
+
+A body that is not valid JSON is refused before it reaches these endpoints, with the platform's `400` and no `errors`. A link is also checked against what applying it today would give the parent, so a delta the contract would refuse comes back with the contract's own codes.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 400
+        },
+        "message": {
+          "description": "The first entry's message.",
+          "type": "string",
+          "example": "value must be no less than 0."
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "required": [
+              "field",
+              "code",
+              "message"
+            ],
+            "properties": {
+              "field": {
+                "description": "The attribute or filter as sent; `null` when the request as a whole is refused.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "example": "value"
+              },
+              "code": {
+                "description": "Stable, in English, one of the codes above.",
+                "type": "string",
+                "example": "TooSmall"
+              },
+              "message": {
+                "description": "In the platform's language.",
+                "type": "string",
+                "example": "value must be no less than 0."
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "value must be no less than 0.",
+  "data": null,
+  "errors": [
+    {
+      "field": "value",
+      "code": "TooSmall",
+      "message": "value must be no less than 0."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** The workspace's plan does not include contract tracking.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "Contract tracking is not available for your current plan."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "Contract tracking is not available for your current plan.",
+  "data": null
+}
+```
+
+
+**Response `409`:** The write sent the `updated_at` it read the contract (or the amendment link) with, and the contract changed since: by another user, an integration or the hourly run. Nothing was written. Read it again, check the change still applies, and send it with the new `updated_at`.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 409
+        },
+        "message": {
+          "type": "string",
+          "example": "The contract changed after it was read; read it again and resend the change."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "ContractChanged"
+          ],
+          "example": "ContractChanged"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 409,
+  "message": "The contract changed after it was read; read it again and resend the change.",
+  "data": null,
+  "code": "ContractChanged"
+}
+```
+
+
+**Response `404`:** The document is not in the workspace (`Document not found.`), or carries no contract terms (on a read: neither its own nor those of a contract it amends whose document still exists). Only the second has a `code`, `NoContractTerms`, so a document without terms can be told from one that is not there.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "This document has no contract terms."
+        },
+        "code": {
+          "description": "Present only when the document is in the workspace but carries no contract terms.",
+          "type": "string",
+          "enum": [
+            "NoContractTerms"
+          ],
+          "example": "NoContractTerms"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "This document has no contract terms.",
+  "data": null,
+  "code": "NoContractTerms"
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null
+}
+```
+
+
 ## ListDocuments
 
 ```pascal
@@ -5023,7 +8390,7 @@ function ListDocuments(const AAccountId: string; Query: TStrings = nil): TAssina
 
 `GET /v1/accounts/{accountId}/documents`
 
-List documents of the workspace.
+List documents of the workspace, most recently updated first. Every row includes its `assignment` and `pages`; an `expand` parameter is ignored. For a lighter list without them, use `GET /v1/accounts/{accountId}/documents/search`.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -5073,10 +8440,11 @@ List documents of the workspace.
 ```
 
 
-- `sort` (query, optional): Sort by `name` or `updated_at`.
+- `sort` (query, optional): `name` or `updated_at`, ascending; prefix with `-` for descending (`-updated_at`, the default). Other values are ignored.
 ```json
 {
-  "type": "string"
+  "type": "string",
+  "example": "-updated_at"
 }
 ```
 
@@ -5148,12 +8516,14 @@ Content type: `application/json`
       },
       "is_closed": false,
       "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
       "declined_by": {
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false
@@ -5167,6 +8537,8 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
         "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
@@ -5176,7 +8548,7 @@ Content type: `application/json`
             "resource": "signer",
             "id": "62d6ee35c7741ca4006b9e11",
             "full_name": "John Signer",
-            "email": "developer@example.com",
+            "email": "john@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": "39053344705",
             "has_accepted_terms": false,
@@ -5243,6 +8615,7 @@ Content type: `application/json`
           "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
+      "has_contract": true,
       "created_at": "2026-06-03T03:54:16Z",
       "updated_at": "2026-06-03T03:54:16Z"
     }
@@ -5419,12 +8792,14 @@ Content type: `application/json`
     },
     "is_closed": false,
     "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": {
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -5438,6 +8813,8 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -5447,7 +8824,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -5514,6 +8891,7 @@ Content type: `application/json`
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
   }
@@ -5676,6 +9054,15 @@ Search documents of the workspace, returning a compact representation (no expand
 ```
 
 
+- `sort` (query, optional): `name` or `updated_at`, ascending; prefix with `-` for descending (`-updated_at`, the default). Other values are ignored.
+```json
+{
+  "type": "string",
+  "example": "-updated_at"
+}
+```
+
+
 - `page` (query, optional): Page number.
 ```json
 {
@@ -5743,12 +9130,14 @@ Content type: `application/json`
       },
       "is_closed": false,
       "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
       "declined_by": {
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false
@@ -5762,6 +9151,8 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
         "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
@@ -5771,7 +9162,7 @@ Content type: `application/json`
             "resource": "signer",
             "id": "62d6ee35c7741ca4006b9e11",
             "full_name": "John Signer",
-            "email": "developer@example.com",
+            "email": "john@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": "39053344705",
             "has_accepted_terms": false,
@@ -5838,6 +9229,7 @@ Content type: `application/json`
           "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
+      "has_contract": true,
       "created_at": "2026-06-03T03:54:16Z",
       "updated_at": "2026-06-03T03:54:16Z"
     }
@@ -6085,7 +9477,7 @@ function GetDocument(const DocumentId: string): TAssinafyResponse;
 
 `GET /v1/documents/{documentId}`
 
-Get a document by its ID. `decline_reason` is only present when the access token belongs to the document's creator.
+Get a document by its ID. `decline_reason` is only present when the access token belongs to the document's creator. With a signer access code (`signer-access-code`), only documents the signer has been sent are found, and `assignment` holds only the signer's own items, without `signers`, `signing_urls`, `copy_receivers` or `summary`.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -6142,12 +9534,14 @@ Content type: `application/json`
     },
     "is_closed": false,
     "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": {
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -6161,6 +9555,8 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -6170,7 +9566,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -6237,6 +9633,7 @@ Content type: `application/json`
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
   }
@@ -6628,12 +10025,14 @@ Content type: `application/json`
     },
     "is_closed": false,
     "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": {
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -6647,6 +10046,8 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -6656,7 +10057,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -6723,6 +10124,7 @@ Content type: `application/json`
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
   }
@@ -7854,7 +11256,9 @@ function ListFields(const AAccountId: string; Query: TStrings = nil): TAssinafyR
 
 List the field definitions of a workspace.
 
-When `include_standard` is enabled, records of type `signature`, `initial` and `signatureDate` are also returned.
+When `include_standard` is enabled, records of type `signature`, `initial` and `signatureDate` are also returned. Every workspace has one of each, created with it; they cannot be created, and a field can't be placed on the `Editor` role with them.
+
+To find the fields a sender can place on a document or template, list with `include_standard=true`: the result is every active field definition, signature fields included, and each one's `id` is the `field_id` to place.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -9211,7 +12615,7 @@ function ListFieldTypes: TAssinafyResponse;
 
 `GET /v1/field-types`
 
-List the possible field types. `cpf` expects 11 digits; `cnpj` accepts 14-char values (letters A-Z allowed in positions 1–12 per the CNPJ Alfanumérico rule; check digits 13–14 stay numeric). Punctuation is ignored during validation.
+List the types a workspace can create field definitions with (`POST /v1/accounts/{accountId}/fields`). The built-in `signature`, `initial` and `signatureDate` types are not listed: they can't be created, and their definitions come from `GET /v1/accounts/{accountId}/fields?include_standard=true`. `cpf` expects 11 digits; `cnpj` accepts 14-char values (letters A-Z allowed in positions 1–12 per the CNPJ Alfanumérico rule; check digits 13–14 stay numeric). Punctuation is ignored during validation.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -10416,7 +13820,7 @@ function GetMyNotificationPreferences: TAssinafyResponse;
 
 `GET /v1/users/self/notification-preferences`
 
-Which owner-facing document notifications the authenticated user receives by e-mail. All nine keys are always returned; everything defaults to `true`. Account and security e-mail (welcome, password reset, invitations, account deletion) is not configurable and never appears here.
+Which owner-facing document notifications the authenticated user receives by e-mail. All thirteen keys are always returned; everything defaults to `true`. Account and security e-mail (welcome, password reset, invitations, account deletion) is not configurable and never appears here. Not available to third-party OAuth applications (`403`), whatever their scopes: these are the user's personal settings. Assinafy's own apps can reach it.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -10464,7 +13868,11 @@ Content type: `application/json`
     "DocumentExpirationReset": true,
     "DocumentProcessingFailed": true,
     "TemplateProcessingFailed": true,
-    "SignerWhatsappFailed": true
+    "SignerWhatsappFailed": true,
+    "ContractRenewalNotice": true,
+    "ContractExpiring": true,
+    "ContractExpired": true,
+    "ContractRenewed": true
   }
 }
 ```
@@ -10556,7 +13964,7 @@ function UpdateMyNotificationPreferences(Body: TJSONData): TAssinafyResponse;
 
 `PUT /v1/users/self/notification-preferences`
 
-Merges the supplied map into the authenticated user's preferences. Send only the keys you want to change — omitted keys keep their current value. Setting a key to `false` stops that e-mail for this user in every account they belong to. Returns the full map. An unknown code, a non-boolean value, or an empty body is rejected with 400 and nothing is written.
+Merges the supplied map into the authenticated user's preferences. Send only the keys you want to change — omitted keys keep their current value. Setting a key to `false` stops that e-mail for this user in every account they belong to. Returns the full map. An unknown code, a non-boolean value, or an empty body is rejected with 400 and nothing is written. Not available to third-party OAuth applications (`403`), whatever their scopes: these are the user's personal settings. Assinafy's own apps can reach it.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -10614,6 +14022,26 @@ No path or query parameters.
       "description": "A WhatsApp notification to a signer could not be delivered.",
       "type": "boolean",
       "example": true
+    },
+    "ContractRenewalNotice": {
+      "description": "A tracked contract entered its notice period: it is about to end or to renew.",
+      "type": "boolean",
+      "example": true
+    },
+    "ContractExpiring": {
+      "description": "A tracked contract ends in 45 or in 30 days.",
+      "type": "boolean",
+      "example": true
+    },
+    "ContractExpired": {
+      "description": "A tracked contract ended without renewal.",
+      "type": "boolean",
+      "example": true
+    },
+    "ContractRenewed": {
+      "description": "A tracked contract was auto-renewed into its next term.",
+      "type": "boolean",
+      "example": true
     }
   },
   "type": "object"
@@ -10632,7 +14060,11 @@ No path or query parameters.
   "DocumentExpirationReset": true,
   "DocumentProcessingFailed": true,
   "TemplateProcessingFailed": true,
-  "SignerWhatsappFailed": true
+  "SignerWhatsappFailed": true,
+  "ContractRenewalNotice": true,
+  "ContractExpiring": true,
+  "ContractExpired": true,
+  "ContractRenewed": true
 }
 ```
 
@@ -10675,7 +14107,11 @@ Content type: `application/json`
     "DocumentExpirationReset": true,
     "DocumentProcessingFailed": true,
     "TemplateProcessingFailed": true,
-    "SignerWhatsappFailed": true
+    "SignerWhatsappFailed": true,
+    "ContractRenewalNotice": true,
+    "ContractExpiring": true,
+    "ContractExpired": true,
+    "ContractRenewed": true
   }
 }
 ```
@@ -11909,12 +15345,14 @@ Content type: `application/json`
     },
     "is_closed": false,
     "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": {
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -11928,6 +15366,8 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -11937,7 +15377,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -12004,6 +15444,7 @@ Content type: `application/json`
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
   }
@@ -12433,7 +15874,7 @@ Content type: `application/json`
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -12558,7 +15999,7 @@ Create a signer in the workspace.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "john@example.com"
     },
     "whatsapp_phone_number": {
       "description": "E.164; normalized on save.",
@@ -12580,7 +16021,7 @@ Create a signer in the workspace.
 ```json
 {
   "full_name": "John Dove",
-  "email": "developer@example.com",
+  "email": "john@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "390.533.447-05"
 }
@@ -12620,7 +16061,7 @@ Content type: `application/json`
     "resource": "signer",
     "id": "62d6ee35c7741ca4006b9e11",
     "full_name": "John Signer",
-    "email": "developer@example.com",
+    "email": "john@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": "39053344705",
     "has_accepted_terms": false
@@ -12811,7 +16252,7 @@ Content type: `application/json`
     "resource": "signer",
     "id": "62d6ee35c7741ca4006b9e11",
     "full_name": "John Signer",
-    "email": "developer@example.com",
+    "email": "john@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": "39053344705",
     "has_accepted_terms": false
@@ -12945,7 +16386,9 @@ function UpdateSigner(const AAccountId: string; const SignerId: string; Body: TJ
 
 `PUT /v1/accounts/{accountId}/signers/{signerId}`
 
-Update a signer's information.
+Update a signer's information. Only the fields sent change; send just the ones you are changing.
+
+**Clearing a field:** `null` or `"` clears `email`, `whatsapp_phone_number` and `government_id` (`whatsapp_phone_number` is stored as `null` either way; the other two keep the value sent). `full_name` cannot be cleared.
 
 **Verification integrity:** `email` / `whatsapp_phone_number` cannot be changed while the signer has verified that channel on an in-flight (not yet certificated) document — the response is `400` naming the offending document(s). Already-certificated documents do not block updates. Changing a channel that has *unverified* in-flight requests rotates their access/verification codes (invalidating previously sent links/OTPs); use the resend endpoint to redeliver. `full_name` can always be updated.
 
@@ -12979,12 +16422,13 @@ Update a signer's information.
       "example": "John Dove"
     },
     "email": {
+      "description": "Can't be changed or cleared while the signer has verified it on an in-flight document (`400`).",
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "john@example.com"
     },
     "whatsapp_phone_number": {
-      "description": "E.164; normalized on save.",
+      "description": "E.164; normalized on save, and compared after normalizing, so the same number in another format is not a change. Can't be changed or cleared while the signer has verified it on an in-flight document (`400`).",
       "type": "string",
       "example": "+5548999990000"
     },
@@ -13003,7 +16447,7 @@ Update a signer's information.
 ```json
 {
   "full_name": "John Dove",
-  "email": "developer@example.com",
+  "email": "john@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "390.533.447-05"
 }
@@ -13043,7 +16487,7 @@ Content type: `application/json`
     "resource": "signer",
     "id": "62d6ee35c7741ca4006b9e11",
     "full_name": "John Signer",
-    "email": "developer@example.com",
+    "email": "john@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": "39053344705",
     "has_accepted_terms": false
@@ -13444,7 +16888,7 @@ Content type: `application/json`
     "resource": "signer",
     "id": "62d6ee35c7741ca4006b9e11",
     "full_name": "John Signer",
-    "email": "developer@example.com",
+    "email": "john@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": "39053344705",
     "has_accepted_terms": false,
@@ -13904,7 +17348,7 @@ function GetSignerDocument(const SignerId: string; const SignerAccessCode: strin
 
 `GET /v1/signers/{signerId}/document`
 
-Return the document and the signer's assignment items, scoped to the signer access code.
+Return the document and the signer's assignment items, scoped to the signer access code. The response adds `current_signer`: this signer, with their `verification_method`, `notification_methods` and `completed` (whether they have already signed).
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
@@ -13961,12 +17405,14 @@ Content type: `application/json`
     },
     "is_closed": false,
     "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": {
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -13980,6 +17426,8 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -13989,7 +17437,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -14056,6 +17504,7 @@ Content type: `application/json`
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
   }
@@ -14188,7 +17637,7 @@ function ViewDocumentToSign(const SignerAccessCode: string; Query: TStrings = ni
 
 `GET /v1/sign`
 
-Retrieve the document a signer has been invited to sign, using the signer access code. Marks the document as viewed. Returns 409 while the document is still being prepared (retry with backoff).
+Retrieve the document a signer has been invited to sign, using the signer access code. Marks the document as viewed. The assignment carries only this signer's items, and leaves out the other signers, their signing links (`signing_urls`), the copy receivers and the signing `summary`. The response adds `current_signer`: this signer, with their `verification_method`, `notification_methods` and `completed` (whether they have already signed). Returns 409 while the document is still being prepared (retry with backoff).
 
 **Signers whose verification method is `DigitalCertificate`** must have confirmed their data *and* accepted the terms before this returns the document; otherwise it is `400`. Both are satisfied in one call to `PUT /v1/documents/{documentId}/signers/confirm-data` with `has_accepted_terms: true`, so send that before this endpoint — the `has_accepted_terms` query parameter here is too late to open the gate. `PUT /v1/signers/accept-terms` also works and is never gated.
 
@@ -14247,12 +17696,14 @@ Content type: `application/json`
     },
     "is_closed": false,
     "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": {
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -14266,6 +17717,8 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -14275,7 +17728,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -14342,6 +17795,7 @@ Content type: `application/json`
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
   }
@@ -14439,7 +17893,7 @@ function SignAssignmentItems(const DocumentId: string; const AssignmentId: strin
 
 `POST /v1/documents/{documentId}/assignments/{assignmentId}`
 
-Sign a document with input fields (collect method): submit the signer's item values, completing their items. For **virtual** assignments the signer must first confirm their data via `PUT /v1/documents/{documentId}/signers/confirm-data`, otherwise this returns `400` (Signer data must be confirmed before signing). Signers whose verification method is `DigitalCertificate` cannot use this endpoint — their signature must be produced through `POST /v1/signers/certificate/start` + `/complete`, and this returns `400`. The request body is a JSON array of item entries. Uses the signer access code.
+Sign a document with input fields (collect method): submit the signer's item values, completing their items. Signing again after the signer has signed changes nothing and returns the current assignment. For **virtual** assignments the signer must first confirm their data via `PUT /v1/documents/{documentId}/signers/confirm-data`, otherwise this returns `400` (Signer data must be confirmed before signing). Signers whose verification method is `DigitalCertificate` cannot use this endpoint — their signature must be produced through `POST /v1/signers/certificate/start` + `/complete`, and this returns `400`. The request body is a JSON array of item entries. Uses the signer access code.
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
@@ -14548,7 +18002,9 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** Signer data must be confirmed before signing (virtual assignments), or the signer must sign with a digital certificate through the digital certificate endpoints.
+**Response `400`:** Signer data must be confirmed before signing (virtual assignments), the signer must sign with a digital certificate through the digital certificate endpoints, or an entry names a page, field or item that is not one of this signer's. Nothing is signed when an entry is refused.
+
+**Response `404`:** The assignment is not the one the access code belongs to.
 
 **Response `409`:** The document is not ready to be signed yet.
 
@@ -14726,6 +18182,8 @@ Content type: `application/json`
 ```
 
 
+**Response `404`:** The assignment is not the one this access code was issued for.
+
 **Response `401`:** Missing or invalid credentials.
 
 Content type: `application/json`
@@ -14893,6 +18351,10 @@ Content type: `application/json`
 }
 ```
 
+
+**Response `400`:** A listed document is not a virtual document of this signer, is not pending signature, or waits for an earlier signing step.
+
+**Response `404`:** A listed document ID does not exist in the workspace. The message names the unknown IDs.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -15069,6 +18531,10 @@ Content type: `application/json`
 }
 ```
 
+
+**Response `400`:** A listed document is not this signer's, is not pending signature, or waits for an earlier signing step. Nothing is declined.
+
+**Response `404`:** A listed document ID does not exist in the workspace. The message names the unknown IDs.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -15415,7 +18881,7 @@ Content type: `application/json`
     "resource": "signer",
     "id": "62d6ee35c7741ca4006b9e11",
     "full_name": "John Signer",
-    "email": "developer@example.com",
+    "email": "john@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": "39053344705",
     "has_accepted_terms": false
@@ -15684,6 +19150,8 @@ Content type: `application/json`
 ```
 
 
+**Response `400`:** The image is not a PNG or JPEG file, or it is blank.
+
 **Response `401`:** Missing or invalid credentials.
 
 Content type: `application/json`
@@ -15924,7 +19392,7 @@ function ListSignerDocuments(const SignerId: string; const SignerAccessCode: str
 
 `GET /v1/signers/{signerId}/documents`
 
-List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
+List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed, and each assignment leaves out `signing_urls`.
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [ListSignerDocumentsAsWorkspace](#listsignerdocumentsasworkspace).
 
@@ -16005,12 +19473,14 @@ Content type: `application/json`
       },
       "is_closed": false,
       "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
       "declined_by": {
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false
@@ -16024,6 +19494,8 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
         "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
@@ -16033,7 +19505,7 @@ Content type: `application/json`
             "resource": "signer",
             "id": "62d6ee35c7741ca4006b9e11",
             "full_name": "John Signer",
-            "email": "developer@example.com",
+            "email": "john@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": "39053344705",
             "has_accepted_terms": false,
@@ -16100,6 +19572,7 @@ Content type: `application/json`
           "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
+      "has_contract": true,
       "created_at": "2026-06-03T03:54:16Z",
       "updated_at": "2026-06-03T03:54:16Z"
     }
@@ -16107,6 +19580,8 @@ Content type: `application/json`
 }
 ```
 
+
+**Response `403`:** The access code belongs to another signer.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -16194,7 +19669,7 @@ function ListSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings 
 
 `GET /v1/signers/{signerId}/documents`
 
-List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
+List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed, and each assignment leaves out `signing_urls`.
 
 Workspace-credential form of [ListSignerDocuments](#listsignerdocuments): it sends the API key or bearer token and never a signer access code.
 
@@ -16277,12 +19752,14 @@ Content type: `application/json`
       },
       "is_closed": false,
       "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
       "declined_by": {
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false
@@ -16296,6 +19773,8 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
         "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
@@ -16305,7 +19784,7 @@ Content type: `application/json`
             "resource": "signer",
             "id": "62d6ee35c7741ca4006b9e11",
             "full_name": "John Signer",
-            "email": "developer@example.com",
+            "email": "john@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": "39053344705",
             "has_accepted_terms": false,
@@ -16372,6 +19851,7 @@ Content type: `application/json`
           "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
+      "has_contract": true,
       "created_at": "2026-06-03T03:54:16Z",
       "updated_at": "2026-06-03T03:54:16Z"
     }
@@ -16379,6 +19859,8 @@ Content type: `application/json`
 }
 ```
 
+
+**Response `403`:** The access code belongs to another signer.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -16466,7 +19948,7 @@ function SearchSignerDocuments(const SignerId: string; const SignerAccessCode: s
 
 `GET /v1/signers/{signerId}/documents/search`
 
-Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
+Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed, and each assignment leaves out `signing_urls`.
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [SearchSignerDocumentsAsWorkspace](#searchsignerdocumentsasworkspace).
 
@@ -16535,12 +20017,14 @@ Content type: `application/json`
       },
       "is_closed": false,
       "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
       "declined_by": {
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false
@@ -16554,6 +20038,8 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
         "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
@@ -16563,7 +20049,7 @@ Content type: `application/json`
             "resource": "signer",
             "id": "62d6ee35c7741ca4006b9e11",
             "full_name": "John Signer",
-            "email": "developer@example.com",
+            "email": "john@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": "39053344705",
             "has_accepted_terms": false,
@@ -16630,6 +20116,7 @@ Content type: `application/json`
           "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
+      "has_contract": true,
       "created_at": "2026-06-03T03:54:16Z",
       "updated_at": "2026-06-03T03:54:16Z"
     }
@@ -16637,6 +20124,8 @@ Content type: `application/json`
 }
 ```
 
+
+**Response `403`:** The access code belongs to another signer.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -16724,7 +20213,7 @@ function SearchSignerDocumentsAsWorkspace(const SignerId: string; Query: TString
 
 `GET /v1/signers/{signerId}/documents/search`
 
-Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace.
+Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed, and each assignment leaves out `signing_urls`.
 
 Workspace-credential form of [SearchSignerDocuments](#searchsignerdocuments): it sends the API key or bearer token and never a signer access code.
 
@@ -16795,12 +20284,14 @@ Content type: `application/json`
       },
       "is_closed": false,
       "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+      "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
       "declined_by": {
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false
@@ -16814,6 +20305,8 @@ Content type: `application/json`
       "assignment": {
         "resource": "assignment",
         "id": "615606ef81d199996981dbce",
+        "document_id": "615601fab04c0a3147bb1246",
+        "created_at": "2026-06-03T03:54:16Z",
         "sender_email": "sender@example.com",
         "method": "virtual",
         "expires_at": null,
@@ -16823,7 +20316,7 @@ Content type: `application/json`
             "resource": "signer",
             "id": "62d6ee35c7741ca4006b9e11",
             "full_name": "John Signer",
-            "email": "developer@example.com",
+            "email": "john@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": "39053344705",
             "has_accepted_terms": false,
@@ -16890,6 +20383,7 @@ Content type: `application/json`
           "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
+      "has_contract": true,
       "created_at": "2026-06-03T03:54:16Z",
       "updated_at": "2026-06-03T03:54:16Z"
     }
@@ -16897,6 +20391,8 @@ Content type: `application/json`
 }
 ```
 
+
+**Response `403`:** The access code belongs to another signer.
 
 **Response `401`:** Missing or invalid credentials.
 
@@ -17504,7 +21000,7 @@ function GetAccountStats(const AAccountId: string; Query: TStrings = nil): TAssi
 
 `GET /v1/accounts/{accountId}/stats`
 
-Precomputed per-account document-funnel KPIs. `granularity=monthly` (default) returns the last 12 months, most recent first; `granularity=daily` with `month=YYYY-MM` returns that month's days. Series are zero-filled.
+Precomputed per-account document-funnel KPIs. `granularity=monthly` (default) returns the last 12 months, most recent first; `granularity=daily` with `month=YYYY-MM` returns that month's days. Series are zero-filled. Requires the `account:read` OAuth scope.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -17720,7 +21216,7 @@ function GetUserStats(Query: TStrings = nil): TAssinafyResponse;
 
 `GET /v1/users/self/stats`
 
-The authenticated user's document-funnel KPIs summed across all accounts they currently belong to. `granularity=monthly` (default) returns the last 12 months, most recent first; `granularity=daily` with `month=YYYY-MM` returns that month's days. Series are zero-filled.
+The authenticated user's document-funnel KPIs summed across all accounts they currently belong to. `granularity=monthly` (default) returns the last 12 months, most recent first; `granularity=daily` with `month=YYYY-MM` returns that month's days. Series are zero-filled. Not available to OAuth access tokens (`403`): a token is bound to one workspace, so an OAuth app reads that workspace's figures from **Account document KPIs** instead.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -19021,9 +22517,7 @@ function CreateDocumentFromTemplate(const AAccountId: string; const TemplateId: 
 
 `POST /v1/accounts/{accountId}/templates/{templateId}/documents`
 
-Generate a new document from a template, creating its assignment in the same call. Provide one signer entry per template role; the signers must already exist in the account.
-
-The API derives the assignment method from the template and does not include it in this request. Until the API rejects certificate signers when a template has placed fields, the SDK refuses every `DigitalCertificate` signer on this route before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
+Generate a new document from a template. The request is checked (roles, fields, balance) before it returns, but the assignment is created in the background, so the response has `status: uploaded` and `assignment: null`. Follow the outcome on `GET /v1/documents/{documentId}` or through webhooks: when the send succeeds the status moves to `pending_signature` and `assignment_created` is sent; when it fails the status becomes `failed`, `document_processing_failed` is sent with the reason, and nothing is charged. When the template has fields, every signing role used must have at least one field; otherwise `400`. A template with placed signer fields sends a `collect` assignment, so it cannot take a `DigitalCertificate` signer (`400`); certificate signing needs a template without placed signer fields. Provide one signer entry per template role. An entry with `id` uses that existing signer; an entry with `email` reuses the account's signer with that email or creates one.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -19058,8 +22552,7 @@ The API derives the assignment method from the template and does not include it 
       "type": "array",
       "items": {
         "required": [
-          "role_id",
-          "id"
+          "role_id"
         ],
         "properties": {
           "role_id": {
@@ -19068,12 +22561,27 @@ The API derives the assignment method from the template and does not include it 
             "example": "fa8c14f32d732271e071998246e"
           },
           "id": {
-            "description": "The signer ID. The signer must already exist in the account.",
+            "description": "An existing signer's ID. Send either `id` or `email`; `id` wins when both are sent, and an unknown `id` returns `400`.",
             "type": "string",
             "example": "fa8c140cb49b79f940aab95fddd"
           },
+          "email": {
+            "description": "Used when `id` is not sent: the account's signer with this email is reused, or a new one is created with `name`.",
+            "type": "string",
+            "example": "signer@example.com"
+          },
+          "name": {
+            "description": "Full name for a signer created from `email`.",
+            "type": "string",
+            "example": "Maria Silva"
+          },
+          "whatsapp_phone_number": {
+            "description": "WhatsApp number for a signer created from `email`.",
+            "type": "string",
+            "example": "+5548999999999"
+          },
           "verification_method": {
-            "description": "Verification method for this signer. If provided without notification_methods, the notification method is inferred. Defaults to Email. `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id` (a CPF requires that person's certificate; a CNPJ requires an e-CNPJ for that company), must be alone in its signing step, and is charged 0.5 credits per signer. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Only applies to signers (not copy receivers).",
+            "description": "Verification method for this signer. If provided without notification_methods, the notification method is inferred. Defaults to Email. `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id` (a CPF requires that person's certificate; a CNPJ requires an e-CNPJ for that company), must be alone in its signing step, and is charged 0.5 credits per signer. It is refused with `400` when the template has placed signer fields, because certificate signers sign only virtual assignments. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Only applies to signers (not copy receivers).",
             "type": "string",
             "enum": [
               "Email",
@@ -19103,7 +22611,7 @@ The API derives the assignment method from the template and does not include it 
       }
     },
     "editor_fields": {
-      "description": "Editor field values to bake into the generated document.",
+      "description": "Values for the fields placed on the template's `Editor` role, baked into the generated document. The `Editor` role takes no `signers` entry: it is filled only through this list. Every field placed on it needs an entry with a non-empty `value` (`400` otherwise); when it has no fields, send nothing. In `signers`, every `Signer` role needs an entry (`400` otherwise), and a `CopyReceiver` role takes an entry only for someone who should receive the certified document; a copy receiver's `verification_method`, `notification_methods` and `step` are ignored.",
       "type": "array",
       "items": {
         "required": [
@@ -19136,7 +22644,7 @@ The API derives the assignment method from the template and does not include it 
       "example": "Message to the signers"
     },
     "expires_at": {
-      "description": "Assignment expiration date (ISO 8601). No expiration by default. Must be at least one hour in the future.",
+      "description": "Assignment expiration date (ISO 8601). No expiration by default. Must be at least one hour in the future. A UTC offset in the value is honored (`2026-12-31T23:59:59-03:00` is `2027-01-01T02:59:59Z`); a value without one is read as UTC, and a date alone (`2026-12-31`) means 23:59 UTC that day.",
       "type": "string",
       "format": "date-time",
       "example": "2024-07-30T23:59:00Z"
@@ -19161,6 +22669,9 @@ The API derives the assignment method from the template and does not include it 
     {
       "role_id": "fa8c14f32d732271e071998246e",
       "id": "fa8c140cb49b79f940aab95fddd",
+      "email": "signer@example.com",
+      "name": "Maria Silva",
+      "whatsapp_phone_number": "+5548999999999",
       "verification_method": "Email",
       "notification_methods": [
         "Email"
@@ -19225,12 +22736,14 @@ Content type: `application/json`
     },
     "is_closed": false,
     "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": {
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -19244,6 +22757,8 @@ Content type: `application/json`
     "assignment": {
       "resource": "assignment",
       "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
       "sender_email": "sender@example.com",
       "method": "virtual",
       "expires_at": null,
@@ -19253,7 +22768,7 @@ Content type: `application/json`
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "developer@example.com",
+          "email": "john@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -19320,6 +22835,7 @@ Content type: `application/json`
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
   }
@@ -19454,8 +22970,6 @@ function EstimateDocumentFromTemplateCost(const AAccountId: string; const Templa
 
 Estimate the cost of creating a document from a template without creating it. Contact information is not required — only the role_id and optionally a verification or notification method are needed. Each document always consumes 1 document from the plan's monthly allowance; if exhausted, the ExtraDocument cost is charged from credits (needs_extra_document = true). blocking_reason may be PendingPayment, InsufficientDocuments, or InsufficientCredits.
 
-The API derives the assignment method from the template and does not include it in this request. Until the API rejects certificate signers when a template has placed fields, the SDK refuses every `DigitalCertificate` signer on this route before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
-
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
@@ -19498,7 +23012,7 @@ The API derives the assignment method from the template and does not include it 
             "example": "fa8c14f32d732271e071998246e"
           },
           "verification_method": {
-            "description": "Verification method. If provided without notification_methods, the notification method is inferred. Defaults to Email. Verification is never billed on its own — the cost comes from the notification it is paired with, so `Whatsapp` verification requires the WhatsApp notification and costs 0.45 credits per signer. `DigitalCertificate` adds the per-signer signature cost (0.5 credits) on top of the notification cost. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged a per-signer fee.",
+            "description": "Verification method. If provided without notification_methods, the notification method is inferred. Defaults to Email. Verification is never billed on its own — the cost comes from the notification it is paired with, so `Whatsapp` verification requires the WhatsApp notification and costs 0.45 credits per signer. `DigitalCertificate` adds the per-signer signature cost (0.5 credits) on top of the notification cost, and returns `400` when the template has placed signer fields. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged a per-signer fee.",
             "type": "string",
             "enum": [
               "Email",
@@ -19575,10 +23089,10 @@ Content type: `application/json`
   "message": "",
   "data": {
     "documents": 1,
-    "credits": 1,
-    "needs_extra_document": false,
+    "credits": 0.9,
+    "needs_extra_document": true,
     "extra_document_cost": 1,
-    "total_credits": 1,
+    "total_credits": 1.9,
     "breakdown": [
       {
         "code": "NotificationWhatsapp",
@@ -19588,9 +23102,9 @@ Content type: `application/json`
         "unit_cost": 0.45
       }
     ],
-    "document_balance": 1,
-    "credit_balance": 1,
-    "has_sufficient_resources": false,
+    "document_balance": 0,
+    "credit_balance": 10,
+    "has_sufficient_resources": true,
     "blocking_reason": null,
     "message": "<string>"
   }
@@ -19684,7 +23198,7 @@ function GetUser: TAssinafyResponse;
 
 `GET /v1/users/self`
 
-Returns the profile of the user owning the access token.
+Returns the profile of the user owning the access token. Not available to OAuth access tokens (`403`); an OAuth app reads the user's identity from `GET /v1/oauth/userinfo`.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -20297,8 +23811,10 @@ Content type: `application/json`
       "document_prepared"
     ],
     "is_active": true,
-    "url": "http://example.com?test=1",
-    "email": "developer@example.com",
+    "is_held": false,
+    "held_since": null,
+    "url": "https://example.com?test=1",
+    "email": "email@example.com",
     "updated_at": "2023-05-10T14:58:24Z"
   }
 }
@@ -20433,16 +23949,16 @@ Update the account's oldest webhook endpoint (creating it if the account has non
       "example": true
     },
     "url": {
-      "description": "The URL that will receive events.",
+      "description": "The URL that will receive events: `https` for a new or changed URL (a URL stored before keeps working). Its host must resolve to a public address (`400` otherwise), and redirects are not followed.",
       "type": "string",
       "format": "uri",
-      "example": "http://example.com?test=1"
+      "example": "https://example.com?test=1"
     },
     "email": {
       "description": "Email that receives important webhook-communication notices.",
       "type": "string",
       "format": "email",
-      "example": "developer@example.com"
+      "example": "email@example.com"
     }
   },
   "type": "object"
@@ -20458,8 +23974,8 @@ Update the account's oldest webhook endpoint (creating it if the account has non
     "document_prepared"
   ],
   "is_active": true,
-  "url": "http://example.com?test=1",
-  "email": "developer@example.com"
+  "url": "https://example.com?test=1",
+  "email": "email@example.com"
 }
 ```
 
@@ -20499,8 +24015,10 @@ Content type: `application/json`
       "document_prepared"
     ],
     "is_active": true,
-    "url": "http://example.com?test=1",
-    "email": "developer@example.com",
+    "is_held": false,
+    "held_since": null,
+    "url": "https://example.com?test=1",
+    "email": "email@example.com",
     "updated_at": "2023-05-10T14:58:24Z"
   }
 }
@@ -20683,8 +24201,10 @@ Content type: `application/json`
       "document_prepared"
     ],
     "is_active": true,
-    "url": "http://example.com?test=1",
-    "email": "developer@example.com",
+    "is_held": false,
+    "held_since": null,
+    "url": "https://example.com?test=1",
+    "email": "email@example.com",
     "updated_at": "2023-05-10T14:58:24Z"
   }
 }
@@ -21035,6 +24555,10 @@ Content type: `application/json`
       "endpoint": "https://example.com/webhook",
       "payload": {},
       "delivered": true,
+      "webhook_id": "9f86d081884c7d659a2feaa0c55ad015",
+      "attempt": 2,
+      "kind": "scheduled",
+      "will_retry": true,
       "http_status": 200,
       "response_body": "OK",
       "error": null,
@@ -21132,7 +24656,7 @@ function RetryWebhookDelivery(const AAccountId: string; const HistoryId: string)
 
 `POST /v1/accounts/{accountId}/webhooks/{historyId}/retry`
 
-Manually retry a webhook delivery for a specific entry, without waiting for automatic retries. The event is sent again only to the endpoint of that entry. Returns the newly created dispatch entry.
+Sends the entry's event to the entry's endpoint once, now, even while the endpoint is paused, and returns the dispatch entry of that attempt; a delivery that gets through lifts the pause. Requires the `webhooks:write` OAuth scope.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -21194,6 +24718,10 @@ Content type: `application/json`
     "endpoint": "https://example.com/webhook",
     "payload": {},
     "delivered": true,
+    "webhook_id": "9f86d081884c7d659a2feaa0c55ad015",
+    "attempt": 2,
+    "kind": "scheduled",
+    "will_retry": true,
     "http_status": 200,
     "response_body": "OK",
     "error": null,
@@ -21427,6 +24955,7 @@ Content type: `application/json`
   "message": "",
   "data": [
     {
+      "resource": "activity_event_subscription",
       "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
       "name": "ERP",
       "url": "https://example.com/webhooks/assinafy",
@@ -21436,6 +24965,8 @@ Content type: `application/json`
         "signer_signed_document"
       ],
       "is_active": true,
+      "is_held": false,
+      "held_since": null,
       "signing_enabled": true,
       "created_at": "2026-10-01T12:00:00Z",
       "updated_at": "2026-10-01T12:00:00Z"
@@ -21531,7 +25062,7 @@ function CreateWebhookEndpoint(const AAccountId: string; Body: TJSONData): TAssi
 
 `POST /v1/accounts/{accountId}/webhooks/endpoints`
 
-Register a URL to receive the account's webhook events. An account can have 1 endpoint, or up to 3 on paid plans; creating one past the limit returns `403`. Each endpoint of a workspace must have a different `url` (`400` otherwise). When `signing_enabled` is `true`, a signing secret is generated and returned once, as `secret` in this response — store it, since it is never shown in list or view responses. It can be read again later with **Get webhook endpoint signing secret**, except by OAuth applications: an OAuth application that loses the secret must delete the endpoint and create a new one. Requires the `webhooks:write` OAuth scope.
+Register a URL to receive the account's webhook events. An account can have 1 endpoint, or up to 3 on paid plans; creating one past the limit returns `403`. Each endpoint of a workspace must have a different `url` (`400` otherwise). When `signing_enabled` is `true`, a signing secret is generated and returned once, as `secret` in this response — store it, since it is never shown in list or view responses. It can be read again later with **Get webhook endpoint signing secret**, except by OAuth applications: an OAuth application that loses the secret gets a new one with **Rotate webhook endpoint signing secret**. Requires the `webhooks:write` OAuth scope.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -21556,7 +25087,7 @@ Register a URL to receive the account's webhook events. An account can have 1 en
   ],
   "properties": {
     "url": {
-      "description": "URL that receives the events (http or https).",
+      "description": "URL that receives the events: `https` for a new or changed URL (a URL stored before keeps working). Its host must resolve to a public address; private, loopback, link-local and other reserved addresses are refused with `400`. Deliveries don't follow redirects: a `3xx` answer counts as a failed delivery.",
       "type": "string",
       "format": "uri",
       "example": "https://example.com/webhooks/assinafy"
@@ -21660,6 +25191,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
+    "resource": "activity_event_subscription",
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
@@ -21669,6 +25201,8 @@ Content type: `application/json`
       "signer_signed_document"
     ],
     "is_active": true,
+    "is_held": false,
+    "held_since": null,
     "signing_enabled": true,
     "created_at": "2026-10-01T12:00:00Z",
     "updated_at": "2026-10-01T12:00:00Z",
@@ -22121,6 +25655,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
+    "resource": "activity_event_subscription",
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
@@ -22130,6 +25665,8 @@ Content type: `application/json`
       "signer_signed_document"
     ],
     "is_active": true,
+    "is_held": false,
+    "held_since": null,
     "signing_enabled": true,
     "created_at": "2026-10-01T12:00:00Z",
     "updated_at": "2026-10-01T12:00:00Z"
@@ -22263,7 +25800,7 @@ function UpdateWebhookEndpoint(const AAccountId: string; const EndpointId: strin
 
 `PUT /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}`
 
-Change a webhook endpoint. Only the fields sent are updated; `url` cannot be one another endpoint of the workspace already uses (`400`). Setting `signing_enabled` to `true` generates a secret if the endpoint has none and keeps the current one otherwise; setting it to `false` discards the secret. Requires the `webhooks:write` OAuth scope.
+Change a webhook endpoint. Only the fields sent are updated; `url` cannot be one another endpoint of the workspace already uses, nor point to a private or reserved address (`400`). Setting `signing_enabled` to `true` generates a secret if the endpoint has none and keeps the current one otherwise; setting it to `false` discards the secret. When this request turns signing on, the new secret is returned once, as `secret` in this response, as on create; otherwise `secret` is absent. Requires the `webhooks:write` OAuth scope.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -22356,7 +25893,22 @@ Content type: `application/json`
     {
       "properties": {
         "data": {
-          "$ref": "#/components/schemas/WebhookEndpoint"
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/WebhookEndpoint"
+            },
+            {
+              "properties": {
+                "secret": {
+                  "description": "Standard Webhooks signing secret: `whsec_` followed by the base64-encoded key. Present only when this request turned signing on.",
+                  "type": "string",
+                  "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+                }
+              },
+              "type": "object"
+            }
+          ]
         }
       },
       "type": "object"
@@ -22372,6 +25924,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
+    "resource": "activity_event_subscription",
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
@@ -22381,9 +25934,12 @@ Content type: `application/json`
       "signer_signed_document"
     ],
     "is_active": true,
+    "is_held": false,
+    "held_since": null,
     "signing_enabled": true,
     "created_at": "2026-10-01T12:00:00Z",
-    "updated_at": "2026-10-01T12:00:00Z"
+    "updated_at": "2026-10-01T12:00:00Z",
+    "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
   }
 }
 ```
@@ -22738,7 +26294,7 @@ function GetWebhookEndpointSigningSecret(const AAccountId: string; const Endpoin
 
 `GET /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}/secret`
 
-Return the secret used to sign deliveries to this endpoint (see **Webhook Payloads → Verifying signatures**). Returns `400` when signing is disabled. Not available to OAuth applications, which receive the secret in the **Create webhook endpoint** response instead.
+Return the secret used to sign deliveries to this endpoint (see **Webhook Payloads → Verifying signatures**). Returns `400` when signing is disabled. Not available to OAuth applications: they receive a secret only when one is generated, in the **Create webhook endpoint** or **Update webhook endpoint** response (when that request turns signing on) or from **Rotate webhook endpoint signing secret**.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -22962,7 +26518,7 @@ function RotateWebhookEndpointSigningSecret(const AAccountId: string; const Endp
 
 `POST /v1/accounts/{accountId}/webhooks/endpoints/{endpointId}/secret/rotate`
 
-Replace the endpoint's signing secret and return the new one. The old secret stops working immediately, so update your receiver right away. Returns `400` when signing is disabled. Not available to OAuth applications, which delete the endpoint and create a new one instead.
+Replace the endpoint's signing secret and return the new one. The old secret stops working immediately, so update your receiver right away. Returns `400` when signing is disabled. Requires the `webhooks:write` OAuth scope.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -23362,7 +26918,7 @@ Content type: `application/json`
   "message": "",
   "data": [
     {
-      "sent_at": 1710000000,
+      "sent_at": "2026-07-07T12:00:00Z",
       "header": "Documento para assinatura: Contrato de Servico",
       "body": "<string>",
       "buttons": [
@@ -23469,6 +27025,16 @@ A user uploaded a document. **Subject:** User · **Object:** Document · **Paylo
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -23526,7 +27092,7 @@ A user uploaded a document. **Subject:** User · **Object:** Document · **Paylo
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -23548,6 +27114,8 @@ A user uploaded a document. **Subject:** User · **Object:** Document · **Paylo
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -23572,6 +27140,16 @@ The document was normalized to PDF and its pages are available, so it can be pre
 
 ```json
 [
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
   {
     "name": "webhook-id",
     "in": "header",
@@ -23627,7 +27205,7 @@ The document was normalized to PDF and its pages are available, so it can be pre
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -23650,6 +27228,8 @@ The document was normalized to PDF and its pages are available, so it can be pre
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -23689,6 +27269,16 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
 
 ```json
 [
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
   {
     "name": "webhook-id",
     "in": "header",
@@ -23744,7 +27334,7 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -23767,6 +27357,8 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -23774,7 +27366,9 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790000300,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -23882,6 +27476,16 @@ A user created an assignment (a signature request) for the document. The payload
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -23932,7 +27536,7 @@ A user created an assignment (a signature request) for the document. The payload
   "message": null,
   "payload": {
     "user_name": "Mariana Costa",
-    "user_email": "developer@example.com",
+    "user_email": "mariana@example.com",
     "user_telephone": "+5511987654321"
   },
   "origin": {
@@ -23943,7 +27547,7 @@ A user created an assignment (a signature request) for the document. The payload
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -23966,6 +27570,8 @@ A user created an assignment (a signature request) for the document. The payload
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -23973,7 +27579,9 @@ A user created an assignment (a signature request) for the document. The payload
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790000300,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -24081,6 +27689,16 @@ A signer was asked to sign the document; sent once per signer. **Subject:** User
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -24140,7 +27758,7 @@ A signer was asked to sign the document; sent once per signer. **Subject:** User
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -24163,6 +27781,8 @@ A signer was asked to sign the document; sent once per signer. **Subject:** User
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -24170,7 +27790,9 @@ A signer was asked to sign the document; sent once per signer. **Subject:** User
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790000301,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -24278,6 +27900,16 @@ A user created a signer. **Subject:** User · **Object:** Signer · **Payload:**
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -24337,7 +27969,7 @@ A user created a signer. **Subject:** User · **Object:** Signer · **Payload:**
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -24375,6 +28007,16 @@ The signer confirmed their email with the verification code sent for this docume
 
 ```json
 [
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
   {
     "name": "webhook-id",
     "in": "header",
@@ -24454,6 +28096,8 @@ The signer confirmed their email with the verification code sent for this docume
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -24461,7 +28105,9 @@ The signer confirmed their email with the verification code sent for this docume
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003700,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -24569,6 +28215,16 @@ The signer confirmed their WhatsApp number with the verification code sent for t
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -24647,6 +28303,8 @@ The signer confirmed their WhatsApp number with the verification code sent for t
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -24654,7 +28312,9 @@ The signer confirmed their WhatsApp number with the verification code sent for t
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003700,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -24762,6 +28422,16 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -24842,6 +28512,8 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -24849,7 +28521,9 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003800,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -24957,6 +28631,16 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -25034,6 +28718,8 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -25041,7 +28727,9 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003600,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -25149,6 +28837,16 @@ The signer passed identity-document verification (directly, or approved by the a
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -25247,6 +28945,8 @@ The signer passed identity-document verification (directly, or approved by the a
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -25254,7 +28954,9 @@ The signer passed identity-document verification (directly, or approved by the a
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003600,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -25362,6 +29064,16 @@ The signer's identity-document verification ended without approval. **Subject:**
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -25437,6 +29149,8 @@ The signer's identity-document verification ended without approval. **Subject:**
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -25444,7 +29158,9 @@ The signer's identity-document verification ended without approval. **Subject:**
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003600,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -25552,6 +29268,16 @@ The provider could not decide the signer's identity verification and it awaits t
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -25630,6 +29356,8 @@ The provider could not decide the signer's identity verification and it awaits t
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -25637,7 +29365,9 @@ The provider could not decide the signer's identity verification and it awaits t
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003600,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -25745,6 +29475,16 @@ A user of the account approved the signer's identity after review. `reason_codes
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -25825,6 +29565,8 @@ A user of the account approved the signer's identity after review. `reason_codes
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -25832,7 +29574,9 @@ A user of the account approved the signer's identity after review. `reason_codes
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003600,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -25940,6 +29684,16 @@ A user of the account rejected the signer's identity after review. The document 
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -26010,13 +29764,15 @@ A user of the account rejected the signer's identity after review. The document 
     "account_id": "65f1c2a9b3e4d5f6",
     "template_id": null,
     "name": "Contrato de Prestação de Serviços.pdf",
-    "status": "pending_signature",
+    "status": "rejected_by_user",
     "artifacts": {
       "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
       "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -26024,7 +29780,9 @@ A user of the account rejected the signer's identity after review. The document 
     "updated_at": 1790000300,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003600,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -26125,12 +29883,22 @@ A user of the account rejected the signer's identity after review. The document 
 
 ### signer_signed_document
 
-The signer signed the document. Signers using a digital certificate add the certificate details to the payload. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`.
+The signer signed the document. **Subject:** Signer · **Object:** Document · **Payload:** `signer_full_name`; a signer using a digital certificate adds `verification_method` (`DigitalCertificate`), `certificate_holder`, `certificate_type`, `cpf`, `cnpj`, `serial_number`, `issuer` and `signed_at` (Unix time).
 
 **Request headers:**
 
 ```json
 [
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
   {
     "name": "webhook-id",
     "in": "header",
@@ -26209,6 +29977,8 @@ The signer signed the document. Signers using a digital certificate add the cert
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -26216,7 +29986,9 @@ The signer signed the document. Signers using a digital certificate add the cert
     "updated_at": 1790003900,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003900,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -26324,6 +30096,16 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -26401,6 +30183,8 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -26408,7 +30192,9 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
     "updated_at": 1790003900,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003900,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -26516,6 +30302,16 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -26575,7 +30371,7 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -26598,6 +30394,8 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -26605,7 +30403,9 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
     "updated_at": 1790003900,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003900,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -26713,6 +30513,16 @@ The last signer signed and the signed document is available: its status is `cert
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -26775,7 +30585,7 @@ The last signer signed and the signed document is available: its status is `cert
       {
         "id": "d6zqpbyog2v3xvxerwn8la94",
         "name": "Mariana Costa",
-        "email": "developer@example.com",
+        "email": "mariana@example.com",
         "telephone": "+5511987654321",
         "government_id": "12345678909",
         "is_email_verified": true,
@@ -26802,6 +30612,8 @@ The last signer signed and the signed document is available: its status is `cert
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -26809,7 +30621,9 @@ The last signer signed and the signed document is available: its status is `cert
     "updated_at": 1790003960,
     "assignment": {
       "id": "66b2f2b3c4d5e6f7a8b9c0d1",
-      "sender_email": "developer@example.com",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003960,
+      "sender_email": "mariana@example.com",
       "method": "virtual",
       "expires_at": 1792592000,
       "message": "Olá João, segue o contrato para assinatura.",
@@ -26917,6 +30731,16 @@ The document could not be processed (invalid or unreadable file). **Subject:** A
 ```json
 [
   {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
     "name": "webhook-id",
     "in": "header",
     "required": true,
@@ -26981,7 +30805,7 @@ The document could not be processed (invalid or unreadable file). **Subject:** A
       {
         "id": "d6zqpbyog2v3xvxerwn8la94",
         "name": "Mariana Costa",
-        "email": "developer@example.com",
+        "email": "mariana@example.com",
         "telephone": "+5511987654321",
         "government_id": "12345678909",
         "is_email_verified": true,
@@ -27004,6 +30828,8 @@ The document could not be processed (invalid or unreadable file). **Subject:** A
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
     "decline_reason": null,
     "declined_by": null,
     "tags": [],
@@ -27028,6 +30854,16 @@ A user created a template. **Subject:** User · **Object:** Template · **Payloa
 
 ```json
 [
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
   {
     "name": "webhook-id",
     "in": "header",
@@ -27086,7 +30922,7 @@ A user created a template. **Subject:** User · **Object:** Template · **Payloa
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -27126,6 +30962,16 @@ The template was processed and is ready to use. **Subject:** User · **Object:**
 
 ```json
 [
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
   {
     "name": "webhook-id",
     "in": "header",
@@ -27181,7 +31027,7 @@ The template was processed and is ready to use. **Subject:** User · **Object:**
   "subject": {
     "id": "d6zqpbyog2v3xvxerwn8la94",
     "name": "Mariana Costa",
-    "email": "developer@example.com",
+    "email": "mariana@example.com",
     "telephone": "+5511987654321",
     "government_id": "12345678909",
     "is_email_verified": true,
@@ -27238,6 +31084,16 @@ The template could not be processed. **Subject:** Account · **Object:** Templat
 
 ```json
 [
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
   {
     "name": "webhook-id",
     "in": "header",
@@ -27303,7 +31159,7 @@ The template could not be processed. **Subject:** Account · **Object:** Templat
       {
         "id": "d6zqpbyog2v3xvxerwn8la94",
         "name": "Mariana Costa",
-        "email": "developer@example.com",
+        "email": "mariana@example.com",
         "telephone": "+5511987654321",
         "government_id": "12345678909",
         "is_email_verified": true,
@@ -27329,6 +31185,1217 @@ The template could not be processed. **Subject:** Account · **Object:** Templat
     "default_document_tags": [],
     "type": "Template"
   },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_updated
+
+A user created or changed the contract terms of the document. Read them with `GET /v1/accounts/{accountId}/documents/{documentId}/contract`. Also sent by the hourly run when it hands the contract of an owner who left the workspace to another owner. Also sent whenever the terms change by other means (see the `by_system` example: subject Account, no `user_name`) — right after `document_contract_amended`, `document_contract_renewed`, `document_contract_expired` or `document_contract_terminated` — with the subject of that event (Account on the hourly or queued run, without `user_name`). **Subject:** User, or Account · **Object:** Document · **Payload:** `user_name` (User subject only), `end_date` (the end date after the change; null when none), `changed` (the fields of the contract resource that changed, such as `["value", "end_date", "term"]`; for terms just created, every field that differs from a contract with no terms).
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184467,
+  "event": "signer_viewed_document",
+  "message": null,
+  "payload": {},
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0"
+  },
+  "created_at": 1790000000,
+  "subject": {},
+  "object": {},
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_renewal_notice
+
+The contract's notice period started: its end date minus its notice period is today, Brasília time. Sent once per term, on the hourly run that first finds it due, so a contract whose notice period already started gets it on the next run. **Subject:** Account · **Object:** Document · **Payload:** `end_date`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184601,
+  "event": "document_contract_renewal_notice",
+  "message": null,
+  "payload": {
+    "end_date": "2027-10-31"
+  },
+  "origin": null,
+  "created_at": 1790100000,
+  "subject": {
+    "id": "65f1c2a9b3e4d5f6",
+    "name": "ACME Contabilidade",
+    "primary_color": "1d4ed8",
+    "secondary_color": null,
+    "notification_sender_type": "User",
+    "created_at": 1772720000,
+    "users": [
+      {
+        "id": "d6zqpbyog2v3xvxerwn8la94",
+        "name": "Mariana Costa",
+        "email": "mariana@example.com",
+        "telephone": "+5511987654321",
+        "government_id": "12345678909",
+        "is_email_verified": true,
+        "is_mfa_enabled": false,
+        "has_accepted_terms": true,
+        "is_password_set": true,
+        "created_at": 1772720000,
+        "to_be_deleted_at": null
+      }
+    ],
+    "type": "Account"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "certificated",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790100000,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003960,
+      "sender_email": "mariana@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": true,
+          "completed": true,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": true
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 1,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true,
+            "completed": true
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_expiring
+
+The contract ends within `days_before` days: 45 and 30. Each is sent once per term, on the hourly run that first finds it due; when both are already due (a contract tracked late), only the nearer one is sent. **Subject:** Account · **Object:** Document · **Payload:** `days_before`, `end_date`.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184602,
+  "event": "document_contract_expiring",
+  "message": null,
+  "payload": {
+    "days_before": 45,
+    "end_date": "2027-10-31"
+  },
+  "origin": null,
+  "created_at": 1790100000,
+  "subject": {
+    "id": "65f1c2a9b3e4d5f6",
+    "name": "ACME Contabilidade",
+    "primary_color": "1d4ed8",
+    "secondary_color": null,
+    "notification_sender_type": "User",
+    "created_at": 1772720000,
+    "users": [
+      {
+        "id": "d6zqpbyog2v3xvxerwn8la94",
+        "name": "Mariana Costa",
+        "email": "mariana@example.com",
+        "telephone": "+5511987654321",
+        "government_id": "12345678909",
+        "is_email_verified": true,
+        "is_mfa_enabled": false,
+        "has_accepted_terms": true,
+        "is_password_set": true,
+        "created_at": 1772720000,
+        "to_be_deleted_at": null
+      }
+    ],
+    "type": "Account"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "certificated",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790100000,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003960,
+      "sender_email": "mariana@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": true,
+          "completed": true,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": true
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 1,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true,
+            "completed": true
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_expired
+
+The contract ended without auto-renew; its status is now `expired`. Sent on the hourly run after the end date passes, Brasília time. **Subject:** Account · **Object:** Document · **Payload:** `end_date`, `changed` (the contract fields that moved: `["status"]`).
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184603,
+  "event": "document_contract_expired",
+  "message": null,
+  "payload": {
+    "end_date": "2027-10-31",
+    "changed": [
+      "status"
+    ]
+  },
+  "origin": null,
+  "created_at": 1790100000,
+  "subject": {
+    "id": "65f1c2a9b3e4d5f6",
+    "name": "ACME Contabilidade",
+    "primary_color": "1d4ed8",
+    "secondary_color": null,
+    "notification_sender_type": "User",
+    "created_at": 1772720000,
+    "users": [
+      {
+        "id": "d6zqpbyog2v3xvxerwn8la94",
+        "name": "Mariana Costa",
+        "email": "mariana@example.com",
+        "telephone": "+5511987654321",
+        "government_id": "12345678909",
+        "is_email_verified": true,
+        "is_mfa_enabled": false,
+        "has_accepted_terms": true,
+        "is_password_set": true,
+        "created_at": 1772720000,
+        "to_be_deleted_at": null
+      }
+    ],
+    "type": "Account"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "certificated",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790100000,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003960,
+      "sender_email": "mariana@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": true,
+          "completed": true,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": true
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 1,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": true,
+            "completed": true
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_renewed
+
+The contract started its next term: by auto-renew on the run after it ended (subject Account, see the `by_auto_renew` example) or by a user through the renew endpoint (subject User, `user_name` in the payload). `end_date` is the new one, and the `term` on the contract stepped. **Subject:** Account or User · **Object:** Document · **Payload:** `end_date`, `changed` (the contract fields that moved, such as `["end_date", "term"]`); `user_name` when a user renewed.
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184467,
+  "event": "signer_viewed_document",
+  "message": null,
+  "payload": {},
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0"
+  },
+  "created_at": 1790000000,
+  "subject": {},
+  "object": {},
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_terminated
+
+A user terminated the contract; its status is now `terminated`. **Subject:** User · **Object:** Document · **Payload:** `user_name`, `reason` (null when none was given), `end_date`, `changed` (the contract fields that moved: `["status"]`).
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184605,
+  "event": "document_contract_terminated",
+  "message": null,
+  "payload": {
+    "user_name": "Mariana Costa",
+    "reason": "Fornecedor substituído",
+    "end_date": "2027-10-31",
+    "changed": [
+      "status"
+    ]
+  },
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+  },
+  "created_at": 1790100000,
+  "subject": {
+    "id": "d6zqpbyog2v3xvxerwn8la94",
+    "name": "Mariana Costa",
+    "email": "mariana@example.com",
+    "telephone": "+5511987654321",
+    "government_id": "12345678909",
+    "is_email_verified": true,
+    "is_mfa_enabled": false,
+    "has_accepted_terms": true,
+    "is_password_set": true,
+    "created_at": 1772720000,
+    "to_be_deleted_at": null,
+    "type": "User"
+  },
+  "object": {
+    "id": "66b2f0e1c3a4d5e6f7a8b9c0",
+    "account_id": "65f1c2a9b3e4d5f6",
+    "template_id": null,
+    "name": "Contrato de Prestação de Serviços.pdf",
+    "status": "certificated",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+    },
+    "is_closed": true,
+    "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
+    "verification_code": null,
+    "verification_url": null,
+    "decline_reason": null,
+    "declined_by": null,
+    "tags": [],
+    "created_at": 1790000000,
+    "updated_at": 1790100000,
+    "assignment": {
+      "id": "66b2f2b3c4d5e6f7a8b9c0d1",
+      "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "created_at": 1790003900,
+      "sender_email": "mariana@example.com",
+      "method": "virtual",
+      "expires_at": 1792592000,
+      "message": "Olá João, segue o contrato para assinatura.",
+      "signers": [
+        {
+          "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "full_name": "João da Silva",
+          "email": "joao.silva@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": null,
+          "has_accepted_terms": false,
+          "completed": false,
+          "notification_history": [],
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": true
+        }
+      ],
+      "copy_receivers": [],
+      "items": [
+        {
+          "id": "66b2f2b3c4d5e6f7a8b9c0d2",
+          "page": null,
+          "signer": {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false
+          },
+          "field": {
+            "id": "65f1c2aa0b1c2d3e4f5a6b7c",
+            "name": "Virtual",
+            "type": "virtual",
+            "regex": null,
+            "is_pre_defined": false,
+            "is_active": true,
+            "is_required": false,
+            "is_standard": false,
+            "is_read_only": false,
+            "is_visible": false
+          },
+          "display_settings": [],
+          "value": null,
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 0,
+        "signers": [
+          {
+            "id": "66b2f0c9a1b2c3d4e5f6a7b8",
+            "full_name": "João da Silva",
+            "email": "joao.silva@example.com",
+            "whatsapp_phone_number": "+5548999990000",
+            "government_id": null,
+            "has_accepted_terms": false,
+            "completed": false
+          }
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "66b2f0c9a1b2c3d4e5f6a7b8",
+          "url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0?email=joao.silva%40example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e1",
+        "number": 1,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+      },
+      {
+        "id": "66b2f12ad4e5f6a7b8c9d0e2",
+        "number": 2,
+        "height": 2200,
+        "width": 1700,
+        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+      }
+    ],
+    "type": "Document"
+  },
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_amended
+
+A signed amendment, renewal or termination document updated the contract terms of the parent document; `changes` lists every field that moved as `{from, to}`, `null` when the instrument moves none (the parent is then left as it was and no `document_contract_updated` follows). Sent seconds after the amendment document is certificated (a job on its `document_ready` event) or by the hourly contract run that catches up, both with subject Account; or, for a document already signed when linked, by the user who linked it (subject User, `user_name` in the payload; see the `by_user` example). **Subject:** Account or User · **Object:** Document (the parent) · **Payload:** `document_id` (the amendment document), `relation_type` (`amendment`, `renewal` or `termination`), `number`, `changes`, `end_date` (the parent's end date after the change), `changed` (the names of the parent's fields that moved, as `document_contract_updated` lists them; `[]` when none did).
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184467,
+  "event": "signer_viewed_document",
+  "message": null,
+  "payload": {},
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0"
+  },
+  "created_at": 1790000000,
+  "subject": {},
+  "object": {},
+  "account_id": "65f1c2a9b3e4d5f6"
+}
+```
+
+
+**Response `2XX`:** Any `2xx` response acknowledges the delivery. Any other status, a connection error or a timeout counts as a failed attempt.
+
+### document_contract_amendment_updated
+
+A user linked the document to a contract as its amendment, renewal or termination, changed the terms the link carries, or unlinked it (`parent_document_id` null, see the `unlinked` example). Sent for every change to the link (a retry that changes nothing is not sent), a signed instrument included: a signed instrument blocked from applying can still have its recorded delta corrected, and this is the record of who did. **Subject:** User · **Object:** Document (the instrument) · **Payload:** `user_name`, `parent_document_id`, `relation_type`, `terms` (the delta as it now stands; `null` after an unlink), `changed` (which of `parent_document_id`, `relation_type` and `terms` moved: all three on a first link and on an unlink, `["terms"]` when only the delta changed).
+
+**Request headers:**
+
+```json
+[
+  {
+    "name": "User-Agent",
+    "in": "header",
+    "required": true,
+    "description": "Always `Assinafy-Webhooks/1.0`.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "Assinafy-Webhooks/1.0"
+  },
+  {
+    "name": "webhook-id",
+    "in": "header",
+    "required": true,
+    "description": "Message ID: the same on every attempt of this event to this endpoint. Use it to deduplicate retries.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "9f86d081884c7d659a2feaa0c55ad015"
+  },
+  {
+    "name": "webhook-timestamp",
+    "in": "header",
+    "required": true,
+    "description": "Unix timestamp (seconds) of this attempt.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "1790000000"
+  },
+  {
+    "name": "webhook-signature",
+    "in": "header",
+    "required": false,
+    "description": "Sent only when signing is enabled on the endpoint: `v1,<base64 HMAC-SHA256>`. See **Verifying signatures**.",
+    "schema": {
+      "type": "string"
+    },
+    "example": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+  }
+]
+```
+
+
+**Request: `application/json`**
+
+```json
+{
+  "$ref": "#/components/schemas/WebhookEvent"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 184467,
+  "event": "signer_viewed_document",
+  "message": null,
+  "payload": {},
+  "origin": {
+    "ip": "203.0.113.7",
+    "user-agent": "Mozilla/5.0"
+  },
+  "created_at": 1790000000,
+  "subject": {},
+  "object": {},
   "account_id": "65f1c2a9b3e4d5f6"
 }
 ```

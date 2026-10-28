@@ -16,7 +16,7 @@ uses
 var
   Client, OAuthClient, SignerClient: TAssinafyClient;
   Response: TAssinafyResponse;
-  SignerBody, AssignmentBody, VerificationBody: TJSONObject;
+  SignerBody, AssignmentBody, VerificationBody, ContractBody: TJSONObject;
   Signers: TJSONArray;
   Output: TFileStream;
   Query, CallbackQuery, RequestHeaders: TStringList;
@@ -24,16 +24,16 @@ var
   PKCE: TAssinafyPKCE;
   AccountID, DocumentID, SignerID, SavedAccessToken, SignerAccessCode,
     VerificationCode, State, URL, Code, SavedState, SavedVerifier,
-    CurrentRefreshToken, LatestStoredToken, EndpointSecret: string;
+    CurrentRefreshToken, LatestStoredToken, EndpointSecret, ContractUpdatedAt: string;
   RawRequestBody: RawByteString;
 begin
   Client := nil; OAuthClient := nil; SignerClient := nil; Response := nil;
-  SignerBody := nil; AssignmentBody := nil; VerificationBody := nil;
+  SignerBody := nil; AssignmentBody := nil; VerificationBody := nil; ContractBody := nil;
   Signers := nil; Output := nil; Query := nil; CallbackQuery := nil; RequestHeaders := nil;
   AccountID := ''; DocumentID := ''; SignerID := ''; SavedAccessToken := '';
   SignerAccessCode := ''; VerificationCode := ''; State := ''; URL := '';
   Code := ''; SavedState := ''; SavedVerifier := ''; CurrentRefreshToken := '';
-  LatestStoredToken := ''; EndpointSecret := ''; RawRequestBody := '';
+  LatestStoredToken := ''; EndpointSecret := ''; ContractUpdatedAt := ''; RawRequestBody := '';
   Config := Default(TAssinafyOAuthConfig);
   PKCE := Default(TAssinafyPKCE);
 '''

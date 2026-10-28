@@ -17,7 +17,7 @@
     // POST /v1/accounts; payloads: docs/API.md#createaccount
     function CreateAccount(Body: TJSONData): TAssinafyResponse;
     // GET /v1/documents/{documentId}/activities; payloads: docs/API.md#listdocumentactivities
-    function ListDocumentActivities(const DocumentId: string): TAssinafyResponse;
+    function ListDocumentActivities(const DocumentId: string; Query: TStrings = nil): TAssinafyResponse;
     // GET /v1/assignments; payloads: docs/API.md#listassignments
     function ListAssignments(Query: TStrings = nil): TAssinafyResponse;
     // POST /v1/documents/{documentId}/assignments; payloads: docs/API.md#createassignment
@@ -46,6 +46,18 @@
     function ChangePassword(Body: TJSONData): TAssinafyResponse;
     // POST /v1/authentication/mfa/verify; payloads: docs/API.md#completeatwofactorlogin
     function CompleteATwoFactorLogin(Body: TJSONData): TAssinafyResponse;
+    // GET /v1/accounts/{accountId}/contracts; payloads: docs/API.md#listcontracts
+    function ListContracts(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
+    // GET /v1/accounts/{accountId}/documents/{documentId}/contract; payloads: docs/API.md#getdocumentcontract
+    function GetDocumentContract(const AAccountId: string; const DocumentId: string): TAssinafyResponse;
+    // PUT /v1/accounts/{accountId}/documents/{documentId}/contract; payloads: docs/API.md#setdocumentcontract
+    function SetDocumentContract(const AAccountId: string; const DocumentId: string; Body: TJSONData): TAssinafyResponse;
+    // GET /v1/accounts/{accountId}/documents/{documentId}/contract/related; payloads: docs/API.md#listrelateddocumentcontracts
+    function ListRelatedDocumentContracts(const AAccountId: string; const DocumentId: string): TAssinafyResponse;
+    // POST /v1/accounts/{accountId}/documents/{documentId}/contract/renew; payloads: docs/API.md#renewdocumentcontract
+    function RenewDocumentContract(const AAccountId: string; const DocumentId: string; Body: TJSONData = nil): TAssinafyResponse;
+    // POST /v1/accounts/{accountId}/documents/{documentId}/contract/terminate; payloads: docs/API.md#terminatedocumentcontract
+    function TerminateDocumentContract(const AAccountId: string; const DocumentId: string; Body: TJSONData = nil): TAssinafyResponse;
     // GET /v1/accounts/{accountId}/documents; payloads: docs/API.md#listdocuments
     function ListDocuments(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
     // POST /v1/accounts/{accountId}/documents; payloads: docs/API.md#uploaddocument

@@ -243,7 +243,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "null"
       ],
       "format": "email",
-      "example": "developer@example.com"
+      "example": "john@example.com"
     },
     "whatsapp_phone_number": {
       "description": "E.164 format; normalized on save.",
@@ -277,7 +277,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "resource": "signer",
   "id": "62d6ee35c7741ca4006b9e11",
   "full_name": "John Signer",
-  "email": "developer@example.com",
+  "email": "john@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "39053344705",
   "has_accepted_terms": false
@@ -336,7 +336,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "resource": "signer",
   "id": "62d6ee35c7741ca4006b9e11",
   "full_name": "John Signer",
-  "email": "developer@example.com",
+  "email": "john@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "39053344705",
   "has_accepted_terms": false,
@@ -543,6 +543,23 @@ Complete shared request and response schemas from the [published API](https://ap
       "type": "string",
       "example": "https://api.assinafy.com.br/v1/sign/doc1"
     },
+    "verification_code": {
+      "description": "The code printed on the certificate page. Anyone can check it with `GET /v1/documents/{verification_code}/verify` or on `verification_url`. `null` until the document is `certificated`, and on documents certificated before verification codes existed.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f"
+    },
+    "verification_url": {
+      "description": "The public verification page for this document. `null` until the document is `certificated`.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "example": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f"
+    },
     "decline_reason": {
       "type": [
         "string",
@@ -575,7 +592,7 @@ Complete shared request and response schemas from the [published API](https://ap
       }
     },
     "assignment": {
-      "description": "Expanded assignment data when included via ?expand=assignment; null otherwise.",
+      "description": "The document's assignment, or `null` before one is created. The server decides when it is included, whatever `expand` the request sends: the document list, `GET /v1/documents/{documentId}`, the signer's document list and document creation from a template always include it; `/documents/search` and the upload response never do. Only the rename response follows `?expand=assignment`.",
       "oneOf": [
         {
           "$ref": "#/components/schemas/Assignment"
@@ -586,10 +603,16 @@ Complete shared request and response schemas from the [published API](https://ap
       ]
     },
     "pages": {
+      "description": "The document's pages. Included on the same responses as `assignment`, and also on the upload response.",
       "type": "array",
       "items": {
         "$ref": "#/components/schemas/DocumentPage"
       }
+    },
+    "has_contract": {
+      "description": "Only on `GET /v1/documents/{documentId}` read by the workspace, while the environment has contract tracking on: not with a signer's access code, not in document lists or webhooks, and left out when the lookup fails, so a missing key means unknown. Whether `GET /v1/accounts/{accountId}/documents/{documentId}/contract` answers with contract terms, the document's own or those of a contract it amends whose document still exists, so a page can lay out the contract section before reading it.",
+      "type": "boolean",
+      "example": true
     },
     "created_at": {
       "type": "string",
@@ -621,12 +644,14 @@ Complete shared request and response schemas from the [published API](https://ap
   },
   "is_closed": false,
   "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+  "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+  "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
   "decline_reason": null,
   "declined_by": {
     "resource": "signer",
     "id": "62d6ee35c7741ca4006b9e11",
     "full_name": "John Signer",
-    "email": "developer@example.com",
+    "email": "john@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": "39053344705",
     "has_accepted_terms": false
@@ -640,6 +665,8 @@ Complete shared request and response schemas from the [published API](https://ap
   "assignment": {
     "resource": "assignment",
     "id": "615606ef81d199996981dbce",
+    "document_id": "615601fab04c0a3147bb1246",
+    "created_at": "2026-06-03T03:54:16Z",
     "sender_email": "sender@example.com",
     "method": "virtual",
     "expires_at": null,
@@ -649,7 +676,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "developer@example.com",
+        "email": "john@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false,
@@ -716,6 +743,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
     }
   ],
+  "has_contract": true,
   "created_at": "2026-06-03T03:54:16Z",
   "updated_at": "2026-06-03T03:54:16Z"
 }
@@ -774,6 +802,17 @@ Complete shared request and response schemas from the [published API](https://ap
       "type": "boolean",
       "example": true
     },
+    "limits": {
+      "description": "Limits of the workspace's current plan. Returned only by `GET /v1/accounts/{accountId}`, not in account lists. More keys may be added.",
+      "properties": {
+        "webhook_endpoints": {
+          "description": "How many webhook endpoints the workspace can have: `1`, or `3` with the Multiple Webhooks feature. Creating one past the limit returns `403`.",
+          "type": "integer",
+          "example": 1
+        }
+      },
+      "type": "object"
+    },
     "created_at": {
       "type": "string",
       "format": "date-time",
@@ -798,6 +837,9 @@ Complete shared request and response schemas from the [published API](https://ap
     "owner"
   ],
   "is_delete_allowed": true,
+  "limits": {
+    "webhook_endpoints": 1
+  },
   "created_at": "2026-06-03T03:54:16Z"
 }
 ```
@@ -925,6 +967,698 @@ Complete shared request and response schemas from the [published API](https://ap
 }
 ```
 
+## DocumentContract
+
+```json
+{
+  "description": "The contract terms tracked on a document.",
+  "properties": {
+    "resource": {
+      "type": "string",
+      "example": "document_contract"
+    },
+    "document_id": {
+      "type": "string",
+      "example": "66b2f0e1c3a4d5e6f7a8b9c0"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "expired",
+        "terminated"
+      ],
+      "example": "active"
+    },
+    "counterparty_name": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "Acme Ltda"
+    },
+    "counterparty_taxpayer_id": {
+      "description": "CPF or CNPJ, digits only.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "11222333000181"
+    },
+    "value": {
+      "description": "Two decimal places at most.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "example": 120000.5
+    },
+    "currency": {
+      "description": "ISO 4217 code; `BRL` when a value is sent without one.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "BRL"
+    },
+    "start_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "example": "2026-11-01"
+    },
+    "end_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "example": "2027-10-31"
+    },
+    "auto_renew": {
+      "type": "boolean",
+      "example": true
+    },
+    "renewal_term_months": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "example": 12
+    },
+    "notice_period_days": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "example": 30
+    },
+    "term": {
+      "description": "Steps on every renewal, starting at 1.",
+      "type": "integer",
+      "example": 1
+    },
+    "owner_id": {
+      "description": "ID of the workspace member who owns the contract. When the owner is no longer a member of the workspace (removed, left, or deleted with their account), the hourly run hands the contract to the first owner who is still an active member, or leaves it without one; an inactive member stays the owner. The contract's e-mails (renewal notice, expiring, expired, renewed) go to the first of the owner and the document's creator who is an active member, as that member's notification preferences allow.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "d6zqpbyog2v3xvxerwn8la94"
+    },
+    "metadata": {
+      "description": "Up to 50 keys of your own, each holding text of at most 500 characters; `null` when there are none. A key ending in `_at` cannot hold a number: the API returns numbers under such keys as dates.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "example": {
+        "crm_stage": "won"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "external_references": {
+      "description": "IDs outside systems use for this contract, ordered by system and id.",
+      "type": "array",
+      "items": {
+        "properties": {
+          "system": {
+            "type": "string",
+            "example": "hubspot"
+          },
+          "id": {
+            "type": "string",
+            "example": "98765"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "document": {
+      "$ref": "#/components/schemas/Document",
+      "description": "Only with `expand=document`: the document the terms are tracked on."
+    },
+    "amendments": {
+      "description": "Only on the single-contract read: the documents that amend, renew or terminate this contract, the applied ones first by `number`, then the pending ones.",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/DocumentContractAmendment"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "resource": "document_contract",
+  "document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+  "status": "active",
+  "counterparty_name": "Acme Ltda",
+  "counterparty_taxpayer_id": "11222333000181",
+  "value": 120000.5,
+  "currency": "BRL",
+  "start_date": "2026-11-01",
+  "end_date": "2027-10-31",
+  "auto_renew": true,
+  "renewal_term_months": 12,
+  "notice_period_days": 30,
+  "term": 1,
+  "owner_id": "d6zqpbyog2v3xvxerwn8la94",
+  "metadata": {
+    "crm_stage": "won"
+  },
+  "external_references": [
+    {
+      "system": "hubspot",
+      "id": "98765"
+    }
+  ],
+  "document": {
+    "resource": "document",
+    "id": "615601fab04c0a3147bb1246",
+    "account_id": "d199996981dbd199996981db",
+    "template_id": null,
+    "name": "document.pdf",
+    "status": "metadata_ready",
+    "artifacts": {
+      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+    },
+    "is_closed": false,
+    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+    "decline_reason": null,
+    "declined_by": {
+      "resource": "signer",
+      "id": "62d6ee35c7741ca4006b9e11",
+      "full_name": "John Signer",
+      "email": "john@example.com",
+      "whatsapp_phone_number": "+5548999990000",
+      "government_id": "39053344705",
+      "has_accepted_terms": false
+    },
+    "tags": [
+      {
+        "id": "<string>",
+        "name": "<string>"
+      }
+    ],
+    "assignment": {
+      "resource": "assignment",
+      "id": "615606ef81d199996981dbce",
+      "document_id": "615601fab04c0a3147bb1246",
+      "created_at": "2026-06-03T03:54:16Z",
+      "sender_email": "sender@example.com",
+      "method": "virtual",
+      "expires_at": null,
+      "message": "<string>",
+      "signers": [
+        {
+          "resource": "signer",
+          "id": "62d6ee35c7741ca4006b9e11",
+          "full_name": "John Signer",
+          "email": "john@example.com",
+          "whatsapp_phone_number": "+5548999990000",
+          "government_id": "39053344705",
+          "has_accepted_terms": false,
+          "verification_method": "Email",
+          "notification_methods": [
+            "Email"
+          ],
+          "step": 1,
+          "notified": false,
+          "identity_verification_status": "InReview",
+          "completed": false,
+          "notification_history": [
+            {
+              "event": "signature_request",
+              "status": "sent",
+              "error_code": "<string>",
+              "error_message": "<string>",
+              "sent_at": "2026-07-07T12:00:00Z",
+              "failed_at": null
+            }
+          ]
+        }
+      ],
+      "copy_receivers": [
+        {}
+      ],
+      "items": [
+        {
+          "id": "<string>",
+          "page": {
+            "id": "615601faf166d6d1d8e7dc30",
+            "number": 1,
+            "height": 2100,
+            "width": 1275,
+            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          },
+          "signer": {},
+          "field": {},
+          "display_settings": "<string>",
+          "value": "<string>",
+          "completed": false
+        }
+      ],
+      "summary": {
+        "signer_count": 1,
+        "completed_count": 1,
+        "signers": [
+          {}
+        ]
+      },
+      "signing_urls": [
+        {
+          "signer_id": "<string>",
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "615601faf166d6d1d8e7dc30",
+        "number": 1,
+        "height": 2100,
+        "width": 1275,
+        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+      }
+    ],
+    "has_contract": true,
+    "created_at": "2026-06-03T03:54:16Z",
+    "updated_at": "2026-06-03T03:54:16Z"
+  },
+  "amendments": [
+    {
+      "resource": "document_contract_amendment",
+      "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+      "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+      "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+      "relation_type": "amendment",
+      "number": 1,
+      "status": "pending",
+      "document_status": "pending_signature",
+      "apply_error": "<string>",
+      "currency": "BRL",
+      "terms": {
+        "value": 130000,
+        "end_date": "2028-06-30"
+      },
+      "changes": {
+        "value": {
+          "from": 120000.5,
+          "to": 130000
+        },
+        "end_date": {
+          "from": "2027-10-31",
+          "to": "2028-06-30"
+        },
+        "term": {
+          "from": 1,
+          "to": 2
+        }
+      },
+      "applied_at": "2030-01-01T12:00:00Z",
+      "created_at": "2026-10-23T12:00:00Z",
+      "updated_at": "2026-10-23T12:00:00Z"
+    }
+  ],
+  "created_at": "2026-10-23T12:00:00Z",
+  "updated_at": "2026-10-23T12:00:00Z"
+}
+```
+
+## DocumentContractInput
+
+```json
+{
+  "description": "Every attribute is optional and only the ones sent change. `null` clears an attribute, except `auto_renew` (back to `false`) and `currency` (back to `BRL` while a `value` is set); `status` does not accept `null`. A changed `end_date` starts a new `term`.",
+  "properties": {
+    "status": {
+      "description": "On creation any status, so a contract that ended before it was tracked is registered as it ended: `expired` needs an `end_date` in the past, `terminated` its `end_date`; neither is walked by the lifecycle. Afterwards only `draft` or `active` (a contract in force never goes back to `draft`): `expired` and `terminated` are set by the lifecycle and the terminate endpoint; a closed contract is reopened by renewing it.",
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "expired",
+        "terminated"
+      ]
+    },
+    "counterparty_name": {
+      "description": "Emoji are kept; other characters outside the 3-byte range are dropped.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 255
+    },
+    "counterparty_taxpayer_id": {
+      "description": "A valid CPF or CNPJ, formatted or not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "value": {
+      "description": "Two decimal places at most.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "maximum": 9999999999999.99,
+      "minimum": 0
+    },
+    "currency": {
+      "description": "Three letters, such as `BRL` or `USD`, stored in capitals; `BRL` when a `value` is set without one.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "BRL"
+    },
+    "start_date": {
+      "description": "`YYYY-MM-DD`, from the year 1000.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "end_date": {
+      "description": "`YYYY-MM-DD`, on or after `start_date`.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "auto_renew": {
+      "description": "Whether the hourly run starts the next term the day after `end_date`, by `renewal_term_months`, instead of expiring the contract.",
+      "type": "boolean"
+    },
+    "renewal_term_months": {
+      "description": "How far a renewal by the term moves `end_date`; 12 when unset.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "maximum": 600,
+      "minimum": 1
+    },
+    "notice_period_days": {
+      "description": "Days before `end_date` the notice period starts (`document_contract_renewal_notice`); none when unset.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "maximum": 3650,
+      "minimum": 0
+    },
+    "owner_id": {
+      "description": "An active member of this workspace.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "metadata": {
+      "description": "Your own fields: up to 50 keys of 1 to 40 letters, digits, `_`, `-` or `.`, each holding plain text of at most 500 characters; no number under a key ending in `_at`, or `stuck_since`.",
+      "maxProperties": 50,
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "external_references": {
+      "description": "Replaces the whole list; `[]` or `null` clears it. Two items whose `system` and `id` compare equal case aside are one reference (the first sent is kept); a pair the database takes for one beyond that (accents, `ß` and `ss`) answers `400`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "required": [
+          "system",
+          "id"
+        ],
+        "properties": {
+          "system": {
+            "description": "Letters, digits, `_`, `-` and `.`; stored in lower case.",
+            "type": "string",
+            "maxLength": 64,
+            "example": "hubspot"
+          },
+          "id": {
+            "description": "Kept as sent; must not contain emoji or other 4-byte characters.",
+            "type": "string",
+            "maxLength": 255,
+            "example": "98765"
+          }
+        },
+        "type": "object"
+      },
+      "maxItems": 20
+    },
+    "parent_document_id": {
+      "description": "Links the document as an amendment of this contract document, or of any document in its family (resolved to the root); `null` unlinks a pending amendment. With it, the other attributes are the terms the instrument changes, not terms of its own; on a pending amendment a `null` value drops that term from the delta rather than clearing it on the parent.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "relation_type": {
+      "description": "Required on the first link. `amendment` may change `value`, `currency`, `start_date` (effective from, display only), `end_date`, `auto_renew`, `renewal_term_months`, `notice_period_days`, `counterparty_name`, `counterparty_taxpayer_id` and `metadata`; `renewal` only `end_date` and `value`; `termination` only `end_date` (the effective date).",
+      "type": "string",
+      "enum": [
+        "amendment",
+        "renewal",
+        "termination"
+      ]
+    },
+    "updated_at": {
+      "description": "Optional precondition: the `updated_at` the client read the contract (or this document's amendment link) with, as the API returned it. If the contract or link changed since, nothing is written and the answer is `409` with `code: ContractChanged`. Not sent, or `null`: the write applies whatever changed meanwhile (last write wins). Compared to the second; a fraction of a second, as a JavaScript date prints it, is read and ignored. New terms and a first link have nothing to have read, so sending one answers `409`; on a pending amendment, send the link's own `updated_at` (the GET on that document).",
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": "draft",
+  "counterparty_name": "<string>",
+  "counterparty_taxpayer_id": "<string>",
+  "value": 0,
+  "currency": "BRL",
+  "start_date": "<string>",
+  "end_date": "<string>",
+  "auto_renew": false,
+  "renewal_term_months": 1,
+  "notice_period_days": 0,
+  "owner_id": "<string>",
+  "metadata": {},
+  "external_references": [
+    {
+      "system": "hubspot",
+      "id": "98765"
+    }
+  ],
+  "parent_document_id": "<string>",
+  "relation_type": "amendment",
+  "updated_at": "2026-10-23T12:00:00Z"
+}
+```
+
+## DocumentContractAmendment
+
+```json
+{
+  "description": "A document that amends, renews or terminates a contract: its link and the terms it changes. The parent's terms take the delta once this document is certificated; until then the parent is untouched.",
+  "properties": {
+    "resource": {
+      "type": "string",
+      "example": "document_contract_amendment"
+    },
+    "document_id": {
+      "description": "This document, the instrument.",
+      "type": "string",
+      "example": "7c3d1e2f4a5b6c7d8e9f0a1b"
+    },
+    "document_name": {
+      "description": "This document's name.",
+      "type": "string",
+      "example": "Aditivo 1 - Contrato de prestação de serviços.pdf"
+    },
+    "parent_document_id": {
+      "description": "The contract document whose terms change.",
+      "type": "string",
+      "example": "66b2f0e1c3a4d5e6f7a8b9c0"
+    },
+    "relation_type": {
+      "type": "string",
+      "enum": [
+        "amendment",
+        "renewal",
+        "termination"
+      ],
+      "example": "amendment"
+    },
+    "number": {
+      "description": "Position among the parent's applied amendments by signing date; `null` while pending.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "example": 1
+    },
+    "status": {
+      "description": "`applied` once the delta moved the parent's terms.",
+      "type": "string",
+      "enum": [
+        "pending",
+        "applied"
+      ],
+      "example": "pending"
+    },
+    "document_status": {
+      "description": "This document's own status, so a declined, cancelled or expired instrument shows as such. An instrument applies only while its document is `certificated`: one whose document reads `failed` after it was signed waits, with no `apply_error`, until it is certificated again, and then applies in its place in the signing order.",
+      "type": "string",
+      "example": "pending_signature"
+    },
+    "apply_error": {
+      "description": "Why a signed instrument has not applied yet, retried every hour: the workspace's plan does not include contract tracking (it applies on the first run after the plan returns), the parent would not take the delta, an instrument signed before this one has not applied yet, one signed after it has already applied (this one then stays blocked: unlink it, and record what it still changes on a new instrument), or an unexpected failure.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "currency": {
+      "description": "The currency of the amounts in `terms` and `changes`. Once applied, the contract's currency at that moment, kept whatever the contract moves to later. While pending (and for an instrument applied before this was kept), the one this instrument moves the contract to, otherwise the contract's. `null` when neither has one.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "BRL"
+    },
+    "terms": {
+      "description": "The delta: only the terms this instrument changes; `null` when it changes none (a termination on the day it is signed).",
+      "type": [
+        "object",
+        "null"
+      ],
+      "example": {
+        "value": 130000,
+        "end_date": "2028-06-30"
+      }
+    },
+    "changes": {
+      "description": "Every parent field the roll-up moves, as `{from, to}`: a preview while pending, the record once applied; `null` when it moves none.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "example": {
+        "value": {
+          "from": 120000.5,
+          "to": 130000
+        },
+        "end_date": {
+          "from": "2027-10-31",
+          "to": "2028-06-30"
+        },
+        "term": {
+          "from": 1,
+          "to": 2
+        }
+      }
+    },
+    "applied_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-10-23T12:00:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "resource": "document_contract_amendment",
+  "document_id": "7c3d1e2f4a5b6c7d8e9f0a1b",
+  "document_name": "Aditivo 1 - Contrato de prestação de serviços.pdf",
+  "parent_document_id": "66b2f0e1c3a4d5e6f7a8b9c0",
+  "relation_type": "amendment",
+  "number": 1,
+  "status": "pending",
+  "document_status": "pending_signature",
+  "apply_error": "<string>",
+  "currency": "BRL",
+  "terms": {
+    "value": 130000,
+    "end_date": "2028-06-30"
+  },
+  "changes": {
+    "value": {
+      "from": 120000.5,
+      "to": 130000
+    },
+    "end_date": {
+      "from": "2027-10-31",
+      "to": "2028-06-30"
+    },
+    "term": {
+      "from": 1,
+      "to": 2
+    }
+  },
+  "applied_at": "2030-01-01T12:00:00Z",
+  "created_at": "2026-10-23T12:00:00Z",
+  "updated_at": "2026-10-23T12:00:00Z"
+}
+```
+
 ## SigningUrl
 
 ```json
@@ -1043,7 +1777,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "resource": "signer",
   "id": "62d6ee35c7741ca4006b9e11",
   "full_name": "John Signer",
-  "email": "developer@example.com",
+  "email": "john@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "39053344705",
   "has_accepted_terms": false,
@@ -1243,8 +1977,25 @@ Complete shared request and response schemas from the [published API](https://ap
       "type": "string",
       "example": "615606ef81d199996981dbce"
     },
-    "sender_email": {
+    "document_id": {
+      "description": "The document this assignment belongs to. `null` only if the document was deleted.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "615601fab04c0a3147bb1246"
+    },
+    "created_at": {
       "type": "string",
+      "format": "date-time",
+      "example": "2026-06-03T03:54:16Z"
+    },
+    "sender_email": {
+      "description": "Email of the user who sent the document; null once that user has deleted their account.",
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "email",
       "example": "sender@example.com"
     },
@@ -1308,6 +2059,8 @@ Complete shared request and response schemas from the [published API](https://ap
 {
   "resource": "assignment",
   "id": "615606ef81d199996981dbce",
+  "document_id": "615601fab04c0a3147bb1246",
+  "created_at": "2026-06-03T03:54:16Z",
   "sender_email": "sender@example.com",
   "method": "virtual",
   "expires_at": null,
@@ -1317,7 +2070,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "developer@example.com",
+      "email": "john@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false,
@@ -1423,7 +2176,7 @@ Complete shared request and response schemas from the [published API](https://ap
 
 ```json
 {
-  "description": "Cost breakdown for an assignment plus current account balances.",
+  "description": "Cost breakdown for an assignment plus current account balances. `credits` is the sum of `breakdown` (notifications, digital-certificate signatures and identity checks). `total_credits` is what the send will take from the credit balance: `credits`, plus `extra_document_cost` when `needs_extra_document` is true. The extra document is not a `breakdown` line.",
   "properties": {
     "documents": {
       "description": "Documents consumed (always 1).",
@@ -1431,20 +2184,24 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": 1
     },
     "credits": {
-      "description": "Total notification credits needed.",
-      "type": "number"
+      "description": "Sum of the `breakdown` costs: notifications, digital-certificate signatures and identity checks. Does not include the extra document.",
+      "type": "number",
+      "example": 0.9
     },
     "needs_extra_document": {
       "description": "True when the plan's document allowance is exhausted and an extra document will be charged from credits.",
-      "type": "boolean"
+      "type": "boolean",
+      "example": true
     },
     "extra_document_cost": {
-      "description": "Credits charged for the extra document when `needs_extra_document` is true.",
+      "description": "Credits for one extra document. Charged only when `needs_extra_document` is true.",
       "type": "number",
       "example": 1
     },
     "total_credits": {
-      "type": "number"
+      "description": "Credits the send will consume: `credits`, plus `extra_document_cost` when `needs_extra_document` is true.",
+      "type": "number",
+      "example": 1.9
     },
     "breakdown": {
       "type": "array",
@@ -1453,13 +2210,18 @@ Complete shared request and response schemas from the [published API](https://ap
       }
     },
     "document_balance": {
-      "type": "number"
+      "description": "Documents left in the plan.",
+      "type": "number",
+      "example": 0
     },
     "credit_balance": {
-      "type": "number"
+      "description": "Credits available.",
+      "type": "number",
+      "example": 10
     },
     "has_sufficient_resources": {
-      "type": "boolean"
+      "type": "boolean",
+      "example": true
     },
     "blocking_reason": {
       "type": [
@@ -1489,10 +2251,10 @@ Complete shared request and response schemas from the [published API](https://ap
 ```json
 {
   "documents": 1,
-  "credits": 1,
-  "needs_extra_document": false,
+  "credits": 0.9,
+  "needs_extra_document": true,
   "extra_document_cost": 1,
-  "total_credits": 1,
+  "total_credits": 1.9,
   "breakdown": [
     {
       "code": "NotificationWhatsapp",
@@ -1502,11 +2264,76 @@ Complete shared request and response schemas from the [published API](https://ap
       "unit_cost": 0.45
     }
   ],
-  "document_balance": 1,
-  "credit_balance": 1,
-  "has_sufficient_resources": false,
+  "document_balance": 0,
+  "credit_balance": 10,
+  "has_sufficient_resources": true,
   "blocking_reason": null,
   "message": "<string>"
+}
+```
+
+## ResendCostEstimate
+
+```json
+{
+  "description": "Credits a reminder to one signer will take, and whether the account can pay for it. A reminder uses no document.",
+  "properties": {
+    "total": {
+      "description": "Sum of the `breakdown` costs.",
+      "type": "number",
+      "example": 0.45
+    },
+    "breakdown": {
+      "type": "array",
+      "items": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "NotificationWhatsappResend"
+          },
+          "name": {
+            "type": "string",
+            "example": "Whatsapp Notification Resend"
+          },
+          "cost": {
+            "type": "number",
+            "example": 0.45
+          }
+        },
+        "type": "object"
+      }
+    },
+    "credit_balance": {
+      "description": "Credits available. `null` when the account's credits are not limited.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "example": 10
+    },
+    "has_sufficient_credits": {
+      "type": "boolean",
+      "example": true
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "total": 0.45,
+  "breakdown": [
+    {
+      "code": "NotificationWhatsappResend",
+      "name": "Whatsapp Notification Resend",
+      "cost": 0.45
+    }
+  ],
+  "credit_balance": 10,
+  "has_sufficient_credits": true
 }
 ```
 
@@ -1824,13 +2651,26 @@ Complete shared request and response schemas from the [published API](https://ap
       "type": "boolean",
       "example": true
     },
+    "is_held": {
+      "description": "Whether deliveries are paused after 10 failures in a row (see **Delivery contract**).",
+      "type": "boolean",
+      "example": false
+    },
+    "held_since": {
+      "description": "When the pause began (Unix timestamp, seconds); `null` while deliveries run.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "example": null
+    },
     "url": {
-      "description": "Webhook endpoint URL.",
+      "description": "Webhook endpoint URL; `https` is required for a new or changed URL.",
       "type": [
         "string",
         "null"
       ],
-      "example": "http://example.com?test=1"
+      "example": "https://example.com?test=1"
     },
     "email": {
       "description": "Contact email for delivery notices.",
@@ -1838,7 +2678,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "string",
         "null"
       ],
-      "example": "developer@example.com"
+      "example": "email@example.com"
     },
     "updated_at": {
       "type": [
@@ -1862,8 +2702,10 @@ Complete shared request and response schemas from the [published API](https://ap
     "document_prepared"
   ],
   "is_active": true,
-  "url": "http://example.com?test=1",
-  "email": "developer@example.com",
+  "is_held": false,
+  "held_since": null,
+  "url": "https://example.com?test=1",
+  "email": "email@example.com",
   "updated_at": "2023-05-10T14:58:24Z"
 }
 ```
@@ -1874,6 +2716,11 @@ Complete shared request and response schemas from the [published API](https://ap
 {
   "description": "A URL that receives the account's webhook events. Every active endpoint subscribed to an event receives it.",
   "properties": {
+    "resource": {
+      "description": "Always `activity_event_subscription` in single-resource responses.",
+      "type": "string",
+      "example": "activity_event_subscription"
+    },
     "id": {
       "description": "Endpoint ID.",
       "type": "string",
@@ -1888,7 +2735,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "ERP"
     },
     "url": {
-      "description": "URL that receives the events (http or https).",
+      "description": "URL that receives the events; `https` is required for a new or changed URL.",
       "type": "string",
       "format": "uri",
       "example": "https://example.com/webhooks/assinafy"
@@ -1915,6 +2762,19 @@ Complete shared request and response schemas from the [published API](https://ap
       "type": "boolean",
       "example": true
     },
+    "is_held": {
+      "description": "Whether deliveries are paused after 10 failures in a row: we probe the endpoint on a growing schedule and deliver what it missed when it answers (see **Delivery contract**). Editing the URL, or sending `is_active: true`, lifts the pause.",
+      "type": "boolean",
+      "example": false
+    },
+    "held_since": {
+      "description": "When the pause began (Unix timestamp, seconds); `null` while deliveries run.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "example": null
+    },
     "signing_enabled": {
       "description": "Whether deliveries carry a `webhook-signature` header (see **Webhook Payloads → Verifying signatures**).",
       "type": "boolean",
@@ -1939,6 +2799,7 @@ Complete shared request and response schemas from the [published API](https://ap
 
 ```json
 {
+  "resource": "activity_event_subscription",
   "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
   "name": "ERP",
   "url": "https://example.com/webhooks/assinafy",
@@ -1948,6 +2809,8 @@ Complete shared request and response schemas from the [published API](https://ap
     "signer_signed_document"
   ],
   "is_active": true,
+  "is_held": false,
+  "held_since": null,
   "signing_enabled": true,
   "created_at": "2026-10-01T12:00:00Z",
   "updated_at": "2026-10-01T12:00:00Z"
@@ -2032,6 +2895,37 @@ Complete shared request and response schemas from the [published API](https://ap
       "type": "boolean",
       "example": true
     },
+    "webhook_id": {
+      "description": "The `webhook-id` header of the request: the same on every attempt of this event to this endpoint.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "9f86d081884c7d659a2feaa0c55ad015"
+    },
+    "attempt": {
+      "description": "Which attempt of this event to this endpoint the entry records, counted from 1.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "example": 2
+    },
+    "kind": {
+      "description": "`scheduled`: the delivery of the event as it happened; `probe`: the one delivery we send to a paused endpoint to see whether it answers; `manual`: asked for through **Retry webhook delivery**.",
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "probe",
+        "manual"
+      ],
+      "example": "scheduled"
+    },
+    "will_retry": {
+      "description": "Whether another attempt follows this one. `false` on a delivered entry and on the last attempt of a failed one.",
+      "type": "boolean",
+      "example": true
+    },
     "http_status": {
       "description": "HTTP status returned (null if connection failed).",
       "type": [
@@ -2083,6 +2977,10 @@ Complete shared request and response schemas from the [published API](https://ap
   "endpoint": "https://example.com/webhook",
   "payload": {},
   "delivered": true,
+  "webhook_id": "9f86d081884c7d659a2feaa0c55ad015",
+  "attempt": 2,
+  "kind": "scheduled",
+  "will_retry": true,
   "http_status": 200,
   "response_body": "OK",
   "error": null,
@@ -2484,7 +3382,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "Assignment created by John Smith."
     },
     "payload": {
-      "description": "Event-specific payload snapshot. Keys vary per event.",
+      "description": "Event-specific snapshot taken when the event happened, with the same keys as the webhook of that event (see **Webhook Payloads**). The common ones: `user_name` (`assignment_created`, `user_rejected_document`); `signer_full_name` (every `signer_*` event and `signature_requested`); `signer_email`, `signer_whatsapp_phone_number` and `notification_method` (`signature_requested`); `reviewer_name` (identity review decisions); `error_message` (`document_processing_failed`). `message` already carries the actor's name, translated, so clients can show it as is. A `*_at` key inside the payload is returned as an ISO 8601 string here, as in every API response, but as a Unix integer in webhook bodies.",
       "type": [
         "object",
         "null"
@@ -2539,9 +3437,10 @@ Complete shared request and response schemas from the [published API](https://ap
   "description": "A rendered WhatsApp notification sent for an assignment, split into header/body/buttons as the signer would see them.",
   "properties": {
     "sent_at": {
-      "description": "Unix timestamp when sent.",
-      "type": "integer",
-      "example": 1710000000
+      "description": "When the message was sent.",
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-07-07T12:00:00Z"
     },
     "header": {
       "type": "string",
@@ -2581,7 +3480,7 @@ Complete shared request and response schemas from the [published API](https://ap
 
 ```json
 {
-  "sent_at": 1710000000,
+  "sent_at": "2026-07-07T12:00:00Z",
   "header": "Documento para assinatura: Contrato de Servico",
   "body": "<string>",
   "buttons": [
@@ -3100,6 +3999,26 @@ Complete shared request and response schemas from the [published API](https://ap
       "description": "A WhatsApp notification to a signer could not be delivered.",
       "type": "boolean",
       "example": true
+    },
+    "ContractRenewalNotice": {
+      "description": "A tracked contract entered its notice period: it is about to end or to renew.",
+      "type": "boolean",
+      "example": true
+    },
+    "ContractExpiring": {
+      "description": "A tracked contract ends in 45 or in 30 days.",
+      "type": "boolean",
+      "example": true
+    },
+    "ContractExpired": {
+      "description": "A tracked contract ended without renewal.",
+      "type": "boolean",
+      "example": true
+    },
+    "ContractRenewed": {
+      "description": "A tracked contract was auto-renewed into its next term.",
+      "type": "boolean",
+      "example": true
     }
   },
   "type": "object"
@@ -3118,7 +4037,11 @@ Complete shared request and response schemas from the [published API](https://ap
   "DocumentExpirationReset": true,
   "DocumentProcessingFailed": true,
   "TemplateProcessingFailed": true,
-  "SignerWhatsappFailed": true
+  "SignerWhatsappFailed": true,
+  "ContractRenewalNotice": true,
+  "ContractExpiring": true,
+  "ContractExpired": true,
+  "ContractRenewed": true
 }
 ```
 

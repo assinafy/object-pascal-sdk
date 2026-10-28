@@ -187,6 +187,16 @@ begin
       end;
     end;
   end;
+  Fake.NextStatus := 409;
+  Fake.NextBody := '{"code":"ContractChanged","message":"Read and retry"}';
+  try
+    Response := Client.GetUser;
+    Response.Free;
+    raise Exception.Create('Expected API error');
+  except
+    on E: EAssinafyAPIError do
+      Check(E.ErrorCode = 'ContractChanged', 'REST error code retained');
+  end;
   Fake.NextBody := '<html>unavailable</html>';
   Fake.NextStatus := 503;
   try
@@ -816,8 +826,6 @@ var
       case Action of
         1: Response := Client.CreateAssignment('document', RequestBody);
         2: Response := Client.EstimateAssignmentCost('document', RequestBody);
-        3: Response := Client.CreateDocumentFromTemplate('', 'template', RequestBody);
-        4: Response := Client.EstimateDocumentFromTemplateCost('', 'template', RequestBody);
       end;
       Response.Free;
       raise Exception.Create('Expected certificate method error');
@@ -852,20 +860,12 @@ begin
       JSONAdd(Signer, 'role_id', 'role');
       TemplateBody := JSONObj(['signers', Signers.Clone]);
       try
-        if Method = 'DigitalCertificate' then
-        begin
-          ExpectCertificateMethodError(3, TemplateBody);
-          ExpectCertificateMethodError(4, TemplateBody);
-        end
-        else
-        begin
-          Response := Client.EstimateDocumentFromTemplateCost('', 'template', TemplateBody);
-          Response.Free;
-          Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template estimate retained');
-          Response := Client.CreateDocumentFromTemplate('', 'template', TemplateBody);
-          Response.Free;
-          Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template creation retained');
-        end;
+        Response := Client.EstimateDocumentFromTemplateCost('', 'template', TemplateBody);
+        Response.Free;
+        Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template estimate retained');
+        Response := Client.CreateDocumentFromTemplate('', 'template', TemplateBody);
+        Response.Free;
+        Check(Fake.LastBody = JSONText(TemplateBody), Method + ' template creation retained');
       finally TemplateBody.Free; end;
     finally Body.Free; end;
   end;
@@ -964,7 +964,7 @@ begin
     {$IFDEF FPC}TestNativeFPCCompatibility;{$ENDIF}
     TestSigningMethods;
     TestIdentityVerification;
-    WriteLn('PASS: ', Checks, ' checks across all 112 API operations, responses, OAuth and webhooks');
+    WriteLn('PASS: ', Checks, ' checks across all 118 API operations, responses, OAuth and webhooks');
   finally
     TestQuery.Free;
     TestBody.Free;
