@@ -133,6 +133,18 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body);'), 2)
 
 
+class WorkflowTests(unittest.TestCase):
+    def test_tag_release_waits_for_checks_and_has_scoped_write_access(self):
+        workflow = (ROOT / '.github' / 'workflows' / 'ci.yml').read_text(encoding='utf-8')
+        release = workflow.split('\n  release:\n', 1)[1]
+        self.assertIn("if: startsWith(github.ref, 'refs/tags/v')", release)
+        self.assertIn('needs: test', release)
+        self.assertIn('contents: write', release)
+        self.assertIn('GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}', release)
+        self.assertIn('gh release view', release)
+        self.assertIn('--verify-tag --generate-notes', release)
+
+
 class GateTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory(prefix='assinafy-tools-')
