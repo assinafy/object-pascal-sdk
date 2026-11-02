@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.1] - 2026-11-02
+
+- Reject `DeleteWebhookEndpointByURL` before transport when its required `url` query is missing or blank.
+- Add the published meanings of document-verification completion and check timestamps to the generated schema reference.
+- Keep the operational guide concise while retaining installation, signing, biometric, certificate, OAuth and webhook flows.
+
 ## [0.5.0] - 2026-10-28
 
 - Add contract listing, terms, related-document, renewal and termination methods, with all published contract schemas and lifecycle webhook payloads.

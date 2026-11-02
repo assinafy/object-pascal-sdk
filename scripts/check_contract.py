@@ -51,6 +51,8 @@ names = re.findall(r'function (\w+)\(', declarations) + re.findall(r'function (\
 require(len(names) == len(actual) + len(workspace) and len(names) == len(set(names)), 'Incorrect resource declarations')
 implementation = (ROOT / 'src/methods.inc').read_text(encoding='utf-8')
 docs = (ROOT / 'docs/API.md').read_text(encoding='utf-8')
+readme = (ROOT / 'README.md').read_text(encoding='utf-8')
+require(len(readme.splitlines()) < 200, 'README must stay under 200 lines')
 for name in names:
     require(implementation.count('TAssinafyClient.' + name + '(') + implementation.count('TAssinafyClient.' + name + ':') == 1, name)
     require('\n## ' + name + '\n' in docs, f'Missing documentation for {name}')

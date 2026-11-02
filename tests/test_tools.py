@@ -128,6 +128,13 @@ class GeneratorTests(unittest.TestCase):
         code = generate.generate_methods([operation])['src/methods.inc']
         self.assertIn("if Body = nil then raise EAssinafyInputError", code)
 
+    def test_required_query_parameter_is_checked(self):
+        operation = next(op for op in generate.operations()
+                         if op['name'] == 'DeleteWebhookEndpointByURL')
+        code = generate.generate_methods([operation])['src/methods.inc']
+        self.assertIn("if Query = nil then raise EAssinafyInputError", code)
+        self.assertIn("RequireValue(Query.Values['url'], 'Query parameter url')", code)
+
     def test_certificate_method_validation_is_generated(self):
         code = generate.generate_methods(list(generate.operations()))['src/methods.inc']
         self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body);'), 2)

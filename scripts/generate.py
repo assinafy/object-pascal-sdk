@@ -208,6 +208,11 @@ def generate_methods(ops):
         impl = [f"function TAssinafyClient.{op['name']}{signature(op, False)}: TAssinafyResponse;", 'begin']
         if op['body'] and op['required_body']:
             impl.append("  if Body = nil then raise EAssinafyInputError.Create('Request body is required');")
+        for parameter in op['parameters']:
+            if parameter['in'] == 'query' and parameter.get('required'):
+                name = parameter['name'].replace("'", "''")
+                impl.append(f"  if Query = nil then raise EAssinafyInputError.Create('Query parameter {name} is required');")
+                impl.append(f"  RequireValue(Query.Values['{name}'], 'Query parameter {name}');")
         if op['name'] in CERTIFICATE_METHOD_VALIDATION:
             impl.append('  ValidateDigitalCertificateMethod(Body);')
         if op['file']:

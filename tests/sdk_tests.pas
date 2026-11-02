@@ -103,6 +103,8 @@ begin
       20: begin Response := Client.StartIdentityVerification('code', nil); Response.Free; end;
       21: begin Response := Client.DecideSignerIdentityReview('document', 'assignment', 'signer', nil); Response.Free; end;
       22: begin Response := Client.DownloadSignerIdentityReviewImage('document', 'assignment', 'signer', '..'); Response.Free; end;
+      23: begin Response := Client.DeleteWebhookEndpointByURL(''); Response.Free; end;
+      24: begin TestQuery.Clear; TestQuery.Add('url=   '); Response := Client.DeleteWebhookEndpointByURL('', TestQuery); Response.Free; end;
     end;
     raise Exception.Create(Name + ': expected input error');
   except
@@ -950,7 +952,7 @@ begin
     Response := Client.GetDocument('doc/with space');
     Response.Free;
     Check(Pos('doc%2Fwith%20space', Fake.LastURL) > 0, 'Path segments encoded');
-    for I := 1 to 22 do ExpectInputError('Input ' + IntToStr(I), I);
+    for I := 1 to 24 do ExpectInputError('Input ' + IntToStr(I), I);
     TestResponses;
     TestAuthenticationAndURLs;
     TestUploadLimits;

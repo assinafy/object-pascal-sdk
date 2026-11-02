@@ -3318,6 +3318,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": 1
     },
     "completed_at": {
+      "description": "When the last signature was made.",
       "type": [
         "string",
         "null"
@@ -3326,6 +3327,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "2023-01-27T19:27:44Z"
     },
     "verified_at": {
+      "description": "When this check ran (the time of the request). It says nothing about when the document was signed or certified.",
       "type": "string",
       "format": "date-time",
       "example": "2023-01-27T19:27:46Z"

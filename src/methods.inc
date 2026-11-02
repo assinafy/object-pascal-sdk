@@ -722,6 +722,8 @@ end;
 
 function TAssinafyClient.DeleteWebhookEndpointByURL(const AAccountId: string; Query: TStrings): TAssinafyResponse;
 begin
+  if Query = nil then raise EAssinafyInputError.Create('Query parameter url is required');
+  RequireValue(Query.Values['url'], 'Query parameter url');
   Result := Call('DELETE', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/webhooks/endpoints', aaAPI,
     Query, nil, '', '', '', '');
 end;
