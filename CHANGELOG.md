@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.6.1] - 2026-11-11
+
+- Add the optional `PAdES` argument to `DownloadCertifiedCopy` for the published PAdES download URL, preserving the existing default PDF behavior.
+- Reject production/sandbox OAuth issuer mismatches even when the issuer URL includes an explicit port or different letter casing.
+
 ## [0.6.0] - 2026-11-11
 
 - Add envelope, embedded-signing, usage, notification-policy, push-preference, certified-copy and webhook-test methods, covering all 147 published operations and 62 shared schemas.

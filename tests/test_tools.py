@@ -105,6 +105,13 @@ class GeneratorTests(unittest.TestCase):
         self.assertTrue(operation['redirect'])
         self.assertIn(", '', True);", generate.generate_methods([operation])['src/methods.inc'])
 
+    def test_certified_copy_has_an_optional_pades_suffix(self):
+        operation = next(op for op in generate.operations() if op['name'] == 'DownloadCertifiedCopy')
+        code = generate.generate_methods([operation])
+        self.assertIn('PAdES: Boolean = False', code['src/resources.inc'])
+        self.assertIn("PathValue(Token, 'Token')", code['src/methods.inc'])
+        self.assertIn("if PAdES then DownloadPath := DownloadPath + '/pades';", code['src/methods.inc'])
+
     def test_path_parameter_must_exist_in_uri(self):
         with self.assertRaises(ValueError):
             self.operation([], parameters=[{'name': 'unexpected', 'in': 'path'}])

@@ -23,6 +23,8 @@ The [API reference](API.md) defines every resource method. This document defines
 
 `CreateEnvelope(AccountID, Body, IdempotencyKey = '')` and `CreateDocumentFromTemplate(AccountID, TemplateID, Body, IdempotencyKey = '')` send a nonempty key in the `Idempotency-Key` header, without changing the JSON payload. The server scopes envelope keys to a workspace and template-document keys to a template. Save a key before sending and reuse it only for the same intended creation. The SDK never retries automatically. A blank default omits the header; CR/LF/NUL injection is rejected before transport. Full replay, conflict, deletion and charging rules are in the [API reference](API.md#createenvelope).
 
+`DownloadCertifiedCopy(Token, PAdES = False)` downloads the certified PDF through its public link token. Set `PAdES` to `True` for the documented `/pades` suffix; token characters remain percent-encoded separately. A missing PAdES artifact returns the server's `404`. Expired links return `302` with `Location`, without following the redirect.
+
 ## Identity verification resources
 
 `GetIdentityVerificationStatus(SignerAccessCode)` and `StartIdentityVerification(SignerAccessCode, Body)` send only a nonempty signer code. Starting requires explicit biometric consent (`{"consent":true}`). The returned capture URL is a bearer credential; preserve its fragment and keep it out of logs and browser storage. The application obtains consent and follows the server's `can_start` state. See the complete [status](API.md#getidentityverificationstatus) and [session](API.md#startidentityverification) contracts.
@@ -119,7 +121,7 @@ JSON response bytes are validated with a UTF-8 decode/encode round trip before s
 
 Token request/response/error payloads are complete in [ExchangeOAuthToken](API.md#exchangeoauthtoken) and [RevokeOAuthToken](API.md#revokeoauthtoken). Authorization request and callback examples, rotation rules, token lifetimes, OAuth workspace restrictions and OIDC validation requirements are in [README](../README.md#aplicativos-de-marketplace-e-oauth2).
 
-`ExchangeCode`, `RefreshToken` and `RevokeToken` reject a configured resource whose scheme, host or effective port differs from the client's API origin. Production/sandbox issuer mismatches are also rejected before transport, including the production issuer used when `Issuer` is empty. Resource paths do not affect the origin check; omit the optional resource when the application does not supply one.
+`ExchangeCode`, `RefreshToken` and `RevokeToken` reject a configured resource whose scheme, host or effective port differs from the client's API origin. Production/sandbox issuer mismatches are also rejected before transport, including the production issuer used when `Issuer` is empty. Issuer URLs must use HTTPS; known environment hosts are checked after URI parsing so explicit ports and host casing cannot bypass the check. Resource paths do not affect the origin check; omit the optional resource when the application does not supply one.
 
 The REST token schema permits a missing/null refresh token. The `RefreshToken` helper requires a nonempty replacement to support a continuing refresh connection. On missing/null refresh tokens or other token validation failures, its protocol error preserves the complete successful response, including any usable credentials. Applications must decide whether to continue with the returned access token or reconnect, and must not reuse the old refresh token blindly.
 

@@ -929,7 +929,7 @@
   Check(Fake.LastBody = JSONText(TestBody), 'SendCertifiedCopy body');
   Check(Fake.LastContentType = 'application/json', 'SendCertifiedCopy content type');
 
-  Response := Client.DownloadCertifiedCopy('Token');
+  Response := Client.DownloadCertifiedCopy('Token', False);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'DownloadCertifiedCopy verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/downloads/Token', 'DownloadCertifiedCopy URL');

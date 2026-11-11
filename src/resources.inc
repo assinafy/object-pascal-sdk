@@ -241,7 +241,7 @@
     // POST /v1/sign/certified-copy; payloads: docs/API.md#sendcertifiedcopy
     function SendCertifiedCopy(const SignerAccessCode: string; Body: TJSONData = nil): TAssinafyResponse;
     // GET /v1/signers/downloads/{token}; payloads: docs/API.md#downloadcertifiedcopy
-    function DownloadCertifiedCopy(const Token: string): TAssinafyResponse;
+    function DownloadCertifiedCopy(const Token: string; PAdES: Boolean = False): TAssinafyResponse;
     // POST /v1/signers/downloads/{token}/resend; payloads: docs/API.md#resendcertifiedcopy
     function ResendCertifiedCopy(const Token: string): TAssinafyResponse;
     // POST /v1/authentication/social-login; payloads: docs/API.md#sociallogin

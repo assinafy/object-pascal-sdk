@@ -775,9 +775,12 @@ begin
     nil, Body, '', '', 'application/json', SignerAccessCode);
 end;
 
-function TAssinafyClient.DownloadCertifiedCopy(const Token: string): TAssinafyResponse;
+function TAssinafyClient.DownloadCertifiedCopy(const Token: string; PAdES: Boolean): TAssinafyResponse;
+var DownloadPath: string;
 begin
-  Result := Call('GET', '/signers/downloads/' + PathValue(Token, 'Token'), aaPublic,
+  DownloadPath := '/signers/downloads/' + PathValue(Token, 'Token');
+  if PAdES then DownloadPath := DownloadPath + '/pades';
+  Result := Call('GET', DownloadPath, aaPublic,
     nil, nil, '', '', '', '', '', True);
 end;
 

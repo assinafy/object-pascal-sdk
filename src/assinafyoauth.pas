@@ -196,7 +196,7 @@ end;
 
 procedure ValidateEnvironment(Client: TAssinafyClient; const Config: TAssinafyOAuthConfig);
 var
-  API, Resource: TAssinafyURI;
+  API, Resource, IssuerURI: TAssinafyURI;
   Issuer: string;
 begin
   API := ParseAssinafyURI(Client.BaseURL);
@@ -213,8 +213,10 @@ begin
   end;
   Issuer := TrimURLTrailingSlash(Config.Issuer);
   if Issuer = '' then Issuer := AssinafyOAuthIssuer;
-  if (SameText(API.Host, 'api.assinafy.com.br') and SameText(Issuer, 'https://auth-sandbox.assinafy.com.br')) or
-    (SameText(API.Host, 'sandbox.assinafy.com.br') and SameText(Issuer, AssinafyOAuthIssuer)) then
+  RequireHTTPS(Issuer, 'Issuer');
+  IssuerURI := ParseAssinafyURI(Issuer);
+  if (SameText(API.Host, 'api.assinafy.com.br') and SameText(IssuerURI.Host, 'auth-sandbox.assinafy.com.br')) or
+    (SameText(API.Host, 'sandbox.assinafy.com.br') and SameText(IssuerURI.Host, 'auth.assinafy.com.br')) then
     raise EAssinafyInputError.Create('OAuth issuer and API must use the same environment');
 end;
 

@@ -117,7 +117,7 @@ Response := ExchangeCode(OAuthClient, Config, Code, PKCE.Verifier);
 3. Use `GetEnvelope`, `UpdateEnvelope`, `ListEnvelopeActivities` e `DownloadEnvelopeArtifacts`. Adicionar/remover documentos e cancelar podem notificar destinatários. `DeleteEnvelope` exige documentos encerrados e preserva os documentos individuais.
 4. Para incorporar assinatura, configure origens HTTPS exatas com `AddEmbedOrigin` e envie `embedded: true` no signatário. `signing_urls[].url` será nulo. Crie `CreateEmbedSession`, use sua URL privada no iframe e troque o token com `ExchangeEmbedSession`; a troca é pública e não envia credenciais do workspace. Preserve a verificação do canal e as origens permitidas; não exponha a API key ao navegador.
 
-`GetNotificationPolicy`/`UpdateNotificationPolicy` configuram avisos do workspace; `GetPushPreferences`/`UpdatePushPreferences` tratam preferências push. `SendCertifiedCopy` e `ResendCertifiedCopy` enviam novas cópias ao destinatário. `DownloadCertifiedCopy` pode retornar `302`: leia `Response.Header('Location')`; o SDK não segue o redirecionamento. Contratos completos e restrições OAuth estão em [docs/API.md](docs/API.md).
+`GetNotificationPolicy`/`UpdateNotificationPolicy` configuram avisos do workspace; `GetPushPreferences`/`UpdatePushPreferences` tratam preferências push. `SendCertifiedCopy` e `ResendCertifiedCopy` enviam novas cópias ao destinatário. `DownloadCertifiedCopy(Token, True)` baixa a versão PAdES; sem o segundo argumento, baixa o PDF certificado. O método pode retornar `302`: leia `Response.Header('Location')`; o SDK não segue o redirecionamento. Contratos completos e restrições OAuth estão em [docs/API.md](docs/API.md).
 
 ## Webhooks assinados
 

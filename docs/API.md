@@ -37970,12 +37970,14 @@ Content type: `application/json`
 ## DownloadCertifiedCopy
 
 ```pascal
-function DownloadCertifiedCopy(const Token: string): TAssinafyResponse;
+function DownloadCertifiedCopy(const Token: string; PAdES: Boolean = False): TAssinafyResponse;
 ```
 
 `GET /v1/signers/downloads/{token}`
 
 The link in the completion and re-send messages. Valid 7 days in the completion message and 30 minutes when re-sent. Add `/pades` for the PAdES version on documents that have one. An expired or unknown link is redirected (`302`) to the expired-link page; for a known link the redirect carries `?token=`, with which the page can ask for a new one (`POST /v1/signers/downloads/{token}/resend`).
+
+Set the optional SDK argument `PAdES` to `True` to request the documented `/pades` variant. The default downloads the certified PDF. The token remains one percent-encoded path segment in both forms.
 
 A documented `302` is returned as a response. Read `Response.Header('Location')`; the SDK does not follow it or forward credentials.
 

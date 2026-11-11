@@ -618,7 +618,8 @@ begin
   Fake.NextBody := '{"access_token":"access","refresh_token":"replacement","token_type":"Bearer"}';
   try
     for I := 0 to 1 do
-      for J := 0 to 3 do
+    begin
+      for J := 0 to 6 do
       begin
         if (J = 3) and (I = 1) then Continue;
         Config.Issuer := Issuers[I];
@@ -628,6 +629,9 @@ begin
           1: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I]; end;
           2: Config.Resource := Resources[I] + ':444';
           3: begin Config.Resource := ''; Config.Issuer := ''; end;
+          4: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I] + ':443'; end;
+          5: begin Config.Resource := ''; Config.Issuer := UpperCase(Issuers[1 - I]) + ':0443/'; end;
+          6: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I] + ':8443/'; end;
         end;
         for Grant := 0 to 2 do
         begin
@@ -641,6 +645,17 @@ begin
           except on E: EAssinafyInputError do Check(Fake.Calls = PriorCalls, 'OAuth environment mismatch rejected before transport'); end;
         end;
       end;
+      Config.Resource := Resources[I];
+      Config.Issuer := UpperCase(Issuers[I]) + ':0443/';
+      PriorCalls := Fake.Calls;
+      Response := ExchangeCode(Clients[I], Config, 'code', StringOfChar('a', 43));
+      Response.Free;
+      Response := RefreshToken(Clients[I], Config, 'refresh');
+      Response.Free;
+      Response := RevokeToken(Clients[I], Config, 'token');
+      Response.Free;
+      Check(Fake.Calls = PriorCalls + 3, 'Matching normalized issuer accepted for all OAuth helpers');
+    end;
   finally Clients[1].Free; end;
 end;
 
@@ -984,6 +999,11 @@ begin
   TestQuery.Add('search=Ana & Joao');
   try
     {$I operations.inc}
+    Response := Client.DownloadCertifiedCopy('token/with space', True);
+    Response.Free;
+    Check(Fake.LastURL = AssinafySandboxURL + '/signers/downloads/token%2Fwith%20space/pades',
+      'PAdES suffix is separate from the encoded token');
+    Check(Fake.LastAuth = 'public', 'PAdES copy suppresses workspace credentials');
     Response := Client.GetDocument('doc/with space');
     Response.Free;
     Check(Pos('doc%2Fwith%20space', Fake.LastURL) > 0, 'Path segments encoded');

@@ -127,39 +127,41 @@ class Handler(BaseHTTPRequestHandler):
             'authorization': self.headers.get('Authorization', ''),
             'idempotency_key': self.headers.get('Idempotency-Key', ''),
         }
-        if path.startswith('/v1/accounts/account/envelopes'):
+        if path in {'/v1/accounts/account/envelopes', '/v1/accounts/account/envelopes/envelope',
+                    '/v1/accounts/account/envelopes/envelope/cancel',
+                    '/v1/accounts/account/envelopes/envelope/download/bundle'}:
             check(data['authorization'] == 'Bearer test-bearer' and not data['key'], 'Envelope workspace credentials')
-            envelope = self.server.envelope
+            data = {'resource': 'envelope', 'id': 'envelope', 'name': 'Envelope', 'message': None,
+                    'documents': [{'id': 'document', 'position': 1, 'name': 'contract.pdf',
+                                   'status': 'pending_signature',
+                                   'artifacts': {'original': 'https://files.example.com/original.pdf'},
+                                   'signers': [{'id': 'signer', 'full_name': 'Example Signer',
+                                                'email': 'signer@example.com', 'whatsapp_phone_number': None,
+                                                'completed': False, 'signed_at': None}]}],
+                    'counts': {'pending_signature': 1},
+                    'signing_urls': [{'signer_id': 'signer', 'url': None, 'embedded': True}],
+                    'created_at': '2030-01-01T12:00:00Z'}
             if self.command == 'POST' and path == '/v1/accounts/account/envelopes':
-                check(data['idempotency_key'] == 'envelope-key', 'Envelope idempotency header')
+                check(self.headers.get('Idempotency-Key') == 'envelope-key', 'Envelope idempotency header')
                 sent = json.loads(raw)
                 check(sent['documents'][0]['signer_ids'] == ['signer'], 'Envelope signer mapping')
                 check(sent['signers'][0]['embedded'] is True, 'Embedded signer flag')
                 check(sent['max_total_credits'] == 1.5, 'Credit ceiling preserved')
-                if envelope is None:
-                    self.server.envelope = envelope = sent | {'id': 'envelope', 'status': 'open'}
-                data = envelope
-            elif envelope is None:
-                self.respond(404, b'{"status":404,"data":null}')
-                return
             elif path.endswith('/download/bundle'):
                 check('application/zip' in self.headers.get('Accept', ''), 'Envelope ZIP media type accepted')
                 self.respond(200, b'PK\x03\x04\x00\xff', 'application/zip')
                 return
             elif self.command == 'PATCH':
-                envelope.update(json.loads(raw))
-                data = envelope
+                check(json.loads(raw) == {'name': 'Renamed', 'message': None}, 'Envelope update body')
+                data['name'] = 'Renamed'
             elif path.endswith('/cancel'):
                 check(self.command == 'PUT', 'Envelope cancellation verb')
-                envelope['status'] = 'cancelled'
-                data = envelope
+                data = [{'id': 'document', 'status': 'rejected_by_user', 'cancelled': True}]
             elif self.command == 'DELETE':
-                check(envelope['status'] == 'cancelled', 'Only closed envelope deleted')
-                self.server.envelope = None
-                self.respond(204, b'')
-                return
+                data = []
             else:
-                data = envelope
+                check(self.command == 'GET', 'Envelope read verb')
+                data['name'] = 'Renamed'
         if path == '/v1/documents/document/assignments/assignment/signers/signer/embed-sessions':
             check(self.command == 'POST' and data['authorization'] == 'Bearer test-bearer', 'Embed session creation')
             data = {'url': 'https://sign.example.com/embed/session-token', 'expires_at': '2030-01-01T12:00:00Z'}
@@ -178,6 +180,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/v1/signers/downloads/expired-token':
             check(not data['authorization'] and not data['key'], 'Certified copy omits workspace credentials')
             self.respond(302, b'', 'text/html', {'Location': f'http://127.0.0.1:{self.server.server_port}/trap'})
+            return
+        if path in {'/v1/signers/downloads/copy%20token', '/v1/signers/downloads/copy%20token/pades'}:
+            check(self.command == 'GET' and not data['authorization'] and not data['key'], 'Public certified-copy download')
+            body = FILE_BYTES + (b'-pades' if path.endswith('/pades') else b'')
+            self.respond(200, body, 'application/pdf')
             return
         review_path = '/v1/documents/review-doc/assignments/assignment/signers/signer/identity-verification'
         if path == '/v1/signers/identity-verification':
@@ -295,7 +302,6 @@ def main():
             server.redirect_followed = False
             server.slow_requests = 0
             server.fixture = fixture
-            server.envelope = None
             threading.Thread(target=server.serve_forever, daemon=True).start()
         thumbprint = hashlib.sha1(ssl.PEM_cert_to_DER_cert(certificate.read_text(encoding='utf-8'))).hexdigest()
         added = False

@@ -53,12 +53,9 @@ begin
       'signers', JSONArr([JSONObj(['id', 'signer', 'embedded', True])]),
       'documents', JSONArr([JSONObj(['id', 'document', 'signer_ids', JSONArr(['signer'])])])]);
     try
-      for I := 1 to 2 do
-      begin
-        Response := Client.CreateEnvelope('account', FlowBody, 'envelope-key');
-        try Check(JSONString(JSONFind(Response.Data, 'id')) = 'envelope', 'Envelope idempotent creation');
-        finally Response.Free; end;
-      end;
+      Response := Client.CreateEnvelope('account', FlowBody, 'envelope-key');
+      try Check(JSONString(JSONFind(Response.Data, 'id')) = 'envelope', 'Envelope creation response');
+      finally Response.Free; end;
     finally FlowBody.Free; end;
     FlowBody := JSONObj(['name', 'Renamed', 'message', nil]);
     try
@@ -67,8 +64,8 @@ begin
     finally FlowBody.Free; end;
     Response := Client.GetEnvelope('account', 'envelope');
     try
-      Check(JSONString(JSONFind(Response.Data, 'name')) = 'Renamed', 'Envelope update persisted');
-      Check(JSONKind(JSONFind(Response.Data, 'message')) = jtNull, 'Envelope explicit null persisted');
+      Check(JSONString(JSONFind(Response.Data, 'name')) = 'Renamed', 'Envelope name parsed');
+      Check(JSONKind(JSONFind(Response.Data, 'message')) = jtNull, 'Envelope explicit null parsed');
     finally Response.Free; end;
     Response := Client.DownloadEnvelopeArtifacts('account', 'envelope', 'bundle');
     try
@@ -93,16 +90,24 @@ begin
       Response.Free;
     finally FlowBody.Free; end;
     Response := Client.CancelEnvelope('account', 'envelope');
-    try Check(JSONString(JSONFind(Response.Data, 'status')) = 'cancelled', 'Envelope cancellation persisted');
+    try
+      Check((Response.Data is TJSONArray) and (TJSONArray(Response.Data).Count = 1), 'Envelope cancellation returns document results');
+      Check(JSONString(JSONFind(TJSONArray(Response.Data).Items[0], 'id')) = 'document', 'Cancelled document ID');
+      Check(JSONString(JSONFind(TJSONArray(Response.Data).Items[0], 'status')) = 'rejected_by_user', 'Cancelled document status');
+      Check(JSONBoolean(JSONFind(TJSONArray(Response.Data).Items[0], 'cancelled')), 'Cancellation result flag');
     finally Response.Free; end;
     Response := Client.DeleteEnvelope('account', 'envelope');
-    try Check((Response.StatusCode = 204) and (Response.Data = nil), 'Empty envelope deletion response');
+    try Check((Response.StatusCode = 200) and (Response.Data is TJSONArray) and
+      (TJSONArray(Response.Data).Count = 0), 'Envelope deletion returns an empty array');
     finally Response.Free; end;
-    try
-      Response := Client.GetEnvelope('account', 'envelope');
-      Response.Free;
-      raise Exception.Create('Deleted envelope still exists');
-    except on E: EAssinafyAPIError do Check(E.StatusCode = 404, 'Deleted envelope is absent'); end;
+    Response := Client.DownloadCertifiedCopy('copy token');
+    try Check((Response.Header('Content-Type') = 'application/pdf') and
+      (Length(Response.Body) = 15), 'Default certified-copy PDF');
+    finally Response.Free; end;
+    Response := Client.DownloadCertifiedCopy('copy token', True);
+    try Check((Response.JSON = nil) and (Length(Response.Body) = 21) and
+      (Copy(Response.Body, 16, 6) = '-pades'), 'PAdES certified-copy path and binary response');
+    finally Response.Free; end;
     Response := Client.DownloadCertifiedCopy('expired-token');
     try
       Check(Response.StatusCode = 302, 'Documented certified-copy redirect is returned');

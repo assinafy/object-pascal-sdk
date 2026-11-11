@@ -32,6 +32,9 @@ DIRECT_CERTIFICATE_NOTE = (
 SDK_OPERATION_NOTES = {
     'CreateAssignment': DIRECT_CERTIFICATE_NOTE,
     'EstimateAssignmentCost': DIRECT_CERTIFICATE_NOTE,
+    'DownloadCertifiedCopy': 'Set the optional SDK argument `PAdES` to `True` to request '
+    'the documented `/pades` variant. The default downloads the certified PDF. '
+    'The token remains one percent-encoded path segment in both forms.',
 }
 OVERRIDES = {
     'Exchange a code, refresh token, or subject token for an access token': 'ExchangeOAuthToken',
@@ -182,6 +185,8 @@ def operations():
                 args.append(('ContentType', 'string', "'application/octet-stream'"))
             if idempotency:
                 args.append(('IdempotencyKey', 'string', "''"))
+            if name == 'DownloadCertifiedCopy':
+                args.append(('PAdES', 'Boolean', 'False'))
             op = {
                 'name': name, 'path': path, 'verb': verb.upper(), 'op': operation,
                 'parameters': parameters, 'paths': paths, 'auth': auth, 'args': args,
@@ -243,7 +248,13 @@ def generate_methods(ops):
         variant = ' (workspace credentials)' if op['workspace_of'] else ' (signer credentials)' if op['signer_of'] else ''
         declarations.append(f"    // {op['verb']} {op['path']}{variant}; payloads: docs/API.md#{op['name'].lower()}")
         declarations.append(f"    function {op['name']}{signature(op)}: TAssinafyResponse;")
-        impl = [f"function TAssinafyClient.{op['name']}{signature(op, False)}: TAssinafyResponse;", 'begin']
+        impl = [f"function TAssinafyClient.{op['name']}{signature(op, False)}: TAssinafyResponse;"]
+        if op['name'] == 'DownloadCertifiedCopy':
+            impl += ['var DownloadPath: string;', 'begin',
+                     f'  DownloadPath := {path_expression(op)};',
+                     "  if PAdES then DownloadPath := DownloadPath + '/pades';"]
+        else:
+            impl.append('begin')
         if op['body'] and op['required_body']:
             impl.append("  if Body = nil then raise EAssinafyInputError.Create('Request body is required');")
         for parameter in op['parameters']:
@@ -260,7 +271,8 @@ def generate_methods(ops):
         field = "'" + op['file_field'].replace("'", "''") + "'"
         media = "'" + op['media_type'].replace("'", "''") + "'"
         request_media = 'ContentType' if op['custom_media'] else media
-        impl.append(f"  Result := Call('{op['verb']}', {path_expression(op)}, {op['auth']},")
+        request_path = 'DownloadPath' if op['name'] == 'DownloadCertifiedCopy' else path_expression(op)
+        impl.append(f"  Result := Call('{op['verb']}', {request_path}, {op['auth']},")
         extra = ', IdempotencyKey' if op['idempotency'] else ", ''" if op['redirect'] else ''
         if op['redirect']:
             extra += ', True'
@@ -269,7 +281,7 @@ def generate_methods(ops):
         implementations.extend(impl)
         args = []
         for name, kind, default in op['args']:
-            if name == 'ContentType':
+            if name == 'ContentType' or kind == 'Boolean':
                 args.append(default)
                 continue
             args.append("''" if name == 'AAccountId' else "'" + name + "'" if kind == 'string' and name != 'FileName' else 'FixtureFile' if name == 'FileName' else 'TestBody' if name == 'Body' else 'TestQuery')
