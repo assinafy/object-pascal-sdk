@@ -16,7 +16,7 @@ end;
 var
   Client, TLSClient: TAssinafyClient;
   Response: TAssinafyResponse;
-  Body, IdentityBody: TJSONObject;
+  Body, IdentityBody, FlowBody: TJSONObject;
   Query: TStringList;
   Transport: TAssinafyDefaultTransport;
   Request: TAssinafyRequest;
@@ -48,6 +48,65 @@ begin
     try
       Check(JSONString(JSONFind(Response.Data, 'authorization')) = 'Bearer test-bearer', 'Bearer reaches HTTP server');
       Check(JSONString(JSONFind(Response.Data, 'key')) = '', 'Bearer suppresses API key');
+    finally Response.Free; end;
+    FlowBody := JSONObj(['name', 'Envelope', 'max_total_credits', 1.5,
+      'signers', JSONArr([JSONObj(['id', 'signer', 'embedded', True])]),
+      'documents', JSONArr([JSONObj(['id', 'document', 'signer_ids', JSONArr(['signer'])])])]);
+    try
+      for I := 1 to 2 do
+      begin
+        Response := Client.CreateEnvelope('account', FlowBody, 'envelope-key');
+        try Check(JSONString(JSONFind(Response.Data, 'id')) = 'envelope', 'Envelope idempotent creation');
+        finally Response.Free; end;
+      end;
+    finally FlowBody.Free; end;
+    FlowBody := JSONObj(['name', 'Renamed', 'message', nil]);
+    try
+      Response := Client.UpdateEnvelope('account', 'envelope', FlowBody);
+      Response.Free;
+    finally FlowBody.Free; end;
+    Response := Client.GetEnvelope('account', 'envelope');
+    try
+      Check(JSONString(JSONFind(Response.Data, 'name')) = 'Renamed', 'Envelope update persisted');
+      Check(JSONKind(JSONFind(Response.Data, 'message')) = jtNull, 'Envelope explicit null persisted');
+    finally Response.Free; end;
+    Response := Client.DownloadEnvelopeArtifacts('account', 'envelope', 'bundle');
+    try
+      Check((Response.Header('Content-Type') = 'application/zip') and (Response.JSON = nil), 'Envelope ZIP stays binary');
+      Check((Length(Response.Body) = 6) and (Ord(Response.Body[5]) = 0) and
+        (Ord(Response.Body[6]) = 255), 'Envelope ZIP bytes retained');
+    finally Response.Free; end;
+    Response := Client.CreateEmbedSession('document', 'assignment', 'signer');
+    try Check(JSONString(JSONFind(Response.Data, 'url')) = 'https://sign.example.com/embed/session-token', 'Embed session URL preserved');
+    finally Response.Free; end;
+    FlowBody := JSONObj(['parent_origin', 'https://app.example.com']);
+    try
+      Response := Client.ExchangeEmbedSession('session-token', FlowBody);
+      try Mode := JSONString(JSONFind(Response.Data, 'signer_access_code'));
+      finally Response.Free; end;
+    finally FlowBody.Free; end;
+    Response := Client.GetDocumentAsSigner('document', Mode);
+    Response.Free;
+    FlowBody := JSONObj(['name', 'template document']);
+    try
+      Response := Client.CreateDocumentFromTemplate('account', 'template', FlowBody, 'template-key');
+      Response.Free;
+    finally FlowBody.Free; end;
+    Response := Client.CancelEnvelope('account', 'envelope');
+    try Check(JSONString(JSONFind(Response.Data, 'status')) = 'cancelled', 'Envelope cancellation persisted');
+    finally Response.Free; end;
+    Response := Client.DeleteEnvelope('account', 'envelope');
+    try Check((Response.StatusCode = 204) and (Response.Data = nil), 'Empty envelope deletion response');
+    finally Response.Free; end;
+    try
+      Response := Client.GetEnvelope('account', 'envelope');
+      Response.Free;
+      raise Exception.Create('Deleted envelope still exists');
+    except on E: EAssinafyAPIError do Check(E.StatusCode = 404, 'Deleted envelope is absent'); end;
+    Response := Client.DownloadCertifiedCopy('expired-token');
+    try
+      Check(Response.StatusCode = 302, 'Documented certified-copy redirect is returned');
+      Check(Pos('/trap', Response.Header('Location')) > 0, 'Redirect destination is available');
     finally Response.Free; end;
     Response := Client.RenameDocument('document', Body);
     try Check(JSONString(JSONFind(Response.Data, 'body.name')) = UTF8String('João 😀 & space'), 'PATCH Unicode JSON payload'); finally Response.Free; end;

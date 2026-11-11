@@ -212,6 +212,7 @@ begin
       raise EAssinafyInputError.Create('OAuth resource must match the API origin');
   end;
   Issuer := TrimURLTrailingSlash(Config.Issuer);
+  if Issuer = '' then Issuer := AssinafyOAuthIssuer;
   if (SameText(API.Host, 'api.assinafy.com.br') and SameText(Issuer, 'https://auth-sandbox.assinafy.com.br')) or
     (SameText(API.Host, 'sandbox.assinafy.com.br') and SameText(Issuer, AssinafyOAuthIssuer)) then
     raise EAssinafyInputError.Create('OAuth issuer and API must use the same environment');
@@ -275,6 +276,7 @@ var
   Body: TJSONObject;
 begin
   if Client = nil then raise EAssinafyInputError.Create('Client is required');
+  ValidateEnvironment(Client, Config);
   RequireValue(Config.ClientID, 'Client ID');
   RequireValue(Token, 'Token');
   if (TokenTypeHint <> '') and (TokenTypeHint <> 'access_token') and (TokenTypeHint <> 'refresh_token') then

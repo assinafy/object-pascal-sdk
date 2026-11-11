@@ -1,6 +1,6 @@
 # Assinafy Object Pascal SDK
 
-Cliente nativo para as 118 operações publicadas da [API Assinafy v1](https://api.assinafy.com.br/v1/docs), compatível com Free Pascal/Lazarus e, experimentalmente, Delphi 12+ no Windows. A [referência da API](docs/API.md) contém cada método, parâmetro, payload, resposta, erro e modo de autenticação; [esquemas](docs/SCHEMAS.md), [tipos e helpers](docs/SDK.md) e o [OpenAPI](docs/openapi.json) completam a documentação.
+Cliente nativo para as 147 operações publicadas da [API Assinafy v1](https://api.assinafy.com.br/v1/docs), compatível com Free Pascal/Lazarus e, experimentalmente, Delphi 12+ no Windows. A [referência da API](docs/API.md) contém cada método, parâmetro, payload, resposta, erro e modo de autenticação; [esquemas](docs/SCHEMAS.md), [tipos e helpers](docs/SDK.md) e o [OpenAPI](docs/openapi.json) completam a documentação.
 
 ## Requisitos e instalação
 
@@ -35,6 +35,8 @@ Client.AccessToken := GetEnvironmentVariable('ASSINAFY_ACCESS_TOKEN');
 ```
 
 Métodos públicos omitem credenciais. Métodos de signatário enviam somente o `signer-access-code`; use `ListSignerDocumentsAsWorkspace` e `SearchSignerDocumentsAsWorkspace` quando a mesma rota precisar de credenciais do workspace.
+
+`GetDocument`, downloads de documento/página/miniatura e validação de campos mantêm a autenticação do workspace; suas variantes `AsSigner` exigem o código e omitem credenciais do workspace. `DownloadSignerDocumentArtifact` agora exige `SignerAccessCode`, conforme a API.
 
 ## Fluxo completo do documento
 
@@ -108,6 +110,15 @@ Response := ExchangeCode(OAuthClient, Config, Code, PKCE.Verifier);
 
 [examples/oauth_connect.pas](examples/oauth_connect.pas) demonstra PKCE e troca do código sem persistir credenciais. O SDK não abre navegador/callback, agenda refresh, armazena segredos nem valida JWT.
 
+## Envelopes e assinatura incorporada
+
+1. Envie os PDFs e aguarde `metadata_ready`. Monte `documents` com IDs e `signer_ids`, e `signers` com os IDs, métodos de verificação e canais. Envelopes aceitam até 20 documentos e 20 signatários, sem etapas; certificado exige documento virtual com um signatário.
+2. Chame `EstimateEnvelopeCost` e depois `CreateEnvelope(AccountID, Body, IdempotencyKey)`, com uma chave única por envelope e `max_total_credits` se precisar limitar gastos. A criação envia convites; `200` não garante entrega: confira `notification_history`. `CreateDocumentFromTemplate` também aceita `IdempotencyKey` opcional.
+3. Use `GetEnvelope`, `UpdateEnvelope`, `ListEnvelopeActivities` e `DownloadEnvelopeArtifacts`. Adicionar/remover documentos e cancelar podem notificar destinatários. `DeleteEnvelope` exige documentos encerrados e preserva os documentos individuais.
+4. Para incorporar assinatura, configure origens HTTPS exatas com `AddEmbedOrigin` e envie `embedded: true` no signatário. `signing_urls[].url` será nulo. Crie `CreateEmbedSession`, use sua URL privada no iframe e troque o token com `ExchangeEmbedSession`; a troca é pública e não envia credenciais do workspace. Preserve a verificação do canal e as origens permitidas; não exponha a API key ao navegador.
+
+`GetNotificationPolicy`/`UpdateNotificationPolicy` configuram avisos do workspace; `GetPushPreferences`/`UpdatePushPreferences` tratam preferências push. `SendCertifiedCopy` e `ResendCertifiedCopy` enviam novas cópias ao destinatário. `DownloadCertifiedCopy` pode retornar `302`: leia `Response.Header('Location')`; o SDK não segue o redirecionamento. Contratos completos e restrições OAuth estão em [docs/API.md](docs/API.md).
+
 ## Webhooks assinados
 
 Salve o segredo retornado uma vez por `CreateWebhookEndpoint` ou ao habilitar assinatura em `UpdateWebhookEndpoint`; OAuth não recupera o segredo perdido, mas pode rotacioná-lo. Até três endpoints dependem do plano. `DeleteWebhookEndpointByURL` exige a URL exata.
@@ -121,7 +132,7 @@ Verifique os bytes originais antes do JSON, rejeite timestamps fora de cinco min
 
 ## Contratos, modelos e demais recursos
 
-O SDK inclui documentos, contratos e termos, renovação/encerramento, relações entre contratos, templates, campos, etiquetas, usuários, sessões, MFA, preferências, workspaces, webhooks e artefatos. Não há modelos Pascal que descartem campos: requisições/respostas usam JSON nativo e preservam nulos, arrays, números e extensões futuras. Consulte [docs/API.md](docs/API.md) para os 118 métodos e [docs/SCHEMAS.md](docs/SCHEMAS.md) para os 49 modelos compartilhados.
+O SDK inclui documentos, contratos e termos, renovação/encerramento, relações entre contratos, templates, campos, etiquetas, usuários, sessões, MFA, preferências, workspaces, webhooks e artefatos. Não há modelos Pascal que descartem campos: requisições/respostas usam JSON nativo e preservam nulos, arrays, números e extensões futuras. Consulte [docs/API.md](docs/API.md) para as 147 operações e [docs/SCHEMAS.md](docs/SCHEMAS.md) para os 62 modelos compartilhados.
 
 ## Respostas, erros e testes
 
@@ -131,7 +142,7 @@ Cada `TAssinafyResponse`, body JSON e query criados pelo chamador precisam de `F
 make check
 ```
 
-Esse comando verifica o contrato, compila com warnings como erros e executa testes das 118 operações, OAuth, criptografia, JSON, HTTP/TLS, multipart/binário e exemplos. `make live` exige credenciais sandbox; mutações isoladas usam `ASSINAFY_TEST_MUTATIONS=1` e `ASSINAFY_TEST_PDF`. Testes de consentimento OAuth, OTP, biometria e A1/A3 exigem pessoas/canais/dispositivos próprios e não devem ser simulados em produção.
+Esse comando verifica o contrato, compila com warnings como erros e executa testes das 147 operações, OAuth, criptografia, JSON, HTTP/TLS, multipart/binário e exemplos. `make live` usa sandbox por padrão; produção exige `ASSINAFY_TEST_PRODUCTION=1`. Mutações isoladas exigem também `ASSINAFY_TEST_MUTATIONS=1` e `ASSINAFY_TEST_PDF`; em produção não enviam convites e removem os recursos criados. Testes de consentimento OAuth, OTP, biometria e A1/A3 exigem pessoas/canais/dispositivos próprios e não devem ser simulados em produção.
 
 ## Licença
 

@@ -12,7 +12,7 @@ uses
 type
   TFakeTransport = class(TAssinafyTransport)
   public
-    LastMethod, LastURL, LastAuth, LastFile, LastFileField, LastContentType: string;
+    LastMethod, LastURL, LastAuth, LastFile, LastFileField, LastContentType, LastIdempotencyKey: string;
     LastBody: RawByteString;
     NextStatus, Calls: Integer;
     NextBody: RawByteString;
@@ -47,8 +47,11 @@ begin
   LastBody := Request.Body;
   LastContentType := Request.ContentType;
   LastAuth := 'public';
+  LastIdempotencyKey := '';
   for HeaderLine in Request.Headers do
   begin
+    if Pos('Idempotency-Key: ', HeaderLine) = 1 then
+      LastIdempotencyKey := Copy(HeaderLine, 18, MaxInt);
     if Pos('X-Api-Key:', HeaderLine) = 1 then LastAuth := 'key';
     if Pos('Authorization:', HeaderLine) = 1 then
     begin
@@ -105,6 +108,9 @@ begin
       22: begin Response := Client.DownloadSignerIdentityReviewImage('document', 'assignment', 'signer', '..'); Response.Free; end;
       23: begin Response := Client.DeleteWebhookEndpointByURL(''); Response.Free; end;
       24: begin TestQuery.Clear; TestQuery.Add('url=   '); Response := Client.DeleteWebhookEndpointByURL('', TestQuery); Response.Free; end;
+      25: begin Response := Client.GetDocumentAsSigner('document', ''); Response.Free; end;
+      26: begin Response := Client.DownloadDocumentArtifactAsSigner('document', 'original', ''); Response.Free; end;
+      27: begin Response := Client.CreateEnvelope('', TestBody, 'key' + #13#10 + 'Injected: value'); Response.Free; end;
     end;
     raise Exception.Create(Name + ': expected input error');
   except
@@ -279,6 +285,18 @@ begin
     Response := OldClient.GetUser;
     Response.Free;
     Check(Fake.LastAuth = 'key', 'API key header supported');
+    Response := OldClient.GetDocument('document');
+    Response.Free;
+    Check(Fake.LastAuth = 'key', 'Existing document read keeps workspace authentication');
+    Response := OldClient.DownloadDocumentArtifact('document', 'original');
+    Response.Free;
+    Check(Fake.LastAuth = 'key', 'Existing document download keeps workspace authentication');
+    Response := OldClient.GetDocumentAsSigner('document', 'private code');
+    Response.Free;
+    Check(Fake.LastAuth = 'signer', 'Document signer read suppresses API key');
+    Response := OldClient.DownloadDocumentArtifactAsSigner('document', 'original', 'private code');
+    Response.Free;
+    Check(Fake.LastAuth = 'signer', 'Document signer download suppresses API key');
     Response := OldClient.ListMyAccounts;
     Response.Free;
     Response := OldClient.VerifyASignedDocument('hash');
@@ -600,21 +618,24 @@ begin
   Fake.NextBody := '{"access_token":"access","refresh_token":"replacement","token_type":"Bearer"}';
   try
     for I := 0 to 1 do
-      for J := 0 to 2 do
+      for J := 0 to 3 do
       begin
+        if (J = 3) and (I = 1) then Continue;
         Config.Issuer := Issuers[I];
         Config.Resource := Resources[I];
         case J of
           0: Config.Resource := Resources[1 - I];
           1: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I]; end;
           2: Config.Resource := Resources[I] + ':444';
+          3: begin Config.Resource := ''; Config.Issuer := ''; end;
         end;
-        for Grant := 0 to 1 do
+        for Grant := 0 to 2 do
         begin
           PriorCalls := Fake.Calls;
           try
             if Grant = 0 then Response := ExchangeCode(Clients[I], Config, 'code', StringOfChar('a', 43))
-            else Response := RefreshToken(Clients[I], Config, 'refresh');
+            else if Grant = 1 then Response := RefreshToken(Clients[I], Config, 'refresh')
+            else Response := RevokeToken(Clients[I], Config, 'token');
             Response.Free;
             raise Exception.Create('OAuth environment mismatch accepted');
           except on E: EAssinafyInputError do Check(Fake.Calls = PriorCalls, 'OAuth environment mismatch rejected before transport'); end;
@@ -817,7 +838,7 @@ const
   Channels: array[0..5] of string = ('Email', 'Whatsapp', 'Email', 'Whatsapp', 'Email', 'Whatsapp');
 var
   Method, Channel: string;
-  Body, TemplateBody, Signer: TJSONObject;
+  Body, TemplateBody, Signer, EnvelopeBody: TJSONObject;
   Signers: TJSONArray;
   I: Integer;
   procedure ExpectCertificateMethodError(Action: Integer; RequestBody: TJSONData);
@@ -859,6 +880,20 @@ begin
       Response := Client.CreateAssignment('document', Body);
       Response.Free;
       Check(Fake.LastBody = JSONText(Body), Method + ' assignment payload retained');
+      EnvelopeBody := JSONObj(['name', 'Envelope', 'max_total_credits', 1.5,
+        'signers', JSONArr([JSONObj(['id', 'signer', 'verification_method', Method,
+          'notification_methods', JSONArr([Channel]), 'embedded', True])]),
+        'documents', JSONArr([JSONObj(['id', 'document', 'method', 'virtual',
+          'signer_ids', JSONArr(['signer'])])])]);
+      try
+        Response := Client.EstimateEnvelopeCost('', EnvelopeBody);
+        Response.Free;
+        Check(Fake.LastBody = JSONText(EnvelopeBody), Method + ' envelope estimate retained');
+        Response := Client.CreateEnvelope('', EnvelopeBody, 'unique-key');
+        Response.Free;
+        Check(Fake.LastBody = JSONText(EnvelopeBody), Method + ' envelope payload retained');
+        Check(Fake.LastIdempotencyKey = 'unique-key', 'Envelope idempotency header retained');
+      finally EnvelopeBody.Free; end;
       JSONAdd(Signer, 'role_id', 'role');
       TemplateBody := JSONObj(['signers', Signers.Clone]);
       try
@@ -952,7 +987,7 @@ begin
     Response := Client.GetDocument('doc/with space');
     Response.Free;
     Check(Pos('doc%2Fwith%20space', Fake.LastURL) > 0, 'Path segments encoded');
-    for I := 1 to 24 do ExpectInputError('Input ' + IntToStr(I), I);
+    for I := 1 to 27 do ExpectInputError('Input ' + IntToStr(I), I);
     TestResponses;
     TestAuthenticationAndURLs;
     TestUploadLimits;
@@ -966,7 +1001,7 @@ begin
     {$IFDEF FPC}TestNativeFPCCompatibility;{$ENDIF}
     TestSigningMethods;
     TestIdentityVerification;
-    WriteLn('PASS: ', Checks, ' checks across all 118 API operations, responses, OAuth and webhooks');
+    WriteLn('PASS: ', Checks, ' checks across all 147 API operations, responses, OAuth and webhooks');
   finally
     TestQuery.Free;
     TestBody.Free;

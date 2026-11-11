@@ -125,7 +125,60 @@ class Handler(BaseHTTPRequestHandler):
             'method': self.command, 'path': self.path,
             'key': self.headers.get('X-Api-Key', ''),
             'authorization': self.headers.get('Authorization', ''),
+            'idempotency_key': self.headers.get('Idempotency-Key', ''),
         }
+        if path.startswith('/v1/accounts/account/envelopes'):
+            check(data['authorization'] == 'Bearer test-bearer' and not data['key'], 'Envelope workspace credentials')
+            envelope = self.server.envelope
+            if self.command == 'POST' and path == '/v1/accounts/account/envelopes':
+                check(data['idempotency_key'] == 'envelope-key', 'Envelope idempotency header')
+                sent = json.loads(raw)
+                check(sent['documents'][0]['signer_ids'] == ['signer'], 'Envelope signer mapping')
+                check(sent['signers'][0]['embedded'] is True, 'Embedded signer flag')
+                check(sent['max_total_credits'] == 1.5, 'Credit ceiling preserved')
+                if envelope is None:
+                    self.server.envelope = envelope = sent | {'id': 'envelope', 'status': 'open'}
+                data = envelope
+            elif envelope is None:
+                self.respond(404, b'{"status":404,"data":null}')
+                return
+            elif path.endswith('/download/bundle'):
+                check('application/zip' in self.headers.get('Accept', ''), 'Envelope ZIP media type accepted')
+                self.respond(200, b'PK\x03\x04\x00\xff', 'application/zip')
+                return
+            elif self.command == 'PATCH':
+                envelope.update(json.loads(raw))
+                data = envelope
+            elif path.endswith('/cancel'):
+                check(self.command == 'PUT', 'Envelope cancellation verb')
+                envelope['status'] = 'cancelled'
+                data = envelope
+            elif self.command == 'DELETE':
+                check(envelope['status'] == 'cancelled', 'Only closed envelope deleted')
+                self.server.envelope = None
+                self.respond(204, b'')
+                return
+            else:
+                data = envelope
+        if path == '/v1/documents/document/assignments/assignment/signers/signer/embed-sessions':
+            check(self.command == 'POST' and data['authorization'] == 'Bearer test-bearer', 'Embed session creation')
+            data = {'url': 'https://sign.example.com/embed/session-token', 'expires_at': '2030-01-01T12:00:00Z'}
+        if path == '/v1/embed/sessions/session-token/exchange':
+            check(self.command == 'POST' and not data['authorization'] and not data['key'], 'Public embed exchange')
+            check(json.loads(raw)['parent_origin'] == 'https://app.example.com', 'Embed parent origin')
+            data = {'signer_access_code': 'embedded-code', 'document_id': 'document',
+                    'signer_id': 'signer', 'verification_method': 'Email',
+                    'embed_origins': ['https://app.example.com']}
+        if path == '/v1/documents/document' and 'signer-access-code' in parse_qs(urlsplit(self.path).query):
+            check(not data['authorization'] and not data['key'], 'Signer document omits workspace authentication')
+            check(parse_qs(urlsplit(self.path).query)['signer-access-code'] == ['embedded-code'], 'Exchanged code reaches document')
+        if path == '/v1/accounts/account/templates/template/documents':
+            check(data['idempotency_key'] == 'template-key', 'Template idempotency header')
+            check(json.loads(raw) == {'name': 'template document'}, 'Template JSON body')
+        if path == '/v1/signers/downloads/expired-token':
+            check(not data['authorization'] and not data['key'], 'Certified copy omits workspace credentials')
+            self.respond(302, b'', 'text/html', {'Location': f'http://127.0.0.1:{self.server.server_port}/trap'})
+            return
         review_path = '/v1/documents/review-doc/assignments/assignment/signers/signer/identity-verification'
         if path == '/v1/signers/identity-verification':
             check(not data['key'] and not data['authorization'], 'Identity capture must omit workspace credentials')
@@ -160,7 +213,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/v1/documents/html-error':
             status = 503
             content_type = 'text/html'
-        elif self.command == 'POST' and (path.endswith(('/documents', '/logo')) or path == '/v1/snapshot'):
+        elif self.command == 'POST' and path in {'/v1/accounts/account/documents', '/v1/accounts/account/logo', '/v1/snapshot'}:
             media = self.headers['Content-Type']
             check(isinstance(media, str) and media.startswith('multipart/form-data; boundary='), 'Expected multipart body')
             message = BytesParser(policy=policy.default).parsebytes(
@@ -182,7 +235,7 @@ class Handler(BaseHTTPRequestHandler):
             check(self.headers['Content-Type'] == 'image/png', 'Expected raw PNG content type')
             check('signer-access-code=signer-code' in self.path, 'Expected signer code')
             data['raw_file_valid'] = raw == FILE_BYTES
-        elif self.command == 'PATCH':
+        elif self.command == 'PATCH' and not path.startswith('/v1/accounts/account/envelopes'):
             check(self.headers['Content-Type'] == 'application/json', 'Expected JSON content type')
             data['body'] = json.loads(raw)
         if path.startswith(review_path + '/images/'):
@@ -242,6 +295,7 @@ def main():
             server.redirect_followed = False
             server.slow_requests = 0
             server.fixture = fixture
+            server.envelope = None
             threading.Thread(target=server.serve_forever, daemon=True).start()
         thumbprint = hashlib.sha1(ssl.PEM_cert_to_DER_cert(certificate.read_text(encoding='utf-8'))).hexdigest()
         added = False

@@ -21,6 +21,8 @@ SECURITY_MODES = {
 MULTIPART_MEDIA = {'/v1/accounts/{accountId}/documents': 'application/pdf',
                    '/v1/accounts/{accountId}/logo': 'application/octet-stream'}
 CERTIFICATE_METHOD_VALIDATION = {'CreateAssignment', 'EstimateAssignmentCost'}
+WORKSPACE_FIRST = {'GetDocument', 'DownloadDocumentArtifact', 'ValidateFieldValue',
+                   'ValidateMultipleFieldValues', 'DownloadDocumentThumbnail', 'DownloadDocumentPage'}
 DIRECT_CERTIFICATE_NOTE = (
     '`DigitalCertificate` signers require `method: virtual`; certificate completion handles the '
     "signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. "
@@ -46,6 +48,20 @@ OVERRIDES = {
     "List signer's documents": 'ListSignerDocuments',
     "Search signer's documents": 'SearchSignerDocuments',
     "Download signer's document artifact": 'DownloadSignerDocumentArtifact',
+    'Download the document to sign': 'DownloadSignerDocumentArtifact',
+    'Create an embed session': 'CreateEmbedSession',
+    'Exchange an embed session': 'ExchangeEmbedSession',
+    'Take document out of envelope': 'RemoveDocumentFromEnvelope',
+    'Get the workspace notification policy': 'GetNotificationPolicy',
+    'Update the workspace notification policy': 'UpdateNotificationPolicy',
+    'Get my push notification preferences': 'GetPushPreferences',
+    'Update my push notification preferences': 'UpdatePushPreferences',
+    'Workspace brand for the signing page': 'GetSigningTheme',
+    'Workspace logo for the signing page': 'GetSigningLogo',
+    'Send the certified copy again': 'SendCertifiedCopy',
+    'Download the certified copy from a sent link': 'DownloadCertifiedCopy',
+    'Send the certified copy again from an expired link': 'ResendCertifiedCopy',
+    'Send a test delivery': 'SendWebhookTestDelivery',
     'Identity document verification status': 'GetIdentityVerificationStatus',
     'Start identity document verification': 'StartIdentityVerification',
     'Signer identity review': 'GetSignerIdentityReview',
@@ -90,6 +106,11 @@ def operations():
             names.add(name.lower())
             parameters = list({(x['in'], x['name']): x for x in map(resolve,
                               item.get('parameters', []) + operation.get('parameters', []))}.values())
+            for parameter in parameters:
+                if parameter['in'] not in {'path', 'query'} and not (
+                        parameter['in'] == 'header' and parameter['name'] == 'Idempotency-Key'):
+                    raise ValueError(f'Unsupported parameter: {parameter["name"]}')
+            idempotency = any(x['in'] == 'header' for x in parameters)
             path_names = re.findall(r'\{([^}]+)\}', path)
             if set(path_names) != {x['name'] for x in parameters if x['in'] == 'path'}:
                 raise ValueError(f'Path parameters do not match URI: {path}')
@@ -159,6 +180,8 @@ def operations():
                 args.append(('Query', 'TStrings', 'nil'))
             if custom_media:
                 args.append(('ContentType', 'string', "'application/octet-stream'"))
+            if idempotency:
+                args.append(('IdempotencyKey', 'string', "''"))
             op = {
                 'name': name, 'path': path, 'verb': verb.upper(), 'op': operation,
                 'parameters': parameters, 'paths': paths, 'auth': auth, 'args': args,
@@ -166,12 +189,27 @@ def operations():
                 'signer': signer, 'content': content,
                 'file_field': file_field, 'media_type': media_type,
                 'required_body': body_spec.get('required', False),
-                'custom_media': custom_media, 'workspace_of': '',
+                'custom_media': custom_media, 'workspace_of': '', 'signer_of': '',
+                'idempotency': idempotency, 'redirect': '302' in operation.get('responses', {}),
             }
-            yield op
-            if signer and api:
+            if signer and api and name in WORKSPACE_FIRST:
+                # Preserve workspace calls when the API adds signer access to an existing route.
+                yield op | {'auth': 'aaAPI', 'signer': False,
+                            'args': [x for x in args if x[0] != 'SignerAccessCode']}
+                variant = name + 'AsSigner'
+                if variant.lower() in names:
+                    raise ValueError(f'Duplicate Pascal method: {variant}')
+                names.add(variant.lower())
+                yield op | {'name': variant, 'auth': 'aaSigner', 'signer_of': name,
+                            'args': [(n, t, None if n == 'SignerAccessCode' else d)
+                                     for n, t, d in args]}
+            else:
+                yield op
+            if signer and api and name not in WORKSPACE_FIRST:
                 # Signer-code methods never fall back to workspace credentials;
                 # workspace access to the same route is a separate explicit method.
+                if (name + 'AsWorkspace').lower() in names:
+                    raise ValueError(f'Duplicate Pascal method: {name}AsWorkspace')
                 names.add((name + 'AsWorkspace').lower())
                 yield op | {'name': name + 'AsWorkspace', 'auth': 'aaAPI', 'signer': False,
                             'workspace_of': name,
@@ -202,7 +240,7 @@ def path_expression(op):
 def generate_methods(ops):
     declarations, implementations, checks = [], [], []
     for op in ops:
-        variant = ' (workspace credentials)' if op['workspace_of'] else ''
+        variant = ' (workspace credentials)' if op['workspace_of'] else ' (signer credentials)' if op['signer_of'] else ''
         declarations.append(f"    // {op['verb']} {op['path']}{variant}; payloads: docs/API.md#{op['name'].lower()}")
         declarations.append(f"    function {op['name']}{signature(op)}: TAssinafyResponse;")
         impl = [f"function TAssinafyClient.{op['name']}{signature(op, False)}: TAssinafyResponse;", 'begin']
@@ -223,7 +261,10 @@ def generate_methods(ops):
         media = "'" + op['media_type'].replace("'", "''") + "'"
         request_media = 'ContentType' if op['custom_media'] else media
         impl.append(f"  Result := Call('{op['verb']}', {path_expression(op)}, {op['auth']},")
-        impl.append(f"    {'Query' if op['query'] else 'nil'}, {'Body' if op['body'] else 'nil'}, {'FileName' if op['file'] else chr(39)*2}, {field}, {request_media}, {'SignerAccessCode' if op['signer'] else chr(39)*2});")
+        extra = ', IdempotencyKey' if op['idempotency'] else ", ''" if op['redirect'] else ''
+        if op['redirect']:
+            extra += ', True'
+        impl.append(f"    {'Query' if op['query'] else 'nil'}, {'Body' if op['body'] else 'nil'}, {'FileName' if op['file'] else chr(39)*2}, {field}, {request_media}, {'SignerAccessCode' if op['signer'] else chr(39)*2}{extra});")
         impl += ['end;', '']
         implementations.extend(impl)
         args = []
@@ -257,6 +298,8 @@ def generate_methods(ops):
             checks.append(f"  Check(Fake.LastFileField = {field}, '{op['name']} file field');")
         if op['file'] or op['body']:
             checks.append(f"  Check(Fake.LastContentType = {media}, '{op['name']} content type');")
+        if op['idempotency']:
+            checks.append(f"  Check(Fake.LastIdempotencyKey = 'IdempotencyKey', '{op['name']} idempotency header');")
         checks.append('')
     return {
         'src/resources.inc': '\n'.join(declarations) + '\n',
@@ -327,6 +370,12 @@ def generate_docs(ops):
             lines += [SDK_OPERATION_NOTES[op['name']], '']
         if op['workspace_of']:
             lines += [f"Workspace-credential form of [{op['workspace_of']}](#{op['workspace_of'].lower()}): it sends the API key or bearer token and never a signer access code.", '']
+        if op['signer_of']:
+            lines += [f"Signer-code form of [{op['signer_of']}](#{op['signer_of'].lower()}): workspace credentials are omitted.", '']
+        if op['name'] in WORKSPACE_FIRST:
+            lines += [f"For signer-code access use [{op['name']}AsSigner](#{op['name'].lower()}assigner). Existing calls keep workspace authentication.", '']
+        if op['redirect']:
+            lines += ['A documented `302` is returned as a response. Read `Response.Header(\'Location\')`; the SDK does not follow it or forward credentials.', '']
         auth = {'aaPublic': 'Public: workspace credentials are omitted.', 'aaAPI': 'API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.', 'aaSigner': 'Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.', 'aaSignerOrAPI': f"Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [{op['name']}AsWorkspace](#{op['name'].lower()}asworkspace).", 'aaBearer': 'Required bearer access token (`Client.AccessToken`).'}[op['auth']]
         lines += ['**Authentication:** ' + auth, '', '**Parameters:**']
         if op['custom_media']:

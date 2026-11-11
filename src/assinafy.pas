@@ -9,7 +9,7 @@ uses
   Classes, SysUtils, AssinafyJson, AssinafyHttp;
 
 const
-  AssinafyVersion = '0.5.1';
+  AssinafyVersion = '0.6.0';
   AssinafyProductionURL = 'https://api.assinafy.com.br/v1';
   AssinafySandboxURL = 'https://sandbox.assinafy.com.br/v1';
 
@@ -27,7 +27,8 @@ type
     procedure SetAccessToken(const Value: string);
     function Call(const Method, Path: string; Auth: TAssinafyAuth;
       Query: TStrings; Body: TJSONData; const FileName, FileField, ContentType,
-      SignerAccessCode: string): TAssinafyResponse;
+      SignerAccessCode: string; const IdempotencyKey: string = '';
+      AllowRedirect: Boolean = False): TAssinafyResponse;
   public
     constructor Create(const AAPIKey: string = ''; const AAccountID: string = '';
       const ABaseURL: string = AssinafyProductionURL; Transport: TAssinafyTransport = nil);
@@ -133,7 +134,8 @@ end;
 
 function TAssinafyClient.Call(const Method, Path: string; Auth: TAssinafyAuth;
   Query: TStrings; Body: TJSONData; const FileName, FileField, ContentType,
-  SignerAccessCode: string): TAssinafyResponse;
+  SignerAccessCode: string; const IdempotencyKey: string;
+  AllowRedirect: Boolean): TAssinafyResponse;
 var
   Request: TAssinafyRequest;
   Headers: TStringList;
@@ -145,8 +147,13 @@ begin
   Result := nil;
   try
     try
-      Headers.Add('Accept: application/json, application/pdf, image/*, application/octet-stream');
+      Headers.Add('Accept: application/json, application/pdf, application/zip, image/*, application/octet-stream');
       Headers.Add('User-Agent: assinafy-object-pascal/' + AssinafyVersion);
+      if IdempotencyKey <> '' then
+      begin
+        RequireValue(IdempotencyKey, 'Idempotency key');
+        Headers.Add('Idempotency-Key: ' + IdempotencyKey);
+      end;
       Params := EncodeQuery(Query);
       if Query <> nil then
         for I := 0 to Query.Count - 1 do
@@ -204,7 +211,8 @@ begin
             if (Result.StatusCode >= 200) and (Result.StatusCode < 300) then raise;
         end;
       end;
-      if (Result.StatusCode < 200) or (Result.StatusCode >= 300) then
+      if ((Result.StatusCode < 200) or (Result.StatusCode >= 300)) and
+        not (AllowRedirect and (Result.StatusCode = 302)) then
         raise EAssinafyAPIError.Create(Result);
     except
       FreeAndNil(Result);

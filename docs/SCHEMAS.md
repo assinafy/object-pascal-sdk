@@ -53,6 +53,43 @@ Complete shared request and response schemas from the [published API](https://ap
         "null"
       ],
       "example": null
+    },
+    "code": {
+      "description": "On the refusals a client can act on: see Reading a refusal. Other refusals have only `message`.",
+      "type": "string",
+      "example": "PlanRestricted"
+    },
+    "errors": {
+      "description": "On a `400` about a field (a model's validation, a missing or an unknown field): one entry per field in error; `message` stays the first entry's. Other `400`s have only `message`. See Reading a refusal.",
+      "type": "array",
+      "items": {
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "field": {
+            "description": "The field as sent, a dot for a nested one (`address.line1`); `null` when the request as a whole is refused.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "full_name"
+          },
+          "code": {
+            "description": "`Required`, `UnknownField` or `Invalid`; the contract endpoints have codes of their own.",
+            "type": "string",
+            "example": "Required"
+          },
+          "message": {
+            "description": "In the platform's language.",
+            "type": "string",
+            "example": "Full Name cannot be blank."
+          }
+        },
+        "type": "object"
+      }
     }
   },
   "type": "object"
@@ -65,7 +102,15 @@ Complete shared request and response schemas from the [published API](https://ap
 {
   "status": 400,
   "message": "Bad request.",
-  "data": null
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
 }
 ```
 
@@ -243,7 +288,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "null"
       ],
       "format": "email",
-      "example": "john@example.com"
+      "example": "developer@example.com"
     },
     "whatsapp_phone_number": {
       "description": "E.164 format; normalized on save.",
@@ -277,7 +322,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "resource": "signer",
   "id": "62d6ee35c7741ca4006b9e11",
   "full_name": "John Signer",
-  "email": "john@example.com",
+  "email": "developer@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "39053344705",
   "has_accepted_terms": false
@@ -336,7 +381,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "resource": "signer",
   "id": "62d6ee35c7741ca4006b9e11",
   "full_name": "John Signer",
-  "email": "john@example.com",
+  "email": "developer@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "39053344705",
   "has_accepted_terms": false,
@@ -586,6 +631,14 @@ Complete shared request and response schemas from the [published API](https://ap
           },
           "name": {
             "type": "string"
+          },
+          "color": {
+            "description": "6-char hex without leading #.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "ff8800"
           }
         },
         "type": "object"
@@ -608,6 +661,35 @@ Complete shared request and response schemas from the [published API](https://ap
       "items": {
         "$ref": "#/components/schemas/DocumentPage"
       }
+    },
+    "envelope_id": {
+      "description": "Only on `GET /v1/documents/{documentId}?expand=envelope_id` read by the workspace, not in document lists or webhooks, so their payloads keep their shape: the envelope this document is in, or `null` for a document sent on its own, taken out of its envelope, or whose envelope was deleted.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": null
+    },
+    "envelope": {
+      "description": "Only on `GET /v1/documents/{documentId}?expand=envelope` read by the workspace and `GET /v1/sign?expand=envelope` or `GET /v1/signers/{signerId}/document?expand=envelope` read with the signer's code, not in document lists or webhooks: the envelope this document is in, or `null` for a document sent on its own, taken out of its envelope, or whose envelope was deleted. The signer's reads name the envelope their code belongs to even when the code's own document was taken out, since the code still reaches the rest.",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "fe1c140cb49b79f940aab95fddd"
+        },
+        "name": {
+          "type": "string",
+          "example": "Contrato de prestação de serviços"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "has_contract": {
       "description": "Only on `GET /v1/documents/{documentId}` read by the workspace, while the environment has contract tracking on: not with a signer's access code, not in document lists or webhooks, and left out when the lookup fails, so a missing key means unknown. Whether `GET /v1/accounts/{accountId}/documents/{documentId}/contract` answers with contract terms, the document's own or those of a contract it amends whose document still exists, so a page can lay out the contract section before reading it.",
@@ -651,7 +733,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "resource": "signer",
     "id": "62d6ee35c7741ca4006b9e11",
     "full_name": "John Signer",
-    "email": "john@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": "39053344705",
     "has_accepted_terms": false
@@ -659,7 +741,8 @@ Complete shared request and response schemas from the [published API](https://ap
   "tags": [
     {
       "id": "<string>",
-      "name": "<string>"
+      "name": "<string>",
+      "color": "ff8800"
     }
   ],
   "assignment": {
@@ -676,7 +759,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "resource": "signer",
         "id": "62d6ee35c7741ca4006b9e11",
         "full_name": "John Signer",
-        "email": "john@example.com",
+        "email": "developer@example.com",
         "whatsapp_phone_number": "+5548999990000",
         "government_id": "39053344705",
         "has_accepted_terms": false,
@@ -691,11 +774,11 @@ Complete shared request and response schemas from the [published API](https://ap
         "notification_history": [
           {
             "event": "signature_request",
-            "status": "sent",
-            "error_code": "<string>",
-            "error_message": "<string>",
+            "status": "failed",
+            "error_code": "MailboxFull",
+            "error_message": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail.",
             "sent_at": "2026-07-07T12:00:00Z",
-            "failed_at": null
+            "failed_at": "2026-07-07T12:05:00Z"
           }
         ]
       }
@@ -730,7 +813,8 @@ Complete shared request and response schemas from the [published API](https://ap
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "embedded": false
       }
     ]
   },
@@ -743,9 +827,266 @@ Complete shared request and response schemas from the [published API](https://ap
       "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
     }
   ],
+  "envelope_id": null,
+  "envelope": {
+    "id": "fe1c140cb49b79f940aab95fddd",
+    "name": "Contrato de prestação de serviços"
+  },
   "has_contract": true,
   "created_at": "2026-06-03T03:54:16Z",
   "updated_at": "2026-06-03T03:54:16Z"
+}
+```
+
+## SigningDocument
+
+```json
+{
+  "description": "The document as its signer reads it with the access code: the document with `current_signer`, `is_signer_access_closed` and `certified_copy`. Once the code is closed, only `id`, `name`, `status` and these three, and `envelope` when asked for.",
+  "required": [
+    "id",
+    "name",
+    "status",
+    "current_signer",
+    "is_signer_access_closed",
+    "certified_copy"
+  ],
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Document"
+    },
+    {
+      "properties": {
+        "current_signer": {
+          "description": "This signer. Once the code is closed, only `id` and the last three.",
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Signer"
+            },
+            {
+              "properties": {
+                "verification_method": {
+                  "description": "This signature request's verification method.",
+                  "type": "string",
+                  "example": "Email"
+                },
+                "notification_methods": {
+                  "description": "This signature request's notification methods; `null` on requests stored before they were recorded.",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  },
+                  "example": [
+                    "Email"
+                  ]
+                },
+                "completed": {
+                  "description": "Whether this signer has signed.",
+                  "type": "boolean",
+                  "example": false
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "is_signer_access_closed": {
+          "description": "Whether the code is closed.",
+          "type": "boolean",
+          "example": false
+        },
+        "certified_copy": {
+          "description": "Whether the signer can ask for the certified copy again (`POST /v1/sign/certified-copy`).",
+          "required": [
+            "available",
+            "notification_method",
+            "resends_left"
+          ],
+          "properties": {
+            "available": {
+              "type": "boolean",
+              "example": false
+            },
+            "notification_method": {
+              "description": "The channel it goes on; `null` when there is none.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "Email",
+                "Whatsapp",
+                null
+              ],
+              "example": "Email"
+            },
+            "resends_left": {
+              "description": "WhatsApp re-sends left; `null` for e-mail.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "example": null
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "resource": "document",
+  "id": "615601fab04c0a3147bb1246",
+  "account_id": "d199996981dbd199996981db",
+  "template_id": null,
+  "name": "document.pdf",
+  "status": "metadata_ready",
+  "artifacts": {
+    "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+  },
+  "is_closed": false,
+  "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+  "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+  "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
+  "decline_reason": null,
+  "declined_by": {
+    "resource": "signer",
+    "id": "62d6ee35c7741ca4006b9e11",
+    "full_name": "John Signer",
+    "email": "developer@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": "39053344705",
+    "has_accepted_terms": false
+  },
+  "tags": [
+    {
+      "id": "<string>",
+      "name": "<string>",
+      "color": "ff8800"
+    }
+  ],
+  "assignment": {
+    "resource": "assignment",
+    "id": "615606ef81d199996981dbce",
+    "document_id": "615601fab04c0a3147bb1246",
+    "created_at": "2026-06-03T03:54:16Z",
+    "sender_email": "sender@example.com",
+    "method": "virtual",
+    "expires_at": null,
+    "message": "<string>",
+    "signers": [
+      {
+        "resource": "signer",
+        "id": "62d6ee35c7741ca4006b9e11",
+        "full_name": "John Signer",
+        "email": "developer@example.com",
+        "whatsapp_phone_number": "+5548999990000",
+        "government_id": "39053344705",
+        "has_accepted_terms": false,
+        "verification_method": "Email",
+        "notification_methods": [
+          "Email"
+        ],
+        "step": 1,
+        "notified": false,
+        "identity_verification_status": "InReview",
+        "completed": false,
+        "notification_history": [
+          {
+            "event": "signature_request",
+            "status": "failed",
+            "error_code": "MailboxFull",
+            "error_message": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail.",
+            "sent_at": "2026-07-07T12:00:00Z",
+            "failed_at": "2026-07-07T12:05:00Z"
+          }
+        ]
+      }
+    ],
+    "copy_receivers": [
+      {}
+    ],
+    "items": [
+      {
+        "id": "<string>",
+        "page": {
+          "id": "615601faf166d6d1d8e7dc30",
+          "number": 1,
+          "height": 2100,
+          "width": 1275,
+          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        },
+        "signer": {},
+        "field": {},
+        "display_settings": "<string>",
+        "value": "<string>",
+        "completed": false
+      }
+    ],
+    "summary": {
+      "signer_count": 1,
+      "completed_count": 1,
+      "signers": [
+        {}
+      ]
+    },
+    "signing_urls": [
+      {
+        "signer_id": "<string>",
+        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "embedded": false
+      }
+    ]
+  },
+  "pages": [
+    {
+      "id": "615601faf166d6d1d8e7dc30",
+      "number": 1,
+      "height": 2100,
+      "width": 1275,
+      "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+    }
+  ],
+  "envelope_id": null,
+  "envelope": {
+    "id": "fe1c140cb49b79f940aab95fddd",
+    "name": "Contrato de prestação de serviços"
+  },
+  "has_contract": true,
+  "created_at": "2026-06-03T03:54:16Z",
+  "updated_at": "2026-06-03T03:54:16Z",
+  "current_signer": {
+    "resource": "signer",
+    "id": "62d6ee35c7741ca4006b9e11",
+    "full_name": "John Signer",
+    "email": "developer@example.com",
+    "whatsapp_phone_number": "+5548999990000",
+    "government_id": "39053344705",
+    "has_accepted_terms": false,
+    "verification_method": "Email",
+    "notification_methods": [
+      "Email"
+    ],
+    "completed": false
+  },
+  "is_signer_access_closed": false,
+  "certified_copy": {
+    "available": false,
+    "notification_method": "Email",
+    "resends_left": null
+  }
 }
 ```
 
@@ -813,6 +1154,44 @@ Complete shared request and response schemas from the [published API](https://ap
       },
       "type": "object"
     },
+    "signing_features": {
+      "description": "Only with `?expand=signing_features` on `GET /v1/accounts/{accountId}`: which signing features the workspace's subscription includes now (its plan's and any granted to it), so a client offers only the identity checks and notices it can use. `DigitalCertificate` and `VerificationIdDocumentFaceMatchBasic` gate the `DigitalCertificate` and `IdDocumentFaceMatchBasic` verification methods, `WhatsappNotification` the `Whatsapp` notification method (and so the `Whatsapp` verification method), and `VerificationBypass` the `Bypass` verification method. `false` means creating an assignment, or a document from a template, with that method (or estimating its cost) answers `403`. `Embed` gates embedded signing: with `false`, the embed origins endpoints, `\"embedded\": true` on a signer and minting an embed session answer `403` with code `PlanRestricted`. `true` is not a promise: credits, the assignment's own rules (a `DigitalCertificate` signer needs a `virtual` assignment) and a change of plan still apply. Requires the `account:read` OAuth scope.",
+      "required": [
+        "DigitalCertificate",
+        "VerificationIdDocumentFaceMatchBasic",
+        "WhatsappNotification",
+        "VerificationBypass",
+        "Embed"
+      ],
+      "properties": {
+        "DigitalCertificate": {
+          "description": "Signing with the signer's own ICP-Brasil certificate.",
+          "type": "boolean",
+          "example": true
+        },
+        "VerificationIdDocumentFaceMatchBasic": {
+          "description": "Identity check by ID document and face match.",
+          "type": "boolean",
+          "example": false
+        },
+        "WhatsappNotification": {
+          "description": "Sending signature requests by WhatsApp.",
+          "type": "boolean",
+          "example": true
+        },
+        "VerificationBypass": {
+          "description": "Signing without a verification code (the `Bypass` verification method).",
+          "type": "boolean",
+          "example": false
+        },
+        "Embed": {
+          "description": "Embedded signing: the signing screen inside your own app (see **Embedded Signing Guide**).",
+          "type": "boolean",
+          "example": false
+        }
+      },
+      "type": "object"
+    },
     "created_at": {
       "type": "string",
       "format": "date-time",
@@ -839,6 +1218,13 @@ Complete shared request and response schemas from the [published API](https://ap
   "is_delete_allowed": true,
   "limits": {
     "webhook_endpoints": 1
+  },
+  "signing_features": {
+    "DigitalCertificate": true,
+    "VerificationIdDocumentFaceMatchBasic": false,
+    "WhatsappNotification": true,
+    "VerificationBypass": false,
+    "Embed": false
   },
   "created_at": "2026-06-03T03:54:16Z"
 }
@@ -971,9 +1357,29 @@ Complete shared request and response schemas from the [published API](https://ap
 
 ```json
 {
-  "description": "The contract terms tracked on a document.",
+  "description": "The contract terms tracked on a document. Every key below is always present, `null` when it holds no value, except `resource`, `document` and `amendments`, which depend on the response.",
+  "required": [
+    "document_id",
+    "status",
+    "counterparty_name",
+    "counterparty_taxpayer_id",
+    "value",
+    "currency",
+    "start_date",
+    "end_date",
+    "auto_renew",
+    "renewal_term_months",
+    "notice_period_days",
+    "term",
+    "owner_id",
+    "metadata",
+    "external_references",
+    "created_at",
+    "updated_at"
+  ],
   "properties": {
     "resource": {
+      "description": "On a response that is this contract alone; list items carry none.",
       "type": "string",
       "example": "document_contract"
     },
@@ -1070,7 +1476,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "d6zqpbyog2v3xvxerwn8la94"
     },
     "metadata": {
-      "description": "Up to 50 keys of your own, each holding text of at most 500 characters; `null` when there are none. A key ending in `_at` cannot hold a number: the API returns numbers under such keys as dates.",
+      "description": "Up to 50 keys of your own, each holding text of at most 500 characters; `null` when there are none. Values come back exactly as sent. A key ending in `_at`, or `stuck_since`, cannot hold a number.",
       "type": [
         "object",
         "null"
@@ -1083,9 +1489,13 @@ Complete shared request and response schemas from the [published API](https://ap
       }
     },
     "external_references": {
-      "description": "IDs outside systems use for this contract, ordered by system and id.",
+      "description": "IDs outside systems use for this contract, ordered by system and id; `[]` when there are none.",
       "type": "array",
       "items": {
+        "required": [
+          "system",
+          "id"
+        ],
         "properties": {
           "system": {
             "type": "string",
@@ -1104,7 +1514,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "description": "Only with `expand=document`: the document the terms are tracked on."
     },
     "amendments": {
-      "description": "Only on the single-contract read: the documents that amend, renew or terminate this contract, the applied ones first by `number`, then the pending ones.",
+      "description": "Only on the contract read and the related read (`GET …/contract`, `GET …/contract/related`), never on the list or on the answer to a write, renewal or termination: the documents that amend, renew or terminate this contract, the applied ones first by `number`, then the pending ones.",
       "type": "array",
       "items": {
         "$ref": "#/components/schemas/DocumentContractAmendment"
@@ -1171,7 +1581,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "john@example.com",
+      "email": "developer@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false
@@ -1179,7 +1589,8 @@ Complete shared request and response schemas from the [published API](https://ap
     "tags": [
       {
         "id": "<string>",
-        "name": "<string>"
+        "name": "<string>",
+        "color": "ff8800"
       }
     ],
     "assignment": {
@@ -1196,7 +1607,7 @@ Complete shared request and response schemas from the [published API](https://ap
           "resource": "signer",
           "id": "62d6ee35c7741ca4006b9e11",
           "full_name": "John Signer",
-          "email": "john@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": "39053344705",
           "has_accepted_terms": false,
@@ -1211,11 +1622,11 @@ Complete shared request and response schemas from the [published API](https://ap
           "notification_history": [
             {
               "event": "signature_request",
-              "status": "sent",
-              "error_code": "<string>",
-              "error_message": "<string>",
+              "status": "failed",
+              "error_code": "MailboxFull",
+              "error_message": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail.",
               "sent_at": "2026-07-07T12:00:00Z",
-              "failed_at": null
+              "failed_at": "2026-07-07T12:05:00Z"
             }
           ]
         }
@@ -1250,7 +1661,8 @@ Complete shared request and response schemas from the [published API](https://ap
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "embedded": false
         }
       ]
     },
@@ -1263,6 +1675,11 @@ Complete shared request and response schemas from the [published API](https://ap
         "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
+    "envelope_id": null,
+    "envelope": {
+      "id": "fe1c140cb49b79f940aab95fddd",
+      "name": "Contrato de prestação de serviços"
+    },
     "has_contract": true,
     "created_at": "2026-06-03T03:54:16Z",
     "updated_at": "2026-06-03T03:54:16Z"
@@ -1500,9 +1917,26 @@ Complete shared request and response schemas from the [published API](https://ap
 
 ```json
 {
-  "description": "A document that amends, renews or terminates a contract: its link and the terms it changes. The parent's terms take the delta once this document is certificated; until then the parent is untouched.",
+  "description": "A document that amends, renews or terminates a contract: its link and the terms it changes. The parent's terms take the delta once this document is certificated; until then the parent is untouched. Every key below is always present, `null` when it holds no value, except `resource`.",
+  "required": [
+    "document_id",
+    "document_name",
+    "parent_document_id",
+    "relation_type",
+    "number",
+    "status",
+    "document_status",
+    "apply_error",
+    "currency",
+    "terms",
+    "changes",
+    "applied_at",
+    "created_at",
+    "updated_at"
+  ],
   "properties": {
     "resource": {
+      "description": "On a response that is this amendment alone; the entries of a contract's `amendments` carry none.",
       "type": "string",
       "example": "document_contract_amendment"
     },
@@ -1663,13 +2097,23 @@ Complete shared request and response schemas from the [published API](https://ap
 
 ```json
 {
+  "description": "One entry per signer whose turn has come. The link depends on how the signer gets the invitation: with `Email` it is a page that does not open the document by itself, where the signer asks for their invitation again by e-mail; with `Whatsapp` only it is `null` (the signer has their link in the WhatsApp message). An embedded signer (`embedded: true`) never gets a link: `url` is `null` and the integrator mints an embed session for them instead.",
   "properties": {
     "signer_id": {
       "type": "string"
     },
     "url": {
-      "type": "string",
+      "description": "See the schema description. `null` for a signer notified only by WhatsApp and for an embedded signer.",
+      "type": [
+        "string",
+        "null"
+      ],
       "example": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+    },
+    "embedded": {
+      "description": "Whether the signer was marked `embedded` when the assignment was created.",
+      "type": "boolean",
+      "example": false
     }
   },
   "type": "object"
@@ -1681,7 +2125,8 @@ Complete shared request and response schemas from the [published API](https://ap
 ```json
 {
   "signer_id": "<string>",
-  "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+  "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+  "embedded": false
 }
 ```
 
@@ -1777,7 +2222,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "resource": "signer",
   "id": "62d6ee35c7741ca4006b9e11",
   "full_name": "John Signer",
-  "email": "john@example.com",
+  "email": "developer@example.com",
   "whatsapp_phone_number": "+5548999990000",
   "government_id": "39053344705",
   "has_accepted_terms": false,
@@ -1792,11 +2237,11 @@ Complete shared request and response schemas from the [published API](https://ap
   "notification_history": [
     {
       "event": "signature_request",
-      "status": "sent",
-      "error_code": "<string>",
-      "error_message": "<string>",
+      "status": "failed",
+      "error_code": "MailboxFull",
+      "error_message": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail.",
       "sent_at": "2026-07-07T12:00:00Z",
-      "failed_at": null
+      "failed_at": "2026-07-07T12:05:00Z"
     }
   ]
 }
@@ -1813,24 +2258,42 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "signature_request"
     },
     "status": {
+      "description": "Furthest delivery stage reached. `opened` means the email was opened/clicked or the WhatsApp message was read.",
       "type": "string",
       "enum": [
         "sent",
+        "delivered",
+        "opened",
         "failed"
       ],
-      "example": "sent"
+      "example": "failed"
     },
     "error_code": {
+      "description": "Why the notification failed. Only set when `status` is `failed`.",
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "enum": [
+        "MailboxFull",
+        "AddressNotFound",
+        "AddressSuppressed",
+        "ContentRejected",
+        "MarkedAsSpam",
+        "NotOnWhatsapp",
+        "RecipientRestricted",
+        "NotSent",
+        "Unknown"
+      ],
+      "example": "MailboxFull"
     },
     "error_message": {
+      "description": "Human-readable, localized explanation of `error_code`. Only set when `status` is `failed`.",
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "example": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail."
     },
     "sent_at": {
       "type": [
@@ -1846,7 +2309,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "null"
       ],
       "format": "date-time",
-      "example": null
+      "example": "2026-07-07T12:05:00Z"
     }
   },
   "type": "object"
@@ -1858,11 +2321,11 @@ Complete shared request and response schemas from the [published API](https://ap
 ```json
 {
   "event": "signature_request",
-  "status": "sent",
-  "error_code": "<string>",
-  "error_message": "<string>",
+  "status": "failed",
+  "error_code": "MailboxFull",
+  "error_message": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail.",
   "sent_at": "2026-07-07T12:00:00Z",
-  "failed_at": null
+  "failed_at": "2026-07-07T12:05:00Z"
 }
 ```
 
@@ -2070,7 +2533,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "resource": "signer",
       "id": "62d6ee35c7741ca4006b9e11",
       "full_name": "John Signer",
-      "email": "john@example.com",
+      "email": "developer@example.com",
       "whatsapp_phone_number": "+5548999990000",
       "government_id": "39053344705",
       "has_accepted_terms": false,
@@ -2085,11 +2548,11 @@ Complete shared request and response schemas from the [published API](https://ap
       "notification_history": [
         {
           "event": "signature_request",
-          "status": "sent",
-          "error_code": "<string>",
-          "error_message": "<string>",
+          "status": "failed",
+          "error_code": "MailboxFull",
+          "error_message": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail.",
           "sent_at": "2026-07-07T12:00:00Z",
-          "failed_at": null
+          "failed_at": "2026-07-07T12:05:00Z"
         }
       ]
     }
@@ -2124,9 +2587,516 @@ Complete shared request and response schemas from the [published API](https://ap
   "signing_urls": [
     {
       "signer_id": "<string>",
-      "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+      "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+      "embedded": false
     }
   ]
+}
+```
+
+## EnvelopeCreateRequest
+
+```json
+{
+  "description": "An envelope as sent: on creation, and to estimate what creating it would cost.",
+  "required": [
+    "name",
+    "signers",
+    "documents"
+  ],
+  "properties": {
+    "name": {
+      "description": "What the invitation calls what is being signed, in place of a document's name. `<` is refused (`400`).",
+      "type": "string",
+      "maxLength": 255,
+      "minLength": 1,
+      "example": "Contrato de prestação de serviços"
+    },
+    "message": {
+      "description": "Optional message sent to every signer; their invitation adds the names of the documents they are on.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "Segue o contrato e seus anexos."
+    },
+    "max_total_credits": {
+      "description": "Optional ceiling on what this request may spend, as on an assignment: refused with `409` and code `CreditCeilingExceeded`, nothing created or charged, when the envelope's total credits are above it. A value that is not a number of credits, zero or more, answers `400`; numeric text counts, as a form-encoded body sends it. The estimate ignores it.",
+      "type": "number",
+      "minimum": 0,
+      "example": 1.5
+    },
+    "signers": {
+      "description": "Every signer of the envelope, once, by id: up to 20. They all sign at once: an envelope takes no `step`.",
+      "type": "array",
+      "items": {
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "description": "An existing signer's ID.",
+            "type": "string",
+            "minLength": 1,
+            "example": "fa8c140cb49b79f940aab95fddd"
+          },
+          "verification_method": {
+            "description": "As on an assignment. A `DigitalCertificate` signer signs only virtual documents, alone on each, each with their certificate, and is charged on each. An `IdDocumentFaceMatchBasic` signer checks their identity once for the whole envelope, and is charged for it once.",
+            "type": "string",
+            "enum": [
+              "Email",
+              "Whatsapp",
+              "DigitalCertificate",
+              "IdDocumentFaceMatchBasic"
+            ],
+            "example": "Email"
+          },
+          "notification_methods": {
+            "description": "As on an assignment: one method, inferred from `verification_method` when left out.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Email",
+                "Whatsapp"
+              ]
+            },
+            "maxItems": 1,
+            "example": [
+              "Email"
+            ]
+          },
+          "embedded": {
+            "description": "As on an assignment: the signer signs inside your app, through an embed session, on every document of the envelope, the ones added later too. Their `signing_urls` entry has no link (`url` is `null`). An embed session minted on any of their documents still waiting for them lists the documents of the envelope they still have to sign, and the code their invitation carries verifies them there.",
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "type": "object"
+      },
+      "maxItems": 20,
+      "minItems": 1
+    },
+    "documents": {
+      "description": "The documents, in the order the envelope lists them: up to 20.",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/EnvelopeDocumentRequest"
+      },
+      "maxItems": 20,
+      "minItems": 1
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "name": "Contrato de prestação de serviços",
+  "message": "Segue o contrato e seus anexos.",
+  "max_total_credits": 1.5,
+  "signers": [
+    {
+      "id": "fa8c140cb49b79f940aab95fddd",
+      "verification_method": "Email",
+      "notification_methods": [
+        "Email"
+      ],
+      "embedded": false
+    }
+  ],
+  "documents": [
+    {
+      "id": "615601fab04c0a3147bb1246",
+      "method": "virtual",
+      "entries": [
+        {
+          "page_id": "<string>",
+          "fields": [
+            {
+              "signer_id": "<string>",
+              "field_id": "<string>",
+              "display_settings": {
+                "left": 69,
+                "top": 282,
+                "width": 421,
+                "height": 45.86,
+                "fontFamily": "Arial",
+                "fontSize": 22,
+                "backgroundColor": "#D5EBFF"
+              }
+            }
+          ]
+        }
+      ],
+      "signer_ids": [
+        "fa8c140cb49b79f940aab95fddd"
+      ],
+      "expires_at": "2026-12-31T23:59:59Z",
+      "copy_receiver_ids": [
+        "cr8c140cb49b79f940aab95fddd"
+      ]
+    }
+  ]
+}
+```
+
+## EnvelopeDocumentRequest
+
+```json
+{
+  "description": "A document of an envelope, as sent on creation (`documents[]`) and when added.",
+  "required": [
+    "id",
+    "signer_ids"
+  ],
+  "properties": {
+    "id": {
+      "description": "A `metadata_ready` document of the workspace with no assignment.",
+      "type": "string",
+      "minLength": 1,
+      "example": "615601fab04c0a3147bb1246"
+    },
+    "method": {
+      "description": "As on an assignment: `virtual` (the default), signed on its virtual page, or `collect`, signed on the fields placed in `entries`.",
+      "type": "string",
+      "default": "virtual",
+      "enum": [
+        "virtual",
+        "collect"
+      ]
+    },
+    "entries": {
+      "description": "Required for `collect`, as on an assignment: the fields placed on each page of the document. Its signers are the ones on its fields, exactly its `signer_ids`.",
+      "type": "array",
+      "items": {
+        "required": [
+          "page_id",
+          "fields"
+        ],
+        "properties": {
+          "page_id": {
+            "description": "A page of the document.",
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "required": [
+                "signer_id",
+                "field_id",
+                "display_settings"
+              ],
+              "properties": {
+                "signer_id": {
+                  "description": "A signer of the document.",
+                  "type": "string"
+                },
+                "field_id": {
+                  "description": "A field definition of the workspace.",
+                  "type": "string"
+                },
+                "display_settings": {
+                  "$ref": "#/components/schemas/DisplaySettings"
+                }
+              },
+              "type": "object"
+            },
+            "minItems": 1
+          }
+        },
+        "type": "object"
+      },
+      "minItems": 1
+    },
+    "signer_ids": {
+      "description": "The signers of this document, each listed once: on creation, signers listed in `signers`; when added, signers of the envelope's documents.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "example": [
+        "fa8c140cb49b79f940aab95fddd"
+      ]
+    },
+    "expires_at": {
+      "description": "This document's expiration, read as on an assignment, at least one hour in the future. Text is read as a date: ISO 8601 is the format to send (a UTC offset in the value is honored, a value without one is read as UTC, and a date alone means 23:59 UTC that day), and text that is a number is Unix time. A number is Unix time in seconds, its fraction dropped. Null, 0, an empty text or leaving it out means no expiration; a value that can't be read as a date answers `400`.",
+      "example": "2026-12-31T23:59:59Z",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "copy_receiver_ids": {
+      "description": "Signer IDs that only receive a copy of this document, as on an assignment.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "example": [
+        "cr8c140cb49b79f940aab95fddd"
+      ]
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": "615601fab04c0a3147bb1246",
+  "method": "virtual",
+  "entries": [
+    {
+      "page_id": "<string>",
+      "fields": [
+        {
+          "signer_id": "<string>",
+          "field_id": "<string>",
+          "display_settings": {
+            "left": 69,
+            "top": 282,
+            "width": 421,
+            "height": 45.86,
+            "fontFamily": "Arial",
+            "fontSize": 22,
+            "backgroundColor": "#D5EBFF"
+          }
+        }
+      ]
+    }
+  ],
+  "signer_ids": [
+    "fa8c140cb49b79f940aab95fddd"
+  ],
+  "expires_at": "2026-12-31T23:59:59Z",
+  "copy_receiver_ids": [
+    "cr8c140cb49b79f940aab95fddd"
+  ]
+}
+```
+
+## DocumentEnvelope
+
+```json
+{
+  "description": "Documents sent together to the same signers. Each document keeps its own assignment, status, certificate and downloads.",
+  "required": [
+    "id",
+    "name",
+    "message",
+    "documents",
+    "counts",
+    "signing_urls",
+    "created_at"
+  ],
+  "properties": {
+    "resource": {
+      "description": "Present in single-resource responses.",
+      "type": "string",
+      "example": "envelope"
+    },
+    "id": {
+      "type": "string",
+      "example": "1a2f3c4d5e6f708192a3b4c5d6e"
+    },
+    "name": {
+      "type": "string",
+      "example": "Contrato de prestação de serviços"
+    },
+    "message": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "Segue o contrato e seus anexos."
+    },
+    "documents": {
+      "description": "The envelope's documents, in the order it lists them.",
+      "type": "array",
+      "items": {
+        "required": [
+          "id",
+          "position",
+          "name",
+          "status",
+          "artifacts",
+          "signers"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "615601fab04c0a3147bb1246"
+          },
+          "position": {
+            "description": "The document's place in the envelope's order, from 1.",
+            "type": "integer",
+            "minimum": 1,
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "contrato.pdf"
+          },
+          "status": {
+            "description": "Status code — see GET /v1/documents/statuses.",
+            "type": "string",
+            "example": "pending_signature"
+          },
+          "artifacts": {
+            "description": "The document's files, as its own read (`GET /v1/documents/{documentId}`) gives them: always `original`, plus `thumbnail` once one exists, and for a certificated document `certificated`, `certificate-page`, `bundle` and, when signed with a digital certificate, `pades`. In the envelope list (`GET /v1/accounts/{accountId}/envelopes`) only `thumbnail`, given without checking that it exists: its URL answers `404` until the thumbnail is generated.",
+            "type": "object",
+            "example": {
+              "original": "https://api.assinafy.com.br/v1/documents/615601fab04c0a3147bb1246/download/original",
+              "thumbnail": "https://api.assinafy.com.br/v1/documents/615601fab04c0a3147bb1246/thumbnail"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "signers": {
+            "description": "The document's signers: a signer appears only on the documents they are on.",
+            "type": "array",
+            "items": {
+              "required": [
+                "id",
+                "full_name",
+                "email",
+                "whatsapp_phone_number",
+                "completed",
+                "signed_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "example": "fa8c140cb49b79f940aab95fddd"
+                },
+                "full_name": {
+                  "type": "string",
+                  "example": "Ana Souza"
+                },
+                "email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "example": "ana@example.com"
+                },
+                "whatsapp_phone_number": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "example": "+5548999990001"
+                },
+                "completed": {
+                  "description": "Whether they have signed this document.",
+                  "type": "boolean",
+                  "example": false
+                },
+                "signed_at": {
+                  "description": "When they signed this document; `null` until they do.",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "example": "2026-11-06T14:30:00Z"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "type": "object"
+      }
+    },
+    "counts": {
+      "description": "How many of its documents are in each status (status code => count); only the statuses present. An envelope has no status of its own. `null` once it lists no document: every one deleted or taken out.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "example": {
+        "certificated": 1,
+        "pending_signature": 2
+      },
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "signing_urls": {
+      "description": "One entry per signer, as on an assignment (`SigningUrl`): the link of the document their invitation is sent from while it waits for them, else of their first document that still does (the e-mail page asks that document for the invitation again; any of their links opens the whole envelope).",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/SigningUrl"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-11-04T12:00:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "resource": "envelope",
+  "id": "1a2f3c4d5e6f708192a3b4c5d6e",
+  "name": "Contrato de prestação de serviços",
+  "message": "Segue o contrato e seus anexos.",
+  "documents": [
+    {
+      "id": "615601fab04c0a3147bb1246",
+      "position": 1,
+      "name": "contrato.pdf",
+      "status": "pending_signature",
+      "artifacts": {
+        "original": "https://api.assinafy.com.br/v1/documents/615601fab04c0a3147bb1246/download/original",
+        "thumbnail": "https://api.assinafy.com.br/v1/documents/615601fab04c0a3147bb1246/thumbnail"
+      },
+      "signers": [
+        {
+          "id": "fa8c140cb49b79f940aab95fddd",
+          "full_name": "Ana Souza",
+          "email": "ana@example.com",
+          "whatsapp_phone_number": "+5548999990001",
+          "completed": false,
+          "signed_at": "2026-11-06T14:30:00Z"
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "certificated": 1,
+    "pending_signature": 2
+  },
+  "signing_urls": [
+    {
+      "signer_id": "<string>",
+      "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+      "embedded": false
+    }
+  ],
+  "created_at": "2026-11-04T12:00:00Z"
 }
 ```
 
@@ -2177,9 +3147,22 @@ Complete shared request and response schemas from the [published API](https://ap
 ```json
 {
   "description": "Cost breakdown for an assignment plus current account balances. `credits` is the sum of `breakdown` (notifications, digital-certificate signatures and identity checks). `total_credits` is what the send will take from the credit balance: `credits`, plus `extra_document_cost` when `needs_extra_document` is true. The extra document is not a `breakdown` line.",
+  "required": [
+    "documents",
+    "credits",
+    "needs_extra_document",
+    "extra_document_cost",
+    "total_credits",
+    "breakdown",
+    "document_balance",
+    "credit_balance",
+    "has_sufficient_resources",
+    "blocking_reason",
+    "message"
+  ],
   "properties": {
     "documents": {
-      "description": "Documents consumed (always 1).",
+      "description": "Documents consumed: 1, for an assignment as for an envelope, whatever its documents.",
       "type": "integer",
       "example": 1
     },
@@ -2210,16 +3193,23 @@ Complete shared request and response schemas from the [published API](https://ap
       }
     },
     "document_balance": {
-      "description": "Documents left in the plan.",
-      "type": "number",
+      "description": "Documents left in the plan. `null` when the account's documents are not limited.",
+      "type": [
+        "number",
+        "null"
+      ],
       "example": 0
     },
     "credit_balance": {
-      "description": "Credits available.",
-      "type": "number",
+      "description": "Credits available. `null` when the account's credits are not limited.",
+      "type": [
+        "number",
+        "null"
+      ],
       "example": 10
     },
     "has_sufficient_resources": {
+      "description": "Whether creating it would pass its balance checks now: the checks creation itself makes, so a contract that allows overage passes with a low `document_balance` or `credit_balance`.",
       "type": "boolean",
       "example": true
     },
@@ -2312,6 +3302,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": 10
     },
     "has_sufficient_credits": {
+      "description": "Whether the reminder would pass its credit check now: the check the reminder itself makes, so a contract that allows overage passes with a low `credit_balance`, and a plan whose payment is pending doesn't, whatever the balance.",
       "type": "boolean",
       "example": true
     }
@@ -2629,6 +3620,109 @@ Complete shared request and response schemas from the [published API](https://ap
 }
 ```
 
+## Balance
+
+```json
+{
+  "description": "A document or credit balance for the current billing cycle.",
+  "properties": {
+    "balance": {
+      "description": "Remaining quantity; null for unlimited.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "example": 100
+    },
+    "limit": {
+      "description": "Allowance per cycle/pool; null when not cycle-limited or unlimited.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "example": 100
+    },
+    "spent": {
+      "description": "Quantity consumed in the current cycle.",
+      "type": "number",
+      "example": 0
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "balance": 100,
+  "limit": 100,
+  "spent": 0
+}
+```
+
+## AccountUsage
+
+```json
+{
+  "description": "The workspace's plan and what is left of it.",
+  "properties": {
+    "plan": {
+      "description": "The plan's name. `null` when the subscription has no plan or its plan was retired.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": "Pro"
+    },
+    "documents_renewal_date": {
+      "description": "When the document allowance next renews. On a custom contract, the next boundary of the contract's billing day. `null` while the subscription awaits its first payment, or on a contract with no billing day.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "example": "2026-12-01"
+    },
+    "balances": {
+      "description": "Document and credit balances, as in **Get current subscription**.",
+      "properties": {
+        "documents": {
+          "$ref": "#/components/schemas/Balance"
+        },
+        "credits": {
+          "$ref": "#/components/schemas/Balance"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "plan": "Pro",
+  "documents_renewal_date": "2026-12-01",
+  "balances": {
+    "documents": {
+      "balance": 100,
+      "limit": 100,
+      "spent": 0
+    },
+    "credits": {
+      "balance": 100,
+      "limit": 100,
+      "spent": 0
+    }
+  }
+}
+```
+
 ## WebhookSubscription
 
 ```json
@@ -2678,7 +3772,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "string",
         "null"
       ],
-      "example": "email@example.com"
+      "example": "developer@example.com"
     },
     "updated_at": {
       "type": [
@@ -2705,7 +3799,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "is_held": false,
   "held_since": null,
   "url": "https://example.com?test=1",
-  "email": "email@example.com",
+  "email": "developer@example.com",
   "updated_at": "2023-05-10T14:58:24Z"
 }
 ```
@@ -2817,6 +3911,122 @@ Complete shared request and response schemas from the [published API](https://ap
 }
 ```
 
+## EmbedOrigin
+
+```json
+{
+  "description": "An origin allowed to embed the workspace's signing pages.",
+  "properties": {
+    "id": {
+      "description": "Embed origin ID.",
+      "type": "string",
+      "example": "6f1c2a9e0b"
+    },
+    "origin": {
+      "description": "Exact `scheme://host[:port]`.",
+      "type": "string",
+      "example": "https://app.example.com"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-11-04T12:05:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": "6f1c2a9e0b",
+  "origin": "https://app.example.com",
+  "created_at": "2026-11-04T12:05:00Z"
+}
+```
+
+## EmbedSession
+
+```json
+{
+  "description": "A single-use embed session for an embedded signer.",
+  "properties": {
+    "url": {
+      "description": "Load this URL in an iframe within 5 minutes. Opening it spends the token.",
+      "type": "string",
+      "example": "https://app.assinafy.com.br/embed/3f2c9a1e5b7d4c68a0e1f2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-11-04T12:05:00Z"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "url": "https://app.assinafy.com.br/embed/3f2c9a1e5b7d4c68a0e1f2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7",
+  "expires_at": "2026-11-04T12:05:00Z"
+}
+```
+
+## EmbedSessionExchange
+
+```json
+{
+  "description": "What the embed page gets for a session token.",
+  "properties": {
+    "signer_access_code": {
+      "description": "The signer's access code, used by the embed page only.",
+      "type": "string"
+    },
+    "signer_id": {
+      "type": "string",
+      "example": "6f1c2a9e0b"
+    },
+    "document_id": {
+      "type": "string",
+      "example": "5e0b1c2a9f"
+    },
+    "verification_method": {
+      "type": "string",
+      "example": "Email"
+    },
+    "embed_origins": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "example": [
+        "https://app.example.com"
+      ]
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "signer_access_code": "<string>",
+  "signer_id": "6f1c2a9e0b",
+  "document_id": "5e0b1c2a9f",
+  "verification_method": "Email",
+  "embed_origins": [
+    "https://app.example.com"
+  ]
+}
+```
+
 ## WebhookEndpointSecret
 
 ```json
@@ -2912,7 +4122,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": 2
     },
     "kind": {
-      "description": "`scheduled`: the delivery of the event as it happened; `probe`: the one delivery we send to a paused endpoint to see whether it answers; `manual`: asked for through **Retry webhook delivery**.",
+      "description": "`scheduled`: the delivery of the event as it happened; `probe`: the one delivery we send to a paused endpoint to see whether it answers; `manual`: asked for through **Retry webhook delivery** or **Send a test delivery**.",
       "type": "string",
       "enum": [
         "scheduled",
@@ -2925,6 +4135,14 @@ Complete shared request and response schemas from the [published API](https://ap
       "description": "Whether another attempt follows this one. `false` on a delivered entry and on the last attempt of a failed one.",
       "type": "boolean",
       "example": true
+    },
+    "duration_ms": {
+      "description": "How long the endpoint took to answer or fail, in milliseconds. `null` when no request was sent (a host that does not resolve, an address that is not public) and on entries recorded before it was measured.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "example": 184
     },
     "http_status": {
       "description": "HTTP status returned (null if connection failed).",
@@ -2981,6 +4199,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "attempt": 2,
   "kind": "scheduled",
   "will_retry": true,
+  "duration_ms": 184,
   "http_status": 200,
   "response_body": "OK",
   "error": null,
@@ -3009,7 +4228,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": 184467
     },
     "event": {
-      "description": "Event type. See **List webhook event types**.",
+      "description": "Event type. See **List webhook event types**; `webhook_test` is sent only by **Send a test delivery**.",
       "type": "string",
       "example": "signer_viewed_document"
     },
@@ -3052,12 +4271,12 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": 1790000000
     },
     "subject": {
-      "description": "Who performed the action: a `User`, `Signer` or `Account`, plus a `type` property naming it.",
+      "description": "Who performed the action: a `User`, `Signer` or `Account` (the endpoint itself in a `webhook_test`), plus a `type` property naming it.",
       "type": "object",
       "additionalProperties": true
     },
     "object": {
-      "description": "What the action was performed on: a `Document`, `Signer` or `Template` with its relations expanded, plus a `type` property naming it.",
+      "description": "What the action was performed on: a `Document`, `Signer` or `Template` with its relations expanded (the endpoint itself in a `webhook_test`), plus a `type` property naming it.",
       "type": "object",
       "additionalProperties": true
     },
@@ -3131,20 +4350,21 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "Account Name"
     },
     "primary_color": {
-      "description": "Hex color without leading `#`.",
+      "description": "Button background: hex color without leading `#`. The platform default when the account set none.",
       "type": "string",
       "example": "aabbcc"
     },
     "secondary_color": {
+      "description": "Button text: hex color without leading `#`. The platform default when the account set none.",
+      "type": "string",
+      "example": "ffffff"
+    },
+    "logo": {
+      "description": "Absolute URL of the logo for the caller: `/v1/accounts/{accountId}/logo` for workspace members, `/v1/sign/logo` (append `signer-access-code`) for signers. `null` when the account has no logo.",
       "type": [
         "string",
         "null"
       ],
-      "example": "aabbcc"
-    },
-    "logo": {
-      "description": "URL to the account logo.",
-      "type": "string",
       "example": "https://api.assinafy.com.br/v1/accounts/1a/logo"
     }
   },
@@ -3158,7 +4378,7 @@ Complete shared request and response schemas from the [published API](https://ap
 {
   "account_name": "Account Name",
   "primary_color": "aabbcc",
-  "secondary_color": "aabbcc",
+  "secondary_color": "ffffff",
   "logo": "https://api.assinafy.com.br/v1/accounts/1a/logo"
 }
 ```
@@ -3326,6 +4546,15 @@ Complete shared request and response schemas from the [published API](https://ap
       "format": "date-time",
       "example": "2023-01-27T19:27:44Z"
     },
+    "certificated_at": {
+      "description": "When certification was first recorded by the document_ready event. Null when no certification event is available, including some historical documents.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "example": "2023-01-27T19:27:45Z"
+    },
     "verified_at": {
       "description": "When this check ran (the time of the request). It says nothing about when the document was signed or certified.",
       "type": "string",
@@ -3358,6 +4587,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "signer_count": "1",
   "completed_count": 1,
   "completed_at": "2023-01-27T19:27:44Z",
+  "certificated_at": "2023-01-27T19:27:45Z",
   "verified_at": "2023-01-27T19:27:46Z",
   "is_valid": true,
   "message": ""
@@ -3384,9 +4614,10 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "Assignment created by John Smith."
     },
     "payload": {
-      "description": "Event-specific snapshot taken when the event happened, with the same keys as the webhook of that event (see **Webhook Payloads**). The common ones: `user_name` (`assignment_created`, `user_rejected_document`); `signer_full_name` (every `signer_*` event and `signature_requested`); `signer_email`, `signer_whatsapp_phone_number` and `notification_method` (`signature_requested`); `reviewer_name` (identity review decisions); `error_message` (`document_processing_failed`). `message` already carries the actor's name, translated, so clients can show it as is. A `*_at` key inside the payload is returned as an ISO 8601 string here, as in every API response, but as a Unix integer in webhook bodies.",
+      "description": "`[]` for the events that record nothing (`document_uploaded`, `document_metadata_ready`, `document_prepared`). Otherwise an event-specific snapshot taken when the event happened, with the same keys as the webhook of that event (see **Webhook Payloads**). The common ones: `user_name` (`assignment_created`, `user_rejected_document`); `signer_full_name` (every `signer_*` event and `signature_requested`); `signer_email`, `signer_whatsapp_phone_number` and `notification_method` (`signature_requested`); `reviewer_name` (identity review decisions); `error_message` (`document_processing_failed`). `message` already carries the actor's name, translated, so clients can show it as is. A `*_at` key inside the payload is returned as an ISO 8601 string here, as in every API response, but as a Unix integer in webhook bodies.",
       "type": [
         "object",
+        "array",
         "null"
       ]
     },
@@ -3394,7 +4625,11 @@ Complete shared request and response schemas from the [published API](https://ap
       "description": "Request origin when available.",
       "properties": {
         "ip": {
-          "type": "string",
+          "description": "`null` when the request carried no client address.",
+          "type": [
+            "string",
+            "null"
+          ],
           "example": "172.19.0.1"
         },
         "user-agent": {
@@ -3429,6 +4664,56 @@ Complete shared request and response schemas from the [published API](https://ap
     "user-agent": "<string>"
   },
   "created_at": "2022-07-19T19:28:13Z"
+}
+```
+
+## EnvelopeActivity
+
+```json
+{
+  "description": "A document activity of an envelope's trail, naming its document.",
+  "required": [
+    "document_id",
+    "document_name"
+  ],
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/DocumentActivity"
+    },
+    {
+      "properties": {
+        "document_id": {
+          "description": "The document the activity is about.",
+          "type": "string",
+          "example": "fe1c140cb49b79f940aab95fddd"
+        },
+        "document_name": {
+          "type": "string",
+          "example": "Contrato.pdf"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "id": 4,
+  "event": "assignment_created",
+  "message": "Assignment created by John Smith.",
+  "payload": {},
+  "origin": {
+    "ip": "172.19.0.1",
+    "user-agent": "<string>"
+  },
+  "created_at": "2022-07-19T19:28:13Z",
+  "document_id": "fe1c140cb49b79f940aab95fddd",
+  "document_name": "Contrato.pdf"
 }
 ```
 
@@ -4044,6 +5329,222 @@ Complete shared request and response schemas from the [published API](https://ap
   "ContractExpiring": true,
   "ContractExpired": true,
   "ContractRenewed": true
+}
+```
+
+## NotificationPolicyEvents
+
+```json
+{
+  "description": "Every e-mail and push alert, keyed by notification type. `false` means the workspace never sends it. New keys may be added.",
+  "properties": {
+    "DocumentCompleted": {
+      "type": "boolean",
+      "example": true
+    },
+    "SignerDeclined": {
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentCancelled": {
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentAboutToExpire": {
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentExpired": {
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentExpirationReset": {
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentProcessingFailed": {
+      "type": "boolean",
+      "example": true
+    },
+    "TemplateProcessingFailed": {
+      "type": "boolean",
+      "example": true
+    },
+    "SignerWhatsappFailed": {
+      "type": "boolean",
+      "example": true
+    },
+    "ContractRenewalNotice": {
+      "type": "boolean",
+      "example": true
+    },
+    "ContractExpiring": {
+      "type": "boolean",
+      "example": true
+    },
+    "ContractExpired": {
+      "type": "boolean",
+      "example": true
+    },
+    "ContractRenewed": {
+      "type": "boolean",
+      "example": true
+    },
+    "SignerViewed": {
+      "type": "boolean",
+      "example": false
+    },
+    "SignerSigned": {
+      "type": "boolean",
+      "example": true
+    },
+    "SignerIdentityReviewRequired": {
+      "description": "Turns off the push only; the identity review e-mail is always sent.",
+      "type": "boolean",
+      "example": true
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "DocumentCompleted": true,
+  "SignerDeclined": true,
+  "DocumentCancelled": true,
+  "DocumentAboutToExpire": true,
+  "DocumentExpired": true,
+  "DocumentExpirationReset": true,
+  "DocumentProcessingFailed": true,
+  "TemplateProcessingFailed": true,
+  "SignerWhatsappFailed": true,
+  "ContractRenewalNotice": true,
+  "ContractExpiring": true,
+  "ContractExpired": true,
+  "ContractRenewed": true,
+  "SignerViewed": false,
+  "SignerSigned": true,
+  "SignerIdentityReviewRequired": true
+}
+```
+
+## NotificationPolicy
+
+```json
+{
+  "description": "The workspace's notification rules, set by its owners.",
+  "properties": {
+    "editable": {
+      "description": "Whether the requesting user is an owner and can change the policy.",
+      "type": "boolean",
+      "example": true
+    },
+    "owners_receive_all": {
+      "description": "Owners also get the push alerts for every member's documents. Each owner's own preferences still apply.",
+      "type": "boolean",
+      "example": false
+    },
+    "events": {
+      "$ref": "#/components/schemas/NotificationPolicyEvents"
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "editable": true,
+  "owners_receive_all": false,
+  "events": {
+    "DocumentCompleted": true,
+    "SignerDeclined": true,
+    "DocumentCancelled": true,
+    "DocumentAboutToExpire": true,
+    "DocumentExpired": true,
+    "DocumentExpirationReset": true,
+    "DocumentProcessingFailed": true,
+    "TemplateProcessingFailed": true,
+    "SignerWhatsappFailed": true,
+    "ContractRenewalNotice": true,
+    "ContractExpiring": true,
+    "ContractExpired": true,
+    "ContractRenewed": true,
+    "SignerViewed": false,
+    "SignerSigned": true,
+    "SignerIdentityReviewRequired": true
+  }
+}
+```
+
+## PushPreferences
+
+```json
+{
+  "description": "Document alerts sent as push notifications to the user's phones, keyed by notification type. `true` means the push is sent. Separate from the e-mail preferences. New keys may be added.",
+  "properties": {
+    "SignerViewed": {
+      "description": "A signer opened the document for the first time.",
+      "type": "boolean",
+      "example": true
+    },
+    "SignerSigned": {
+      "description": "A signer signed the document.",
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentCompleted": {
+      "description": "Every signer has signed and the document is certified.",
+      "type": "boolean",
+      "example": true
+    },
+    "SignerDeclined": {
+      "description": "A signer declined to sign.",
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentAboutToExpire": {
+      "description": "The signature deadline is approaching.",
+      "type": "boolean",
+      "example": true
+    },
+    "DocumentExpired": {
+      "description": "The signature deadline passed.",
+      "type": "boolean",
+      "example": true
+    },
+    "SignerIdentityReviewRequired": {
+      "description": "A signer's identity awaits the sender's review. The e-mail for this is always sent.",
+      "type": "boolean",
+      "example": true
+    },
+    "SignerWhatsappFailed": {
+      "description": "A WhatsApp notification to a signer could not be delivered.",
+      "type": "boolean",
+      "example": true
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "SignerViewed": true,
+  "SignerSigned": true,
+  "DocumentCompleted": true,
+  "SignerDeclined": true,
+  "DocumentAboutToExpire": true,
+  "DocumentExpired": true,
+  "SignerIdentityReviewRequired": true,
+  "SignerWhatsappFailed": true
 }
 ```
 

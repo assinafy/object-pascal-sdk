@@ -47,8 +47,9 @@ actual = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+);', declarations)
 require(len(actual) == len(set(actual)), 'Duplicate API operation')
 require(set(actual) == expected, 'Missing or extra API operations')
 workspace = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+) \(workspace credentials\);[^\n]*\n\s+function (\w+)', declarations)
+signer = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+) \(signer credentials\);[^\n]*\n\s+function (\w+)', declarations)
 names = re.findall(r'function (\w+)\(', declarations) + re.findall(r'function (\w+):', declarations)
-require(len(names) == len(actual) + len(workspace) and len(names) == len(set(names)), 'Incorrect resource declarations')
+require(len(names) == len(actual) + len(workspace) + len(signer) and len(names) == len(set(names)), 'Incorrect resource declarations')
 implementation = (ROOT / 'src/methods.inc').read_text(encoding='utf-8')
 docs = (ROOT / 'docs/API.md').read_text(encoding='utf-8')
 readme = (ROOT / 'README.md').read_text(encoding='utf-8')
@@ -60,13 +61,23 @@ auth_modes = dict(re.findall(r'function TAssinafyClient\.(\w+)[\s\S]*?Result := 
 bindings = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+);[^\n]*\n\s+function (\w+)', declarations)
 require(len(bindings) == len(actual) and set(auth_modes) == set(names), 'Incomplete authentication checks')
 for verb, path, name in bindings:
-    require(auth_modes.get(name) == expected_auth(spec['paths'][path][verb.lower()], path),
+    expected_mode = expected_auth(spec['paths'][path][verb.lower()], path)
+    if name in {'GetDocument', 'DownloadDocumentArtifact', 'ValidateFieldValue',
+                'ValidateMultipleFieldValues', 'DownloadDocumentThumbnail',
+                'DownloadDocumentPage'} and expected_mode == 'aaSignerOrAPI':
+        expected_mode = 'aaAPI'
+        require((verb, path, name + 'AsSigner') in signer, f'Missing signer method for {name}')
+    require(auth_modes.get(name) == expected_mode,
             f'Incorrect authentication for {name}')
 dual = {(verb, path) for verb, path, name in bindings if auth_modes[name] == 'aaSignerOrAPI'}
 require({(verb, path) for verb, path, _ in workspace} == dual, 'Signer-or-workspace routes need separate workspace methods')
 for verb, path, name in workspace:
     require(auth_modes.get(name) == 'aaAPI' and 'SignerAccessCode' not in re.search(
         r'function ' + name + r'\b[^\n]*', declarations).group(0), f'Workspace method must not take a signer code: {name}')
+for verb, path, name in signer:
+    require(expected_auth(spec['paths'][path][verb.lower()], path) == 'aaSignerOrAPI' and
+            auth_modes.get(name) == 'aaSigner' and 'SignerAccessCode' in re.search(
+                r'function ' + name + r'\b[^\n]*', declarations).group(0), f'Incorrect signer method: {name}')
 require((ROOT / 'VERSION').read_text(encoding='utf-8').strip() in (ROOT / 'src/assinafy.pas').read_text(encoding='utf-8'), 'Version mismatch')
 for filename in ['AGENTS.md', 'CLAUDE.md']:
     require('/' + filename in (ROOT / '.gitignore').read_text(encoding='utf-8'), f'{filename} must be ignored')

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0] - 2026-11-11
+
+- Add envelope, embedded-signing, usage, notification-policy, push-preference, certified-copy and webhook-test methods, covering all 147 published operations and 62 shared schemas.
+- Support optional `Idempotency-Key` headers when creating envelopes and documents from templates, and return documented certified-copy redirects with their `Location` header without following them.
+- Preserve workspace authentication on existing document, rendering and field-validation methods; add explicit `AsSigner` variants for their new signer-code access.
+- Require `SignerAccessCode` on `DownloadSignerDocumentArtifact` because the API no longer permits public access to that route.
+- Include current envelope expansions, contract renewal preconditions, notification delivery states, credit ceilings and embedded signer payloads in the generated reference.
+- Apply OAuth environment validation to revocation and to the default production issuer before sending credentials.
+
 ## [0.5.1] - 2026-11-02
 
 - Reject `DeleteWebhookEndpointByURL` before transport when its required `url` query is missing or blank.

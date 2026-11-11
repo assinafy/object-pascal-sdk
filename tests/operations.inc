@@ -1,7 +1,9 @@
-  Response := Client.GetAccount('');
+  TestQuery.Clear;
+  TestQuery.Add('expand=<string>');
+  Response := Client.GetAccount('', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'GetAccount verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account', 'GetAccount URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account?expand=%3Cstring%3E', 'GetAccount URL');
   Check(Fake.LastAuth = 'bearer', 'GetAccount authentication');
 
   Response := Client.UpdateAccount('', TestBody);
@@ -25,6 +27,12 @@
   Check(Fake.LastMethod = 'GET', 'GetAccountTheme verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/theme', 'GetAccountTheme URL');
   Check(Fake.LastAuth = 'bearer', 'GetAccountTheme authentication');
+
+  Response := Client.GetAccountUsage('');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetAccountUsage verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/usage', 'GetAccountUsage URL');
+  Check(Fake.LastAuth = 'bearer', 'GetAccountUsage authentication');
 
   Response := Client.DownloadAccountLogo('');
   Response.Free;
@@ -211,10 +219,12 @@
   Check(Fake.LastBody = JSONText(TestBody), 'SetDocumentContract body');
   Check(Fake.LastContentType = 'application/json', 'SetDocumentContract content type');
 
-  Response := Client.ListRelatedDocumentContracts('', 'DocumentId');
+  TestQuery.Clear;
+  TestQuery.Add('expand=document');
+  Response := Client.ListRelatedDocumentContracts('', 'DocumentId', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListRelatedDocumentContracts verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/contract/related', 'ListRelatedDocumentContracts URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/contract/related?expand=document', 'ListRelatedDocumentContracts URL');
   Check(Fake.LastAuth = 'bearer', 'ListRelatedDocumentContracts authentication');
 
   Response := Client.RenewDocumentContract('', 'DocumentId', TestBody);
@@ -235,6 +245,7 @@
 
   TestQuery.Clear;
   TestQuery.Add('status=<string>');
+  TestQuery.Add('envelope_id=<string>');
   TestQuery.Add('method=virtual');
   TestQuery.Add('search=<string>');
   TestQuery.Add('tags=<string>');
@@ -244,7 +255,7 @@
   Response := Client.ListDocuments('', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListDocuments verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents?status=%3Cstring%3E&method=virtual&search=%3Cstring%3E&tags=%3Cstring%3E&sort=-updated_at&page=1&per-page=25', 'ListDocuments URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents?status=%3Cstring%3E&envelope_id=%3Cstring%3E&method=virtual&search=%3Cstring%3E&tags=%3Cstring%3E&sort=-updated_at&page=1&per-page=25', 'ListDocuments URL');
   Check(Fake.LastAuth = 'bearer', 'ListDocuments authentication');
 
   Response := Client.UploadDocument('', FixtureFile);
@@ -259,13 +270,14 @@
   TestQuery.Clear;
   TestQuery.Add('search=<string>');
   TestQuery.Add('status=<string>');
+  TestQuery.Add('envelope_id=<string>');
   TestQuery.Add('sort=-updated_at');
   TestQuery.Add('page=1');
   TestQuery.Add('per-page=25');
   Response := Client.SearchDocuments('', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'SearchDocuments verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/search?search=%3Cstring%3E&status=%3Cstring%3E&sort=-updated_at&page=1&per-page=25', 'SearchDocuments URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/search?search=%3Cstring%3E&status=%3Cstring%3E&envelope_id=%3Cstring%3E&sort=-updated_at&page=1&per-page=25', 'SearchDocuments URL');
   Check(Fake.LastAuth = 'bearer', 'SearchDocuments authentication');
 
   Response := Client.ListDocumentStatuses;
@@ -274,11 +286,21 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/statuses', 'ListDocumentStatuses URL');
   Check(Fake.LastAuth = 'bearer', 'ListDocumentStatuses authentication');
 
-  Response := Client.GetDocument('DocumentId');
+  TestQuery.Clear;
+  TestQuery.Add('expand=envelope_id');
+  Response := Client.GetDocument('DocumentId', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'GetDocument verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId', 'GetDocument URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId?expand=envelope_id', 'GetDocument URL');
   Check(Fake.LastAuth = 'bearer', 'GetDocument authentication');
+
+  TestQuery.Clear;
+  TestQuery.Add('expand=envelope_id');
+  Response := Client.GetDocumentAsSigner('DocumentId', 'SignerAccessCode', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetDocumentAsSigner verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId?expand=envelope_id&signer-access-code=SignerAccessCode', 'GetDocumentAsSigner URL');
+  Check(Fake.LastAuth = 'signer', 'GetDocumentAsSigner authentication');
 
   Response := Client.DeleteDocument('DocumentId');
   Response.Free;
@@ -299,6 +321,12 @@
   Check(Fake.LastMethod = 'GET', 'DownloadDocumentArtifact verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/download/ArtifactName', 'DownloadDocumentArtifact URL');
   Check(Fake.LastAuth = 'bearer', 'DownloadDocumentArtifact authentication');
+
+  Response := Client.DownloadDocumentArtifactAsSigner('DocumentId', 'ArtifactName', 'SignerAccessCode');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'DownloadDocumentArtifactAsSigner verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/download/ArtifactName?signer-access-code=SignerAccessCode', 'DownloadDocumentArtifactAsSigner URL');
+  Check(Fake.LastAuth = 'signer', 'DownloadDocumentArtifactAsSigner authentication');
 
   Response := Client.VerifyASignedDocument('DocumentSignatureHash');
   Response.Free;
@@ -333,6 +361,138 @@
   Check(Fake.LastMethod = 'DELETE', 'DetachDocumentTag verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/tags/TagId', 'DetachDocumentTag URL');
   Check(Fake.LastAuth = 'bearer', 'DetachDocumentTag authentication');
+
+  Response := Client.ListEmbedOrigins('');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListEmbedOrigins verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/embed-origins', 'ListEmbedOrigins URL');
+  Check(Fake.LastAuth = 'bearer', 'ListEmbedOrigins authentication');
+
+  Response := Client.AddEmbedOrigin('', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'AddEmbedOrigin verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/embed-origins', 'AddEmbedOrigin URL');
+  Check(Fake.LastAuth = 'bearer', 'AddEmbedOrigin authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'AddEmbedOrigin body');
+  Check(Fake.LastContentType = 'application/json', 'AddEmbedOrigin content type');
+
+  Response := Client.UpdateEmbedOrigin('', 'OriginId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'UpdateEmbedOrigin verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/embed-origins/OriginId', 'UpdateEmbedOrigin URL');
+  Check(Fake.LastAuth = 'bearer', 'UpdateEmbedOrigin authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateEmbedOrigin body');
+  Check(Fake.LastContentType = 'application/json', 'UpdateEmbedOrigin content type');
+
+  Response := Client.RemoveEmbedOrigin('', 'OriginId');
+  Response.Free;
+  Check(Fake.LastMethod = 'DELETE', 'RemoveEmbedOrigin verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/embed-origins/OriginId', 'RemoveEmbedOrigin URL');
+  Check(Fake.LastAuth = 'bearer', 'RemoveEmbedOrigin authentication');
+
+  Response := Client.CreateEmbedSession('DocumentId', 'AssignmentId', 'SignerId');
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'CreateEmbedSession verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/assignments/AssignmentId/signers/SignerId/embed-sessions', 'CreateEmbedSession URL');
+  Check(Fake.LastAuth = 'bearer', 'CreateEmbedSession authentication');
+
+  Response := Client.ExchangeEmbedSession('Token', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'ExchangeEmbedSession verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/embed/sessions/Token/exchange', 'ExchangeEmbedSession URL');
+  Check(Fake.LastAuth = 'public', 'ExchangeEmbedSession authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'ExchangeEmbedSession body');
+  Check(Fake.LastContentType = 'application/json', 'ExchangeEmbedSession content type');
+
+  TestQuery.Clear;
+  TestQuery.Add('page=1');
+  TestQuery.Add('per-page=25');
+  TestQuery.Add('search=Contrato');
+  TestQuery.Add('status=open');
+  Response := Client.ListEnvelopes('', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListEnvelopes verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes?page=1&per-page=25&search=Contrato&status=open', 'ListEnvelopes URL');
+  Check(Fake.LastAuth = 'bearer', 'ListEnvelopes authentication');
+
+  Response := Client.CreateEnvelope('', TestBody, 'IdempotencyKey');
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'CreateEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes', 'CreateEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'CreateEnvelope authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'CreateEnvelope body');
+  Check(Fake.LastContentType = 'application/json', 'CreateEnvelope content type');
+  Check(Fake.LastIdempotencyKey = 'IdempotencyKey', 'CreateEnvelope idempotency header');
+
+  Response := Client.EstimateEnvelopeCost('', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'EstimateEnvelopeCost verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/estimate-cost', 'EstimateEnvelopeCost URL');
+  Check(Fake.LastAuth = 'bearer', 'EstimateEnvelopeCost authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'EstimateEnvelopeCost body');
+  Check(Fake.LastContentType = 'application/json', 'EstimateEnvelopeCost content type');
+
+  Response := Client.GetEnvelope('', 'EnvelopeId');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId', 'GetEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'GetEnvelope authentication');
+
+  Response := Client.DeleteEnvelope('', 'EnvelopeId');
+  Response.Free;
+  Check(Fake.LastMethod = 'DELETE', 'DeleteEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId', 'DeleteEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'DeleteEnvelope authentication');
+
+  Response := Client.UpdateEnvelope('', 'EnvelopeId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'PATCH', 'UpdateEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId', 'UpdateEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'UpdateEnvelope authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateEnvelope body');
+  Check(Fake.LastContentType = 'application/json', 'UpdateEnvelope content type');
+
+  TestQuery.Clear;
+  TestQuery.Add('sort=<string>');
+  TestQuery.Add('page=1');
+  TestQuery.Add('per-page=25');
+  Response := Client.ListEnvelopeActivities('', 'EnvelopeId', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListEnvelopeActivities verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/activities?sort=%3Cstring%3E&page=1&per-page=25', 'ListEnvelopeActivities URL');
+  Check(Fake.LastAuth = 'bearer', 'ListEnvelopeActivities authentication');
+
+  Response := Client.DownloadEnvelopeArtifacts('', 'EnvelopeId', 'ArtifactName');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'DownloadEnvelopeArtifacts verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/download/ArtifactName', 'DownloadEnvelopeArtifacts URL');
+  Check(Fake.LastAuth = 'bearer', 'DownloadEnvelopeArtifacts authentication');
+
+  Response := Client.CancelEnvelope('', 'EnvelopeId');
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'CancelEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/cancel', 'CancelEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'CancelEnvelope authentication');
+
+  Response := Client.RemindEnvelopeSigner('', 'EnvelopeId', 'SignerId');
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'RemindEnvelopeSigner verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/signers/SignerId/resend', 'RemindEnvelopeSigner URL');
+  Check(Fake.LastAuth = 'bearer', 'RemindEnvelopeSigner authentication');
+
+  Response := Client.AddDocumentToEnvelope('', 'EnvelopeId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'AddDocumentToEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/documents', 'AddDocumentToEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'AddDocumentToEnvelope authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'AddDocumentToEnvelope body');
+  Check(Fake.LastContentType = 'application/json', 'AddDocumentToEnvelope content type');
+
+  Response := Client.RemoveDocumentFromEnvelope('', 'EnvelopeId', 'DocumentId');
+  Response.Free;
+  Check(Fake.LastMethod = 'DELETE', 'RemoveDocumentFromEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/documents/DocumentId', 'RemoveDocumentFromEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'RemoveDocumentFromEnvelope authentication');
 
   TestQuery.Clear;
   TestQuery.Add('include_inactive=false');
@@ -379,6 +539,14 @@
   Check(Fake.LastBody = JSONText(TestBody), 'ValidateFieldValue body');
   Check(Fake.LastContentType = 'application/json', 'ValidateFieldValue content type');
 
+  Response := Client.ValidateFieldValueAsSigner('', 'FieldId', TestBody, 'SignerAccessCode');
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'ValidateFieldValueAsSigner verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/fields/FieldId/validate?signer-access-code=SignerAccessCode', 'ValidateFieldValueAsSigner URL');
+  Check(Fake.LastAuth = 'signer', 'ValidateFieldValueAsSigner authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'ValidateFieldValueAsSigner body');
+  Check(Fake.LastContentType = 'application/json', 'ValidateFieldValueAsSigner content type');
+
   Response := Client.ValidateMultipleFieldValues('', TestBody);
   Response.Free;
   Check(Fake.LastMethod = 'POST', 'ValidateMultipleFieldValues verb');
@@ -386,6 +554,14 @@
   Check(Fake.LastAuth = 'bearer', 'ValidateMultipleFieldValues authentication');
   Check(Fake.LastBody = JSONText(TestBody), 'ValidateMultipleFieldValues body');
   Check(Fake.LastContentType = 'application/json', 'ValidateMultipleFieldValues content type');
+
+  Response := Client.ValidateMultipleFieldValuesAsSigner('', TestBody, 'SignerAccessCode');
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'ValidateMultipleFieldValuesAsSigner verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/fields/validate-multiple?signer-access-code=SignerAccessCode', 'ValidateMultipleFieldValuesAsSigner URL');
+  Check(Fake.LastAuth = 'signer', 'ValidateMultipleFieldValuesAsSigner authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'ValidateMultipleFieldValuesAsSigner body');
+  Check(Fake.LastContentType = 'application/json', 'ValidateMultipleFieldValuesAsSigner content type');
 
   Response := Client.ListFieldTypes;
   Response.Free;
@@ -431,6 +607,20 @@
   Check(Fake.LastBody = JSONText(TestBody), 'RemoveATwoFactorMethod body');
   Check(Fake.LastContentType = 'application/json', 'RemoveATwoFactorMethod content type');
 
+  Response := Client.GetNotificationPolicy('');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetNotificationPolicy verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/notification-policy', 'GetNotificationPolicy URL');
+  Check(Fake.LastAuth = 'bearer', 'GetNotificationPolicy authentication');
+
+  Response := Client.UpdateNotificationPolicy('', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'UpdateNotificationPolicy verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/notification-policy', 'UpdateNotificationPolicy URL');
+  Check(Fake.LastAuth = 'bearer', 'UpdateNotificationPolicy authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdateNotificationPolicy body');
+  Check(Fake.LastContentType = 'application/json', 'UpdateNotificationPolicy content type');
+
   Response := Client.GetMyNotificationPreferences;
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'GetMyNotificationPreferences verb');
@@ -467,17 +657,37 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/oauth/userinfo', 'GetOAuthUserInfo URL');
   Check(Fake.LastAuth = 'bearer', 'GetOAuthUserInfo authentication');
 
-  Response := Client.DownloadDocumentThumbnail('DocumentId');
+  TestQuery.Clear;
+  TestQuery.Add('artifact=<string>');
+  Response := Client.DownloadDocumentThumbnail('DocumentId', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'DownloadDocumentThumbnail verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/thumbnail', 'DownloadDocumentThumbnail URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/thumbnail?artifact=%3Cstring%3E', 'DownloadDocumentThumbnail URL');
   Check(Fake.LastAuth = 'bearer', 'DownloadDocumentThumbnail authentication');
 
-  Response := Client.DownloadDocumentPage('DocumentId', 'PageId');
+  TestQuery.Clear;
+  TestQuery.Add('artifact=<string>');
+  Response := Client.DownloadDocumentThumbnailAsSigner('DocumentId', 'SignerAccessCode', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'DownloadDocumentThumbnailAsSigner verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/thumbnail?artifact=%3Cstring%3E&signer-access-code=SignerAccessCode', 'DownloadDocumentThumbnailAsSigner URL');
+  Check(Fake.LastAuth = 'signer', 'DownloadDocumentThumbnailAsSigner authentication');
+
+  TestQuery.Clear;
+  TestQuery.Add('artifact=<string>');
+  Response := Client.DownloadDocumentPage('DocumentId', 'PageId', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'DownloadDocumentPage verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/pages/PageId/download', 'DownloadDocumentPage URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/pages/PageId/download?artifact=%3Cstring%3E', 'DownloadDocumentPage URL');
   Check(Fake.LastAuth = 'bearer', 'DownloadDocumentPage authentication');
+
+  TestQuery.Clear;
+  TestQuery.Add('artifact=<string>');
+  Response := Client.DownloadDocumentPageAsSigner('DocumentId', 'PageId', 'SignerAccessCode', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'DownloadDocumentPageAsSigner verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/pages/PageId/download?artifact=%3Cstring%3E&signer-access-code=SignerAccessCode', 'DownloadDocumentPageAsSigner URL');
+  Check(Fake.LastAuth = 'signer', 'DownloadDocumentPageAsSigner authentication');
 
   Response := Client.ViewPublicDocument('DocumentId');
   Response.Free;
@@ -492,6 +702,20 @@
   Check(Fake.LastAuth = 'public', 'SendAccessTokenForPublicDocument authentication');
   Check(Fake.LastBody = JSONText(TestBody), 'SendAccessTokenForPublicDocument body');
   Check(Fake.LastContentType = 'application/json', 'SendAccessTokenForPublicDocument content type');
+
+  Response := Client.GetPushPreferences;
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetPushPreferences verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/self/push-preferences', 'GetPushPreferences URL');
+  Check(Fake.LastAuth = 'bearer', 'GetPushPreferences authentication');
+
+  Response := Client.UpdatePushPreferences(TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'UpdatePushPreferences verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/users/self/push-preferences', 'UpdatePushPreferences URL');
+  Check(Fake.LastAuth = 'bearer', 'UpdatePushPreferences authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'UpdatePushPreferences body');
+  Check(Fake.LastContentType = 'application/json', 'UpdatePushPreferences content type');
 
   TestQuery.Clear;
   TestQuery.Add('search=<string>');
@@ -537,6 +761,18 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/self?signer-access-code=SignerAccessCode', 'GetCurrentSigner URL');
   Check(Fake.LastAuth = 'signer', 'GetCurrentSigner authentication');
 
+  Response := Client.GetSigningTheme('SignerAccessCode');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetSigningTheme verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/sign/theme?signer-access-code=SignerAccessCode', 'GetSigningTheme URL');
+  Check(Fake.LastAuth = 'signer', 'GetSigningTheme authentication');
+
+  Response := Client.GetSigningLogo('SignerAccessCode');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetSigningLogo verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/sign/logo?signer-access-code=SignerAccessCode', 'GetSigningLogo URL');
+  Check(Fake.LastAuth = 'signer', 'GetSigningLogo authentication');
+
   Response := Client.GetIdentityVerificationStatus('SignerAccessCode');
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'GetIdentityVerificationStatus verb');
@@ -551,18 +787,22 @@
   Check(Fake.LastBody = JSONText(TestBody), 'StartIdentityVerification body');
   Check(Fake.LastContentType = 'application/json', 'StartIdentityVerification content type');
 
-  Response := Client.GetSignerDocument('SignerId', 'SignerAccessCode');
+  TestQuery.Clear;
+  TestQuery.Add('expand=envelope');
+  Response := Client.GetSignerDocument('SignerId', 'SignerAccessCode', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'GetSignerDocument verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/document?signer-access-code=SignerAccessCode', 'GetSignerDocument URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/document?expand=envelope&signer-access-code=SignerAccessCode', 'GetSignerDocument URL');
   Check(Fake.LastAuth = 'signer', 'GetSignerDocument authentication');
 
   TestQuery.Clear;
   TestQuery.Add('has_accepted_terms=false');
+  TestQuery.Add('expand=envelope');
+  TestQuery.Add('document_id=<string>');
   Response := Client.ViewDocumentToSign('SignerAccessCode', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ViewDocumentToSign verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/sign?has_accepted_terms=false&signer-access-code=SignerAccessCode', 'ViewDocumentToSign URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/sign?has_accepted_terms=false&expand=envelope&document_id=%3Cstring%3E&signer-access-code=SignerAccessCode', 'ViewDocumentToSign URL');
   Check(Fake.LastAuth = 'signer', 'ViewDocumentToSign authentication');
 
   Response := Client.SignAssignmentItems('DocumentId', 'AssignmentId', 'SignerAccessCode', TestBody);
@@ -638,44 +878,68 @@
   Check(Fake.LastAuth = 'signer', 'DownloadSignatureImage authentication');
 
   TestQuery.Clear;
+  TestQuery.Add('envelope_id=<string>');
   TestQuery.Add('page=1');
   TestQuery.Add('per-page=25');
   Response := Client.ListSignerDocuments('SignerId', 'SignerAccessCode', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListSignerDocuments verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents?page=1&per-page=25&signer-access-code=SignerAccessCode', 'ListSignerDocuments URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents?envelope_id=%3Cstring%3E&page=1&per-page=25&signer-access-code=SignerAccessCode', 'ListSignerDocuments URL');
   Check(Fake.LastAuth = 'signer', 'ListSignerDocuments authentication');
 
   TestQuery.Clear;
+  TestQuery.Add('envelope_id=<string>');
   TestQuery.Add('page=1');
   TestQuery.Add('per-page=25');
   Response := Client.ListSignerDocumentsAsWorkspace('SignerId', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListSignerDocumentsAsWorkspace verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents?page=1&per-page=25', 'ListSignerDocumentsAsWorkspace URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents?envelope_id=%3Cstring%3E&page=1&per-page=25', 'ListSignerDocumentsAsWorkspace URL');
   Check(Fake.LastAuth = 'bearer', 'ListSignerDocumentsAsWorkspace authentication');
 
   TestQuery.Clear;
+  TestQuery.Add('envelope_id=<string>');
   TestQuery.Add('search=<string>');
   Response := Client.SearchSignerDocuments('SignerId', 'SignerAccessCode', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'SearchSignerDocuments verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/search?search=%3Cstring%3E&signer-access-code=SignerAccessCode', 'SearchSignerDocuments URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/search?envelope_id=%3Cstring%3E&search=%3Cstring%3E&signer-access-code=SignerAccessCode', 'SearchSignerDocuments URL');
   Check(Fake.LastAuth = 'signer', 'SearchSignerDocuments authentication');
 
   TestQuery.Clear;
+  TestQuery.Add('envelope_id=<string>');
   TestQuery.Add('search=<string>');
   Response := Client.SearchSignerDocumentsAsWorkspace('SignerId', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'SearchSignerDocumentsAsWorkspace verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/search?search=%3Cstring%3E', 'SearchSignerDocumentsAsWorkspace URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/search?envelope_id=%3Cstring%3E&search=%3Cstring%3E', 'SearchSignerDocumentsAsWorkspace URL');
   Check(Fake.LastAuth = 'bearer', 'SearchSignerDocumentsAsWorkspace authentication');
 
-  Response := Client.DownloadSignerDocumentArtifact('SignerId', 'DocumentId', 'ArtifactName');
+  Response := Client.DownloadSignerDocumentArtifact('SignerId', 'DocumentId', 'ArtifactName', 'SignerAccessCode');
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'DownloadSignerDocumentArtifact verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/DocumentId/download/ArtifactName', 'DownloadSignerDocumentArtifact URL');
-  Check(Fake.LastAuth = 'public', 'DownloadSignerDocumentArtifact authentication');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/SignerId/documents/DocumentId/download/ArtifactName?signer-access-code=SignerAccessCode', 'DownloadSignerDocumentArtifact URL');
+  Check(Fake.LastAuth = 'signer', 'DownloadSignerDocumentArtifact authentication');
+
+  Response := Client.SendCertifiedCopy('SignerAccessCode', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'SendCertifiedCopy verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/sign/certified-copy?signer-access-code=SignerAccessCode', 'SendCertifiedCopy URL');
+  Check(Fake.LastAuth = 'signer', 'SendCertifiedCopy authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'SendCertifiedCopy body');
+  Check(Fake.LastContentType = 'application/json', 'SendCertifiedCopy content type');
+
+  Response := Client.DownloadCertifiedCopy('Token');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'DownloadCertifiedCopy verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/downloads/Token', 'DownloadCertifiedCopy URL');
+  Check(Fake.LastAuth = 'public', 'DownloadCertifiedCopy authentication');
+
+  Response := Client.ResendCertifiedCopy('Token');
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'ResendCertifiedCopy verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signers/downloads/Token/resend', 'ResendCertifiedCopy URL');
+  Check(Fake.LastAuth = 'public', 'ResendCertifiedCopy authentication');
 
   Response := Client.SocialLogin(TestBody);
   Response.Free;
@@ -753,13 +1017,14 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/templates?search=%3Cstring%3E&page=1&per-page=25', 'ListTemplates URL');
   Check(Fake.LastAuth = 'bearer', 'ListTemplates authentication');
 
-  Response := Client.CreateDocumentFromTemplate('', 'TemplateId', TestBody);
+  Response := Client.CreateDocumentFromTemplate('', 'TemplateId', TestBody, 'IdempotencyKey');
   Response.Free;
   Check(Fake.LastMethod = 'POST', 'CreateDocumentFromTemplate verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/templates/TemplateId/documents', 'CreateDocumentFromTemplate URL');
   Check(Fake.LastAuth = 'bearer', 'CreateDocumentFromTemplate authentication');
   Check(Fake.LastBody = JSONText(TestBody), 'CreateDocumentFromTemplate body');
   Check(Fake.LastContentType = 'application/json', 'CreateDocumentFromTemplate content type');
+  Check(Fake.LastIdempotencyKey = 'IdempotencyKey', 'CreateDocumentFromTemplate idempotency header');
 
   Response := Client.EstimateDocumentFromTemplateCost('', 'TemplateId', TestBody);
   Response.Free;
@@ -828,11 +1093,11 @@
   TestQuery.Add('from=1');
   TestQuery.Add('to=1');
   TestQuery.Add('page=1');
-  TestQuery.Add('per-page=1');
+  TestQuery.Add('per-page=25');
   Response := Client.ListWebhookDeliveries('', TestQuery);
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'ListWebhookDeliveries verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks?endpoint_id=%3Cstring%3E&event=%3Cstring%3E&delivered=true&from=1&to=1&page=1&per-page=1', 'ListWebhookDeliveries URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks?endpoint_id=%3Cstring%3E&event=%3Cstring%3E&delivered=true&from=1&to=1&page=1&per-page=25', 'ListWebhookDeliveries URL');
   Check(Fake.LastAuth = 'bearer', 'ListWebhookDeliveries authentication');
 
   Response := Client.RetryWebhookDelivery('', 'HistoryId');
@@ -891,11 +1156,19 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints/EndpointId/secret', 'GetWebhookEndpointSigningSecret URL');
   Check(Fake.LastAuth = 'bearer', 'GetWebhookEndpointSigningSecret authentication');
 
-  Response := Client.RotateWebhookEndpointSigningSecret('', 'EndpointId');
+  Response := Client.RotateWebhookEndpointSigningSecret('', 'EndpointId', TestBody);
   Response.Free;
   Check(Fake.LastMethod = 'POST', 'RotateWebhookEndpointSigningSecret verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints/EndpointId/secret/rotate', 'RotateWebhookEndpointSigningSecret URL');
   Check(Fake.LastAuth = 'bearer', 'RotateWebhookEndpointSigningSecret authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'RotateWebhookEndpointSigningSecret body');
+  Check(Fake.LastContentType = 'application/json', 'RotateWebhookEndpointSigningSecret content type');
+
+  Response := Client.SendWebhookTestDelivery('', 'EndpointId');
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'SendWebhookTestDelivery verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/webhooks/endpoints/EndpointId/test', 'SendWebhookTestDelivery URL');
+  Check(Fake.LastAuth = 'bearer', 'SendWebhookTestDelivery authentication');
 
   Response := Client.GetOAuthResourceMetadata;
   Response.Free;

@@ -82,6 +82,29 @@ class GeneratorTests(unittest.TestCase):
             with self.subTest(security=security), self.assertRaises(ValueError):
                 self.operation(security)
 
+    def test_workspace_document_calls_keep_their_authentication(self):
+        operations = {op['name']: op for op in generate.operations()}
+        for name in ['GetDocument', 'DownloadDocumentArtifact', 'ValidateFieldValue',
+                     'ValidateMultipleFieldValues', 'DownloadDocumentThumbnail', 'DownloadDocumentPage']:
+            self.assertEqual(operations[name]['auth'], 'aaAPI')
+            self.assertNotIn('SignerAccessCode', [x[0] for x in operations[name]['args']])
+            signer = operations[name + 'AsSigner']
+            self.assertEqual(signer['auth'], 'aaSigner')
+            self.assertIn(('SignerAccessCode', 'string', None), signer['args'])
+        self.assertIn('DownloadSignerDocumentArtifact', operations)
+
+    def test_header_parameters_cannot_be_silently_dropped(self):
+        with self.assertRaisesRegex(ValueError, 'Unsupported parameter'):
+            self.operation([], parameters=[{'name': 'Unknown-Header', 'in': 'header'}])
+        operations = {op['name']: op for op in generate.operations()}
+        for name in ['CreateEnvelope', 'CreateDocumentFromTemplate']:
+            self.assertIn(('IdempotencyKey', 'string', "''"), operations[name]['args'])
+
+    def test_documented_redirect_is_returned_without_following(self):
+        operation = next(op for op in generate.operations() if op['name'] == 'DownloadCertifiedCopy')
+        self.assertTrue(operation['redirect'])
+        self.assertIn(", '', True);", generate.generate_methods([operation])['src/methods.inc'])
+
     def test_path_parameter_must_exist_in_uri(self):
         with self.assertRaises(ValueError):
             self.operation([], parameters=[{'name': 'unexpected', 'in': 'path'}])
