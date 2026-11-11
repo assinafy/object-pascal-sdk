@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.6.2] - 2026-11-11
+
+- Run macOS builds and tests on the supported macOS 15 GitHub Actions runner.
+
 ## [0.6.1] - 2026-11-11
 
 - Add the optional `PAdES` argument to `DownloadCertifiedCopy` for the published PAdES download URL, preserving the existing default PDF behavior.
