@@ -7,7 +7,8 @@ from pathlib import Path
 from urllib.parse import quote, urlencode
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = json.loads((ROOT / 'docs/openapi.json').read_text(encoding='utf-8'))
+PRODUCTION = json.loads((ROOT / 'docs/openapi.json').read_text(encoding='utf-8'))
+SPEC = json.loads((ROOT / 'docs/openapi-stage.json').read_text(encoding='utf-8'))
 METHODS = {'get', 'post', 'put', 'patch', 'delete'}
 SECURITY_MODES = {
     frozenset(): 'aaPublic',
@@ -20,7 +21,7 @@ SECURITY_MODES = {
 }
 MULTIPART_MEDIA = {'/v1/accounts/{accountId}/documents': 'application/pdf',
                    '/v1/accounts/{accountId}/logo': 'application/octet-stream'}
-CERTIFICATE_METHOD_VALIDATION = {'CreateAssignment', 'EstimateAssignmentCost'}
+CERTIFICATE_METHOD_VALIDATION = {'CreateAssignment', 'EstimateAssignmentCost', 'ScheduleAssignment'}
 WORKSPACE_FIRST = {'GetDocument', 'DownloadDocumentArtifact', 'ValidateFieldValue',
                    'ValidateMultipleFieldValues', 'DownloadDocumentThumbnail', 'DownloadDocumentPage'}
 DIRECT_CERTIFICATE_NOTE = (
@@ -32,11 +33,19 @@ DIRECT_CERTIFICATE_NOTE = (
 SDK_OPERATION_NOTES = {
     'CreateAssignment': DIRECT_CERTIFICATE_NOTE,
     'EstimateAssignmentCost': DIRECT_CERTIFICATE_NOTE,
+    'ScheduleAssignment': DIRECT_CERTIFICATE_NOTE,
     'DownloadCertifiedCopy': 'Set the optional SDK argument `PAdES` to `True` to request '
     'the documented `/pades` variant. The default downloads the certified PDF. '
     'The token remains one percent-encoded path segment in both forms.',
 }
 OVERRIDES = {
+    "List a document's watchers": 'ListDocumentWatchers',
+    "Set a document's watchers": 'SetDocumentWatchers',
+    'Get notification history with delivery times': 'GetDocumentNotificationHistory',
+    'Schedule an assignment': 'ScheduleAssignment',
+    'Schedule an envelope': 'ScheduleEnvelope',
+    'Cancel a scheduled send': 'CancelScheduledSend',
+    'Send a scheduled send now': 'SendScheduledSendNow',
     'Exchange a code, refresh token, or subject token for an access token': 'ExchangeOAuthToken',
     'Revoke a token': 'RevokeOAuthToken',
     'OpenID Connect userinfo': 'GetOAuthUserInfo',
@@ -140,7 +149,10 @@ def operations():
             api = auth in {'aaAPI', 'aaBearer', 'aaSignerOrAPI'}
             body_spec = resolve(operation.get('requestBody', {}))
             content = body_spec.get('content', {})
-            if len(content) > 1 and set(content) != {'application/json', 'application/x-www-form-urlencoded'}:
+            binary_media = bool(content) and all(
+                resolve(item.get('schema', {})).get('format') == 'binary'
+                for item in content.values())
+            if len(content) > 1 and not binary_media and set(content) != {'application/json', 'application/x-www-form-urlencoded'}:
                 raise ValueError(f'Unsupported request media alternatives: {path}')
             file_field, media_type = '', ''
             custom_media = False
@@ -154,14 +166,15 @@ def operations():
                     raise ValueError(f'Multipart field must be binary: {path}')
                 media_type = multipart.get('encoding', {}).get(file_field, {}).get('contentType', '')
                 media_type = media_type or resolve(file_schema).get('contentMediaType', '')
-                custom_media = not media_type and MULTIPART_MEDIA.get(path) == 'application/octet-stream'
+                custom_media = not media_type and path in MULTIPART_MEDIA
                 media_type = media_type or MULTIPART_MEDIA.get(path, '')
                 if not media_type or ',' in media_type:
                     raise ValueError(f'Explicit multipart content type required: {path}')
             elif content and 'application/json' not in content:
-                if len(content) != 1:
+                if len(content) != 1 and not binary_media:
                     raise ValueError(f'Unsupported request media: {path}')
                 media_type = next(iter(content))
+                custom_media = len(content) > 1
                 if resolve(content[media_type].get('schema', {})).get('format') != 'binary':
                     raise ValueError(f'Unsupported request body: {path}')
             is_file = bool(media_type)
@@ -182,7 +195,7 @@ def operations():
             if has_query:
                 args.append(('Query', 'TStrings', 'nil'))
             if custom_media:
-                args.append(('ContentType', 'string', "'application/octet-stream'"))
+                args.append(('ContentType', 'string', repr(media_type)))
             if idempotency:
                 args.append(('IdempotencyKey', 'string', "''"))
             if name == 'DownloadCertifiedCopy':
@@ -268,6 +281,9 @@ def generate_methods(ops):
             impl.append("  RequireValue(FileName, 'File name');")
         if op['custom_media']:
             impl.append("  RequireValue(ContentType, 'File content type');")
+            if not op['file_field']:
+                allowed = ' and '.join(f"(ContentType <> '{media}')" for media in op['content'])
+                impl.append(f"  if {allowed} then raise EAssinafyInputError.Create('Unsupported file content type');")
         field = "'" + op['file_field'].replace("'", "''") + "'"
         media = "'" + op['media_type'].replace("'", "''") + "'"
         request_media = 'ContentType' if op['custom_media'] else media
@@ -373,11 +389,37 @@ def query_value(schema):
     return str(value)
 
 
+def wire_contract(value):
+    if isinstance(value, dict):
+        return {key: wire_contract(item) for key, item in value.items()
+                if key not in {'description', 'summary', 'example', 'examples', 'tags', 'externalDocs'}}
+    if isinstance(value, list):
+        return [wire_contract(item) for item in value]
+    return value
+
+
 def generate_docs(ops):
-    lines = ['# API reference', '', 'Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).', '', f'The client exposes all {len({(op["verb"], op["path"]) for op in ops})} published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).', '', '## Ownership and payloads', '', 'Every call returns a caller-owned `TAssinafyResponse`; free it in `finally`. `Response.JSON` contains the entire wire response; `Response.Data` refers to the envelope’s `data`, or the entire flat OAuth response. Both are borrowed until `Response.Free`. Requests borrow `Body` and `Query`; the caller frees them. Empty account IDs use the client’s configured account. Other path parameters are required and percent-encoded.', '', '`Query` is a `TStrings` of decoded `name=value` pairs; use the exact API field names. The SDK percent-encodes names and values, preserving duplicates and empty values. Send JSON booleans, arrays, numbers and explicit nulls using `AssinafyJson` helpers or the compiler’s native JSON classes. Binary response bytes remain in `Response.Body`; use `Response.SaveToStream` to write them after a successful request.', '', 'Payload examples show the documented fields, including optional fields. They illustrate shapes; follow each schema’s `required`, `enum`, constraints and descriptions when constructing an actual request. Placeholder values and mutually exclusive variants must be replaced with valid values. `{}` denotes an open object whose fields the API does not specify.', '', '## Operations', '', '| Method | HTTP operation |', '| --- | --- |']
+    production_count = sum(verb in METHODS for item in PRODUCTION['paths'].values() for verb in item)
+    staging_count = sum(verb in METHODS for item in SPEC['paths'].values() for verb in item)
+    contracts = (f'Contracts: [production](openapi.json) ({production_count} operations) and '
+                f'[staging](openapi-stage.json) ({staging_count} operations). '
+                'Staging base URL: `https://api.angry-pisco.stage.assinafy.com.br/v1`. '
+                'The request/response reference below uses staging; staging-only routes are marked. '
+                'Where production has a different wire contract, its complete operation is included too. '
+                'Shared schemas are identical unless explicitly marked. Server deployment determines availability.')
+    coverage = (f'The client exposes all {len({(op["verb"], op["path"]) for op in ops})} operations '
+                'across these environments. Shared request/response models are defined in [Schemas](SCHEMAS.md).')
+    lines = ['# API reference', '', contracts, '', coverage, '', '## Ownership and payloads', '', 'Every call returns a caller-owned `TAssinafyResponse`; free it in `finally`. `Response.JSON` contains the entire wire response; `Response.Data` refers to the envelope’s `data`, or the entire flat OAuth response. Both are borrowed until `Response.Free`. Requests borrow `Body` and `Query`; the caller frees them. Empty account IDs use the client’s configured account. Other path parameters are required and percent-encoded.', '', '`Query` is a `TStrings` of decoded `name=value` pairs; use the exact API field names. The SDK percent-encodes names and values, preserving duplicates and empty values. Send JSON booleans, arrays, numbers and explicit nulls using `AssinafyJson` helpers or the compiler’s native JSON classes. Binary response bytes remain in `Response.Body`; use `Response.SaveToStream` to write them after a successful request.', '', 'Payload examples show the documented fields, including optional fields. They illustrate shapes; follow each schema’s `required`, `enum`, constraints and descriptions when constructing an actual request. Placeholder values and mutually exclusive variants must be replaced with valid values. `{}` denotes an open object whose fields the API does not specify.', '', '## Operations', '', '| Method | HTTP operation |', '| --- | --- |']
     lines += [f"| [{op['name']}](#{op['name'].lower()}) | `{op['verb']} {op['path']}` |" for op in ops]
     for op in ops:
         lines += ['', f"## {op['name']}", '', code(f"function {op['name']}{signature(op)}: TAssinafyResponse;", 'pascal'), f"`{op['verb']} {op['path']}`", '', op['op'].get('description', op['op']['summary']), '']
+        production = PRODUCTION['paths'].get(op['path'], {}).get(op['verb'].lower())
+        if production is None:
+            lines += ['**Availability:** staging only; not published by production.', '']
+        elif wire_contract(production) != wire_contract(op['op']):
+            lines += ['**Production contract:** the operation below uses references from '
+                      '[production OpenAPI](openapi.json). Subsequent payloads describe staging.', '',
+                      code(production)]
         if op['name'] in SDK_OPERATION_NOTES:
             lines += [SDK_OPERATION_NOTES[op['name']], '']
         if op['workspace_of']:
@@ -391,7 +433,8 @@ def generate_docs(ops):
         auth = {'aaPublic': 'Public: workspace credentials are omitted.', 'aaAPI': 'API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.', 'aaSigner': 'Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.', 'aaSignerOrAPI': f"Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [{op['name']}AsWorkspace](#{op['name'].lower()}asworkspace).", 'aaBearer': 'Required bearer access token (`Client.AccessToken`).'}[op['auth']]
         lines += ['**Authentication:** ' + auth, '', '**Parameters:**']
         if op['custom_media']:
-            lines += ['', '`ContentType` is an optional SDK parameter for the file part media type (for example `image/png` or `image/jpeg`); the default is `application/octet-stream`. It does not add a JSON field.']
+            lines += ['', f"`ContentType` selects the upload media type; default `{op['media_type']}`. "
+                      'It does not add a JSON field. All uploads are limited by the SDK to 25 MiB.']
         if not op['parameters']:
             lines += ['', 'No path or query parameters.']
         for parameter in op['parameters']:
@@ -427,9 +470,16 @@ def generate_docs(ops):
                           '**Payload shape:**', '', code(content.get('example', example(schema)))]
             for status, response in operation['responses'].items():
                 lines += ['', f"**Response `{status}`:** {resolve(response).get('description', '')}"]
-    schemas = ['# Payload schemas', '', 'Complete shared request and response schemas from the [published API](https://api.assinafy.com.br/v1/docs). References use the identifiers in [openapi.json](openapi.json).', '']
+    schemas = ['# Payload schemas', '', 'Complete shared request and response schemas from '
+               '[production](openapi.json) and [staging](openapi-stage.json). '
+               'Staging schemas appear below; production variants and staging-only models are marked. '
+               'References use the identifiers in the corresponding contract.', '']
     for name, schema in SPEC['components'].get('schemas', {}).items():
         schemas += [f'## {name}', '', code(schema), '**Payload shape:**', '', code(example(schema))]
+        if name not in PRODUCTION['components']['schemas']:
+            schemas += ['Staging only.', '']
+        elif wire_contract(schema) != wire_contract(PRODUCTION['components']['schemas'][name]):
+            schemas += ['**Production schema:**', '', code(PRODUCTION['components']['schemas'][name])]
     return {'docs/API.md': '\n'.join(lines) + '\n', 'docs/SCHEMAS.md': '\n'.join(schemas) + '\n'}
 
 

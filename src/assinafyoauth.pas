@@ -198,6 +198,19 @@ procedure ValidateEnvironment(Client: TAssinafyClient; const Config: TAssinafyOA
 var
   API, Resource, IssuerURI: TAssinafyURI;
   Issuer: string;
+  APIEnvironment, IssuerEnvironment: Integer;
+  function Environment(const Host: string): Integer;
+  var Normalized: string;
+  begin
+    Normalized := LowerCase(Host);
+    if (Normalized <> '') and (Normalized[Length(Normalized)] = '.') then
+      Delete(Normalized, Length(Normalized), 1);
+    if (Normalized = 'api.assinafy.com.br') or (Normalized = 'auth.assinafy.com.br') then Exit(1);
+    if (Normalized = 'sandbox.assinafy.com.br') or (Normalized = 'auth-sandbox.assinafy.com.br') then Exit(2);
+    if Copy(Normalized, Length(Normalized) - Length('.stage.assinafy.com.br') + 1, MaxInt) =
+      '.stage.assinafy.com.br' then Exit(3);
+    Result := 0;
+  end;
 begin
   API := ParseAssinafyURI(Client.BaseURL);
   if Config.Resource <> '' then
@@ -215,8 +228,10 @@ begin
   if Issuer = '' then Issuer := AssinafyOAuthIssuer;
   RequireHTTPS(Issuer, 'Issuer');
   IssuerURI := ParseAssinafyURI(Issuer);
-  if (SameText(API.Host, 'api.assinafy.com.br') and SameText(IssuerURI.Host, 'auth-sandbox.assinafy.com.br')) or
-    (SameText(API.Host, 'sandbox.assinafy.com.br') and SameText(IssuerURI.Host, 'auth.assinafy.com.br')) then
+  APIEnvironment := Environment(API.Host);
+  IssuerEnvironment := Environment(IssuerURI.Host);
+  if (APIEnvironment <> 0) and (IssuerEnvironment <> 0) and
+    (APIEnvironment <> IssuerEnvironment) then
     raise EAssinafyInputError.Create('OAuth issuer and API must use the same environment');
 end;
 

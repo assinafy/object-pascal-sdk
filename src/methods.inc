@@ -128,6 +128,12 @@ begin
     nil, Body, '', '', 'application/json', '');
 end;
 
+function TAssinafyClient.GetSignerCapacities(const DocumentId: string): TAssinafyResponse;
+begin
+  Result := Call('GET', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/signer-capacities', aaAPI,
+    nil, nil, '', '', '', '');
+end;
+
 function TAssinafyClient.Login(Body: TJSONData): TAssinafyResponse;
 begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
@@ -206,11 +212,12 @@ begin
     Query, nil, '', '', '', '');
 end;
 
-function TAssinafyClient.UploadDocument(const AAccountId: string; const FileName: string): TAssinafyResponse;
+function TAssinafyClient.UploadDocument(const AAccountId: string; const FileName: string; const ContentType: string): TAssinafyResponse;
 begin
   RequireValue(FileName, 'File name');
+  RequireValue(ContentType, 'File content type');
   Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/documents', aaAPI,
-    nil, nil, FileName, 'file', 'application/pdf', '');
+    nil, nil, FileName, 'file', ContentType, '');
 end;
 
 function TAssinafyClient.SearchDocuments(const AAccountId: string; Query: TStrings): TAssinafyResponse;
@@ -292,6 +299,19 @@ function TAssinafyClient.DetachDocumentTag(const AAccountId: string; const Docum
 begin
   Result := Call('DELETE', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/documents/' + PathValue(DocumentId, 'DocumentId') + '/tags/' + PathValue(TagId, 'TagId'), aaAPI,
     nil, nil, '', '', '', '');
+end;
+
+function TAssinafyClient.ListDocumentWatchers(const DocumentId: string): TAssinafyResponse;
+begin
+  Result := Call('GET', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/watchers', aaAPI,
+    nil, nil, '', '', '', '');
+end;
+
+function TAssinafyClient.SetDocumentWatchers(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
+begin
+  if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  Result := Call('PUT', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/watchers', aaAPI,
+    nil, Body, '', '', 'application/json', '');
 end;
 
 function TAssinafyClient.ListEmbedOrigins(const AAccountId: string): TAssinafyResponse;
@@ -392,6 +412,12 @@ end;
 function TAssinafyClient.RemindEnvelopeSigner(const AAccountId: string; const EnvelopeId: string; const SignerId: string): TAssinafyResponse;
 begin
   Result := Call('PUT', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/envelopes/' + PathValue(EnvelopeId, 'EnvelopeId') + '/signers/' + PathValue(SignerId, 'SignerId') + '/resend', aaAPI,
+    nil, nil, '', '', '', '');
+end;
+
+function TAssinafyClient.EstimateEnvelopeReminderCost(const AAccountId: string; const EnvelopeId: string; const SignerId: string): TAssinafyResponse;
+begin
+  Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/envelopes/' + PathValue(EnvelopeId, 'EnvelopeId') + '/signers/' + PathValue(SignerId, 'SignerId') + '/estimate-resend-cost', aaAPI,
     nil, nil, '', '', '', '');
 end;
 
@@ -507,6 +533,12 @@ begin
     nil, Body, '', '', 'application/json', '');
 end;
 
+function TAssinafyClient.GetDocumentNotificationHistory(const DocumentId: string): TAssinafyResponse;
+begin
+  Result := Call('GET', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/notification-history', aaAPI,
+    nil, nil, '', '', '', '');
+end;
+
 function TAssinafyClient.GetNotificationPolicy(const AAccountId: string): TAssinafyResponse;
 begin
   Result := Call('GET', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/notification-policy', aaAPI,
@@ -601,6 +633,39 @@ begin
   if Body = nil then raise EAssinafyInputError.Create('Request body is required');
   Result := Call('PUT', '/users/self/push-preferences', aaAPI,
     nil, Body, '', '', 'application/json', '');
+end;
+
+function TAssinafyClient.ScheduleAssignment(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
+begin
+  if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  ValidateDigitalCertificateMethod(Body);
+  Result := Call('POST', '/documents/' + PathValue(DocumentId, 'DocumentId') + '/scheduled-sends', aaAPI,
+    nil, Body, '', '', 'application/json', '');
+end;
+
+function TAssinafyClient.ListScheduledSends(const AAccountId: string; Query: TStrings): TAssinafyResponse;
+begin
+  Result := Call('GET', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/scheduled-sends', aaAPI,
+    Query, nil, '', '', '', '');
+end;
+
+function TAssinafyClient.ScheduleEnvelope(const AAccountId: string; Body: TJSONData): TAssinafyResponse;
+begin
+  if Body = nil then raise EAssinafyInputError.Create('Request body is required');
+  Result := Call('POST', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/scheduled-sends', aaAPI,
+    nil, Body, '', '', 'application/json', '');
+end;
+
+function TAssinafyClient.CancelScheduledSend(const AAccountId: string; const ScheduledSendId: string): TAssinafyResponse;
+begin
+  Result := Call('PUT', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/scheduled-sends/' + PathValue(ScheduledSendId, 'ScheduledSendId') + '/cancel', aaAPI,
+    nil, nil, '', '', '', '');
+end;
+
+function TAssinafyClient.SendScheduledSendNow(const AAccountId: string; const ScheduledSendId: string): TAssinafyResponse;
+begin
+  Result := Call('PUT', '/accounts/' + PathValue(AAccountId, 'AccountId') + '/scheduled-sends/' + PathValue(ScheduledSendId, 'ScheduledSendId') + '/send', aaAPI,
+    nil, nil, '', '', '', '');
 end;
 
 function TAssinafyClient.ListSigners(const AAccountId: string; Query: TStrings): TAssinafyResponse;
@@ -726,11 +791,13 @@ begin
     nil, nil, '', '', '', SignerAccessCode);
 end;
 
-function TAssinafyClient.UploadSignatureImage(const SignerAccessCode: string; const FileName: string; Query: TStrings): TAssinafyResponse;
+function TAssinafyClient.UploadSignatureImage(const SignerAccessCode: string; const FileName: string; Query: TStrings; const ContentType: string): TAssinafyResponse;
 begin
   RequireValue(FileName, 'File name');
+  RequireValue(ContentType, 'File content type');
+  if (ContentType <> 'image/png') and (ContentType <> 'image/jpeg') then raise EAssinafyInputError.Create('Unsupported file content type');
   Result := Call('POST', '/signature', aaSigner,
-    Query, nil, FileName, '', 'image/png', SignerAccessCode);
+    Query, nil, FileName, '', ContentType, SignerAccessCode);
 end;
 
 function TAssinafyClient.DownloadSignatureImage(const SignatureType: string; const SignerAccessCode: string): TAssinafyResponse;

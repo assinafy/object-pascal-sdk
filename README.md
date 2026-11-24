@@ -1,10 +1,10 @@
 # Assinafy Object Pascal SDK
 
-Cliente nativo para as 147 operações publicadas da [API Assinafy v1](https://api.assinafy.com.br/v1/docs), compatível com Free Pascal/Lazarus e, experimentalmente, Delphi 12+ no Windows. A [referência da API](docs/API.md) contém cada método, parâmetro, payload, resposta, erro e modo de autenticação; [esquemas](docs/SCHEMAS.md), [tipos e helpers](docs/SDK.md) e o [OpenAPI](docs/openapi.json) completam a documentação.
+Cliente nativo para as 147 operações de [produção](https://api.assinafy.com.br/v1/docs) e as 157 de [staging](https://api.angry-pisco.stage.assinafy.com.br/v1/docs), compatível com Free Pascal/Lazarus e, experimentalmente, Delphi 12+ no Windows. A [referência da API](docs/API.md) contém cada método, ambiente, parâmetro, payload, resposta, erro e modo de autenticação; [esquemas](docs/SCHEMAS.md), [tipos e helpers](docs/SDK.md) e os contratos [produção](docs/openapi.json)/[staging](docs/openapi-stage.json) completam a documentação.
 
 ## Requisitos e instalação
 
-Free Pascal 3.2.2 é a versão estável oficial atual; o projeto não publica um canal LTS separado. O SDK usa FCL, libcurl com TLS 1.2+ e OpenSSL 3 `libcrypto`. Adicione `src` aos caminhos de unidades e includes:
+Free Pascal 3.2.2 é a versão estável oficial atual; o projeto não publica um canal LTS separado. O SDK usa FCL, libcurl com TLS 1.2+ e OpenSSL 3 `libcrypto`; prefira OpenSSL 3.5 LTS ou os pacotes de segurança mantidos pela distribuição. Adicione `src` aos caminhos de unidades e includes:
 
 ```sh
 git clone https://github.com/assinafy/object-pascal-sdk.git
@@ -26,6 +26,8 @@ A integração Delphi usa `System.JSON`, `System.Net.HttpClient` e o armazenamen
 
 Produção usa `https://api.assinafy.com.br/v1`; sandbox usa `https://sandbox.assinafy.com.br/v1`. Os exemplos leem `ASSINAFY_BASE_URL`, `ASSINAFY_API_KEY`, `ASSINAFY_ACCOUNT_ID` e `ASSINAFY_ACCESS_TOKEN`; [.env.example](.env.example) lista também as opções OAuth. Nunca combine API key e Bearer. Em OAuth, chame `ListMyAccounts` e salve o workspace autorizado junto dos tokens.
 
+Staging usa `https://api.angry-pisco.stage.assinafy.com.br/v1`, separado de sandbox. Para OAuth, use a origem `resource` e o emissor retornados pela descoberta: staging anuncia a origem canônica `https://api.elated-rosettes.stage.assinafy.com.br`. Configure o cliente OAuth nessa origem com `/v1`.
+
 ```pascal
 Client := TAssinafyClient.Create(
   GetEnvironmentVariable('ASSINAFY_API_KEY'),
@@ -40,7 +42,7 @@ Métodos públicos omitem credenciais. Métodos de signatário enviam somente o 
 
 ## Fluxo completo do documento
 
-1. Envie um PDF de até 25 MiB/2.000 páginas e guarde seu ID. Uma atribuição `virtual` pode ser criada durante o processamento; `collect` exige `metadata_ready` para posicionar campos.
+1. Envie um PDF, DOC, DOCX ou ODT de até 25 MiB/2.000 páginas e guarde seu ID; arquivos Office são convertidos em PDF. `UploadDocument` aceita `ContentType` opcional, mantendo `application/pdf` por padrão. Uma atribuição `virtual` pode ser criada durante o processamento; `collect` exige `metadata_ready` para posicionar campos.
 2. Crie ou reutilize signatários. Guarde seus IDs e informe CPF/CNPJ em `government_id` quando o método exigir.
 3. Escolha verificação e notificação, estime o custo e confira `has_sufficient_resources`.
 4. Crie a atribuição. Preserve etapas contíguas; entregue cada URL de assinatura apenas ao destinatário correto e nunca a registre em logs.
@@ -84,6 +86,8 @@ finally AssignmentBody.Free; end;
 
 Envie exatamente um canal. A API pode inferi-lo quando omitido. A1/A3 ocorre na página de assinatura da Assinafy; o SDK não inventa nem transporta a cerimônia do dispositivo. `collect` com certificado é rejeitado antes da rede. Templates aceitam certificado somente quando não geram campos de signatário.
 
+Antes de assinar, confirme os dados com `ConfirmSignerData`, registre a aceitação dos termos e valide o OTP com `VerifySignerCode`. `SignAssignmentItems` recebe `[]` para `virtual` e os itens preenchidos para `collect`. `UploadSignatureImage` mantém PNG por padrão; staging aceita também `ContentType = 'image/jpeg'`. O limite do SDK é 25 MiB por imagem.
+
 ### Verificação biométrica e análise de identidade
 
 `GetIdentityVerificationStatus` e `StartIdentityVerification` recebem apenas o código do signatário. Inicie com `{"consent":true}` somente após consentimento; siga `can_start`, preserve a URL inteira com fragmento e reinicie apenas sessões `Expired`. `InReview` permite assinatura enquanto a certificação aguarda e `pending_identity_review` não é falha terminal.
@@ -115,7 +119,7 @@ Response := ExchangeCode(OAuthClient, Config, Code, PKCE.Verifier);
 1. Envie os PDFs e aguarde `metadata_ready`. Monte `documents` com IDs e `signer_ids`, e `signers` com os IDs, métodos de verificação e canais. Envelopes aceitam até 20 documentos e 20 signatários, sem etapas; certificado exige documento virtual com um signatário.
 2. Chame `EstimateEnvelopeCost` e depois `CreateEnvelope(AccountID, Body, IdempotencyKey)`, com uma chave única por envelope e `max_total_credits` se precisar limitar gastos. A criação envia convites; `200` não garante entrega: confira `notification_history`. `CreateDocumentFromTemplate` também aceita `IdempotencyKey` opcional.
 3. Use `GetEnvelope`, `UpdateEnvelope`, `ListEnvelopeActivities` e `DownloadEnvelopeArtifacts`. Adicionar/remover documentos e cancelar podem notificar destinatários. `DeleteEnvelope` exige documentos encerrados e preserva os documentos individuais.
-4. Para incorporar assinatura, configure origens HTTPS exatas com `AddEmbedOrigin` e envie `embedded: true` no signatário. `signing_urls[].url` será nulo. Crie `CreateEmbedSession`, use sua URL privada no iframe e troque o token com `ExchangeEmbedSession`; a troca é pública e não envia credenciais do workspace. Preserve a verificação do canal e as origens permitidas; não exponha a API key ao navegador.
+4. Para incorporar assinatura, configure origens HTTPS exatas com `AddEmbedOrigin` e envie `embedded: true` no signatário. `signing_urls[].url` será nulo. Crie `CreateEmbedSession` e use sua URL privada no iframe; a página da Assinafy faz a troca única do token (`ExchangeEmbedSession`). Preserve a verificação do canal e as origens permitidas; não exponha a API key ao navegador.
 
 `GetNotificationPolicy`/`UpdateNotificationPolicy` configuram avisos do workspace; `GetPushPreferences`/`UpdatePushPreferences` tratam preferências push. `SendCertifiedCopy` e `ResendCertifiedCopy` enviam novas cópias ao destinatário. `DownloadCertifiedCopy(Token, True)` baixa a versão PAdES; sem o segundo argumento, baixa o PDF certificado. O método pode retornar `302`: leia `Response.Header('Location')`; o SDK não segue o redirecionamento. Contratos completos e restrições OAuth estão em [docs/API.md](docs/API.md).
 
@@ -132,7 +136,9 @@ Verifique os bytes originais antes do JSON, rejeite timestamps fora de cinco min
 
 ## Contratos, modelos e demais recursos
 
-O SDK inclui documentos, contratos e termos, renovação/encerramento, relações entre contratos, templates, campos, etiquetas, usuários, sessões, MFA, preferências, workspaces, webhooks e artefatos. Não há modelos Pascal que descartem campos: requisições/respostas usam JSON nativo e preservam nulos, arrays, números e extensões futuras. Consulte [docs/API.md](docs/API.md) para as 147 operações e [docs/SCHEMAS.md](docs/SCHEMAS.md) para os 62 modelos compartilhados.
+O SDK inclui documentos, contratos e termos, renovação/encerramento, relações entre contratos, templates, campos, etiquetas, usuários, sessões, MFA, preferências, workspaces, webhooks e artefatos. Não há modelos Pascal que descartem campos: requisições/respostas usam JSON nativo e preservam nulos, arrays, números e extensões futuras. Consulte [docs/API.md](docs/API.md) para as 157 operações e [docs/SCHEMAS.md](docs/SCHEMAS.md) para os 63 modelos compartilhados.
+
+Em staging, `ScheduleAssignment` e `ScheduleEnvelope` guardam o payload de criação mais `send_at` (entre uma hora e 90 dias); `ListScheduledSends`, `CancelScheduledSend` e `SendScheduledSendNow` acompanham, cancelam ou enviam imediatamente. Não há cobrança ao agendar; o envio verifica novamente permissões e saldo. Agendar não aceita idempotência nem faz retry automático. `SetDocumentWatchers`/`ListDocumentWatchers` gerenciam até dez contatos notificados ao encerrar; envie `watcher_ids: []` para removê-los. `GetSignerCapacities` lê `sign_as`, `GetDocumentNotificationHistory` inclui entrega/abertura e `EstimateEnvelopeReminderCost` estima sem enviar. Essas dez operações ainda não constam no contrato de produção.
 
 ## Respostas, erros e testes
 
@@ -142,7 +148,7 @@ Cada `TAssinafyResponse`, body JSON e query criados pelo chamador precisam de `F
 make check
 ```
 
-Esse comando verifica o contrato, compila com warnings como erros e executa testes das 147 operações, OAuth, criptografia, JSON, HTTP/TLS, multipart/binário e exemplos. `make live` usa sandbox por padrão; produção exige `ASSINAFY_TEST_PRODUCTION=1`. Mutações isoladas exigem também `ASSINAFY_TEST_MUTATIONS=1` e `ASSINAFY_TEST_PDF`; em produção não enviam convites e removem os recursos criados. Testes de consentimento OAuth, OTP, biometria e A1/A3 exigem pessoas/canais/dispositivos próprios e não devem ser simulados em produção.
+Esse comando verifica os contratos, compila com warnings como erros e executa testes das 157 operações, OAuth, criptografia, JSON, HTTP/TLS, multipart/binário e exemplos. `make live` usa sandbox por padrão; produção exige `ASSINAFY_TEST_PRODUCTION=1`. Mutações isoladas exigem também `ASSINAFY_TEST_MUTATIONS=1` e `ASSINAFY_TEST_PDF`; em produção não enviam convites e removem os recursos criados. Testes de consentimento OAuth, OTP, biometria e A1/A3 exigem pessoas/canais/dispositivos próprios e não devem ser simulados em produção.
 
 ## Licença
 

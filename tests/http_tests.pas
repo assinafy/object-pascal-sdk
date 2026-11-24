@@ -49,6 +49,44 @@ begin
       Check(JSONString(JSONFind(Response.Data, 'authorization')) = 'Bearer test-bearer', 'Bearer reaches HTTP server');
       Check(JSONString(JSONFind(Response.Data, 'key')) = '', 'Bearer suppresses API key');
     finally Response.Free; end;
+    FlowBody := JSONObj(['send_at', '2030-01-01T12:00:00Z', 'expires_at', nil,
+      'signers', JSONArr([JSONObj(['id', 'signer', 'sign_as', 'Witness'])])]);
+    try
+      Response := Client.ScheduleAssignment('document', FlowBody);
+      try
+        Check(JSONString(JSONFind(Response.Data, 'status')) = 'pending', 'Scheduled assignment status');
+        Check(JSONKind(JSONFind(Response.Data, 'assignment_id')) = jtNull, 'Pending assignment ID is null');
+      finally Response.Free; end;
+      JSONAdd(FlowBody, 'documents', JSONArr([JSONObj(['id', 'document'])]));
+      Response := Client.ScheduleEnvelope('account', FlowBody);
+      try Check(JSONString(JSONFind(Response.Data, 'type')) = 'envelope', 'Scheduled envelope response');
+      finally Response.Free; end;
+    finally FlowBody.Free; end;
+    Query.Add('document_id=doc/with space');
+    Response := Client.ListScheduledSends('account', Query);
+    try Check((Response.Data is TJSONArray) and (TJSONArray(Response.Data).Count = 1), 'Schedule list response');
+    finally Response.Free; Query.Clear; end;
+    Response := Client.CancelScheduledSend('account', 'scheduled');
+    try Check(JSONString(JSONFind(Response.Data, 'status')) = 'cancelled', 'Schedule cancellation response');
+    finally Response.Free; end;
+    Response := Client.SendScheduledSendNow('account', 'scheduled');
+    try Check(JSONString(JSONFind(Response.Data, 'assignment_id')) = 'assignment', 'Immediate send result');
+    finally Response.Free; end;
+    FlowBody := JSONObj(['watcher_ids', JSONArr([])]);
+    try Response := Client.SetDocumentWatchers('document', FlowBody); Response.Free;
+    finally FlowBody.Free; end;
+    Response := Client.ListDocumentWatchers('document');
+    try Check((Response.Data is TJSONArray) and (TJSONArray(Response.Data).Count = 0), 'Empty watcher list');
+    finally Response.Free; end;
+    Response := Client.GetSignerCapacities('document');
+    try Check(JSONString(JSONFind(TJSONArray(Response.Data).Items[0], 'sign_as')) = 'Witness', 'Signer capacity retained');
+    finally Response.Free; end;
+    Response := Client.GetDocumentNotificationHistory('document');
+    try Check(JSONKind(JSONFind(TJSONArray(Response.Data).Items[0], 'notification_history')) = jtArray, 'Notification history array');
+    finally Response.Free; end;
+    Response := Client.EstimateEnvelopeReminderCost('account', 'envelope', 'signer');
+    try Check(JSONBoolean(JSONFind(Response.Data, 'has_sufficient_credits')), 'Reminder estimate response');
+    finally Response.Free; end;
     FlowBody := JSONObj(['name', 'Envelope', 'max_total_credits', 1.5,
       'signers', JSONArr([JSONObj(['id', 'signer', 'embedded', True])]),
       'documents', JSONArr([JSONObj(['id', 'document', 'signer_ids', JSONArr(['signer'])])])]);
@@ -159,6 +197,11 @@ begin
       Check(JSONString(JSONFind(Response.Data, 'file_name')) = 'fixture.pdf', 'Multipart filename retained');
       Check(JSONString(JSONFind(Response.Data, 'file_media')) = 'application/pdf', 'Document part content type');
     finally Response.Free; end;
+    Response := Client.UploadDocument('account', ParamStr(2), 'application/vnd.oasis.opendocument.text');
+    try
+      Check(JSONString(JSONFind(Response.Data, 'file_media')) = 'application/vnd.oasis.opendocument.text', 'Office document part content type');
+      Check(JSONBoolean(JSONFind(Response.Data, 'valid_file')), 'Office media type preserves upload snapshot');
+    finally Response.Free; end;
     Response := Client.UploadAccountLogo('account', ParamStr(2));
     try
       Check(JSONString(JSONFind(Response.Data, 'file_field')) = 'file', 'Logo multipart field');
@@ -207,6 +250,9 @@ begin
     try
       Check(JSONBoolean(JSONFind(Response.Data, 'raw_file_valid')), 'Raw signature bytes');
       Check(JSONString(JSONFind(Response.Data, 'authorization')) = '', 'Signer request omits bearer');
+    finally Response.Free; end;
+    Response := Client.UploadSignatureImage('signer-code', ParamStr(2), nil, 'image/jpeg');
+    try Check(JSONBoolean(JSONFind(Response.Data, 'raw_file_valid')), 'Raw JPEG upload bytes');
     finally Response.Free; end;
     Response := Client.DownloadDocumentArtifact('binary', 'original');
     try

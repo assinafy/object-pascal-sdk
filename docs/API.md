@@ -1,8 +1,8 @@
 # API reference
 
-Contract: [Assinafy API v1](https://api.assinafy.com.br/v1/docs) and [OpenAPI](https://api.assinafy.com.br/v1/docs/openapi.json).
+Contracts: [production](openapi.json) (147 operations) and [staging](openapi-stage.json) (157 operations). Staging base URL: `https://api.angry-pisco.stage.assinafy.com.br/v1`. The request/response reference below uses staging; staging-only routes are marked. Where production has a different wire contract, its complete operation is included too. Shared schemas are identical unless explicitly marked. Server deployment determines availability.
 
-The client exposes all 147 published operations. Each method below links its request, response, authentication, and status codes to the bundled [contract](openapi.json). Shared response models are fully defined in [Schemas](SCHEMAS.md).
+The client exposes all 157 operations across these environments. Shared request/response models are defined in [Schemas](SCHEMAS.md).
 
 ## Ownership and payloads
 
@@ -36,6 +36,7 @@ Payload examples show the documented fields, including optional fields. They ill
 | [GetSignerIdentityReview](#getsigneridentityreview) | `GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification` |
 | [DownloadSignerIdentityReviewImage](#downloadsigneridentityreviewimage) | `GET /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/images/{name}` |
 | [DecideSignerIdentityReview](#decidesigneridentityreview) | `POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/review` |
+| [GetSignerCapacities](#getsignercapacities) | `GET /v1/documents/{documentId}/signer-capacities` |
 | [Login](#login) | `POST /v1/login` |
 | [RequestPasswordReset](#requestpasswordreset) | `PUT /v1/authentication/request-password-reset` |
 | [ResetPassword](#resetpassword) | `PUT /v1/authentication/reset-password` |
@@ -62,6 +63,8 @@ Payload examples show the documented fields, including optional fields. They ill
 | [ReplaceDocumentTags](#replacedocumenttags) | `PUT /v1/accounts/{accountId}/documents/{documentId}/tags` |
 | [AttachDocumentTags](#attachdocumenttags) | `POST /v1/accounts/{accountId}/documents/{documentId}/tags` |
 | [DetachDocumentTag](#detachdocumenttag) | `DELETE /v1/accounts/{accountId}/documents/{documentId}/tags/{tagId}` |
+| [ListDocumentWatchers](#listdocumentwatchers) | `GET /v1/documents/{documentId}/watchers` |
+| [SetDocumentWatchers](#setdocumentwatchers) | `PUT /v1/documents/{documentId}/watchers` |
 | [ListEmbedOrigins](#listembedorigins) | `GET /v1/accounts/{accountId}/embed-origins` |
 | [AddEmbedOrigin](#addembedorigin) | `POST /v1/accounts/{accountId}/embed-origins` |
 | [UpdateEmbedOrigin](#updateembedorigin) | `PUT /v1/accounts/{accountId}/embed-origins/{originId}` |
@@ -78,6 +81,7 @@ Payload examples show the documented fields, including optional fields. They ill
 | [DownloadEnvelopeArtifacts](#downloadenvelopeartifacts) | `GET /v1/accounts/{accountId}/envelopes/{envelopeId}/download/{artifactName}` |
 | [CancelEnvelope](#cancelenvelope) | `PUT /v1/accounts/{accountId}/envelopes/{envelopeId}/cancel` |
 | [RemindEnvelopeSigner](#remindenvelopesigner) | `PUT /v1/accounts/{accountId}/envelopes/{envelopeId}/signers/{signerId}/resend` |
+| [EstimateEnvelopeReminderCost](#estimateenveloperemindercost) | `POST /v1/accounts/{accountId}/envelopes/{envelopeId}/signers/{signerId}/estimate-resend-cost` |
 | [AddDocumentToEnvelope](#adddocumenttoenvelope) | `POST /v1/accounts/{accountId}/envelopes/{envelopeId}/documents` |
 | [RemoveDocumentFromEnvelope](#removedocumentfromenvelope) | `DELETE /v1/accounts/{accountId}/envelopes/{envelopeId}/documents/{documentId}` |
 | [ListFields](#listfields) | `GET /v1/accounts/{accountId}/fields` |
@@ -95,6 +99,7 @@ Payload examples show the documented fields, including optional fields. They ill
 | [ConfirmAuthenticatorEnrollment](#confirmauthenticatorenrollment) | `PUT /v1/users/self/mfa/totp/confirm` |
 | [RegenerateRecoveryCodes](#regeneraterecoverycodes) | `POST /v1/users/self/mfa/recovery-codes` |
 | [RemoveATwoFactorMethod](#removeatwofactormethod) | `DELETE /v1/users/self/mfa/{customId}` |
+| [GetDocumentNotificationHistory](#getdocumentnotificationhistory) | `GET /v1/documents/{documentId}/notification-history` |
 | [GetNotificationPolicy](#getnotificationpolicy) | `GET /v1/accounts/{accountId}/notification-policy` |
 | [UpdateNotificationPolicy](#updatenotificationpolicy) | `PUT /v1/accounts/{accountId}/notification-policy` |
 | [GetMyNotificationPreferences](#getmynotificationpreferences) | `GET /v1/users/self/notification-preferences` |
@@ -110,6 +115,11 @@ Payload examples show the documented fields, including optional fields. They ill
 | [SendAccessTokenForPublicDocument](#sendaccesstokenforpublicdocument) | `PUT /v1/public/documents/{documentId}/send-token` |
 | [GetPushPreferences](#getpushpreferences) | `GET /v1/users/self/push-preferences` |
 | [UpdatePushPreferences](#updatepushpreferences) | `PUT /v1/users/self/push-preferences` |
+| [ScheduleAssignment](#scheduleassignment) | `POST /v1/documents/{documentId}/scheduled-sends` |
+| [ListScheduledSends](#listscheduledsends) | `GET /v1/accounts/{accountId}/scheduled-sends` |
+| [ScheduleEnvelope](#scheduleenvelope) | `POST /v1/accounts/{accountId}/scheduled-sends` |
+| [CancelScheduledSend](#cancelscheduledsend) | `PUT /v1/accounts/{accountId}/scheduled-sends/{scheduledSendId}/cancel` |
+| [SendScheduledSendNow](#sendscheduledsendnow) | `PUT /v1/accounts/{accountId}/scheduled-sends/{scheduledSendId}/send` |
 | [ListSigners](#listsigners) | `GET /v1/accounts/{accountId}/signers` |
 | [CreateSigner](#createsigner) | `POST /v1/accounts/{accountId}/signers` |
 | [GetSigner](#getsigner) | `GET /v1/accounts/{accountId}/signers/{signerId}` |
@@ -763,11 +773,12 @@ Content type: `application/json`
           "items": {
             "properties": {
               "code": {
-                "description": "Machine-readable restriction code. `PendingDocuments` only appears together with `ActivePaidSubscription`, never alone.",
+                "description": "Machine-readable restriction code. `PendingDocuments` only appears together with `ActivePaidSubscription`, never alone. `SharedWorkspacePaidPlan` (user deletion only): a workspace that stays with other members has a paid plan the request neither cancels nor keeps; `force` does not lift it.",
                 "type": "string",
                 "enum": [
                   "ActivePaidSubscription",
-                  "PendingDocuments"
+                  "PendingDocuments",
+                  "SharedWorkspacePaidPlan"
                 ],
                 "example": "ActivePaidSubscription"
               },
@@ -1622,7 +1633,7 @@ Upload or replace the account logo image.
 
 **Parameters:**
 
-`ContentType` is an optional SDK parameter for the file part media type (for example `image/png` or `image/jpeg`); the default is `application/octet-stream`. It does not add a JSON field.
+`ContentType` selects the upload media type; default `application/octet-stream`. It does not add a JSON field. All uploads are limited by the SDK to 25 MiB.
 
 - `accountId` (path, required): Workspace account ID.
 ```json
@@ -2765,7 +2776,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -2809,7 +2820,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -2828,7 +2839,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -3091,6 +3102,280 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
 
 `step` controls signing order: signers sharing a step sign in parallel, and the next step is notified only after the previous step completes. If supplied, every signer must supply it and values must be contiguous starting at 1.
 
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Assignments"
+  ],
+  "summary": "Create assignment (request signatures)",
+  "description": "Request signatures on a document. Use `method: virtual` to sign without input fields, or `method: collect` to place input fields on specific pages.\n\n**Digital certificate signing works only on `virtual` assignments.** A `DigitalCertificate` signer cannot sign placed fields, so a `collect` assignment with one is refused with `400` before anything is charged.\n\nA document takes one assignment: a retry after a lost response answers `400` and charges nothing. Read the document to see whether the first request went through.\n\nFor **virtual**, the document may be in `uploaded`, `metadata_processing` or `metadata_ready`; it is promoted to `pending_signature` automatically once metadata processing completes. For **collect**, the document must be in `metadata_ready` (fields reference specific pages).\n\n`step` controls signing order: signers sharing a step sign in parallel, and the next step is notified only after the previous step completes. If supplied, every signer must supply it and values must be contiguous starting at 1.",
+  "operationId": "d1293d781c9d94ec8b8c43d540c99ef4",
+  "parameters": [
+    {
+      "$ref": "#/components/parameters/DocumentId"
+    }
+  ],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "required": [
+            "method",
+            "signers"
+          ],
+          "properties": {
+            "method": {
+              "description": "`virtual` signs without input fields; `collect` places input fields on pages. Signers with `DigitalCertificate` verification need `virtual` (`collect` returns `400`).",
+              "type": "string",
+              "enum": [
+                "virtual",
+                "collect"
+              ],
+              "example": "virtual"
+            },
+            "signers": {
+              "type": "array",
+              "items": {
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "example": "615605f50e968054a5b7c9b8"
+                  },
+                  "verification_method": {
+                    "description": "How the signer's identity is verified before signing. `Email` (default) sends a one-time code to the signer's email; `Whatsapp` sends the code over WhatsApp — the verification itself is not billed, but it requires the WhatsApp notification channel, so the signer costs 0.45 credits (available only on paid subscriptions); `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate (A1/A3) — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id`, must be alone in its signing step, needs `method: virtual` (a `collect` assignment with a `DigitalCertificate` signer returns `400`), and is charged 0.45 credits per signer. A CPF requires that person's certificate (an e-CPF, or an e-CNPJ naming them as legal representative); a CNPJ requires an e-CNPJ for that company, from any of its representatives. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Omit to default to `Email`.",
+                    "type": "string",
+                    "enum": [
+                      "Email",
+                      "Whatsapp",
+                      "DigitalCertificate",
+                      "IdDocumentFaceMatchBasic"
+                    ],
+                    "example": "Email"
+                  },
+                  "notification_methods": {
+                    "description": "How the signer is told a signature is being requested. **Exactly one method per signer** — the array shape is historical, and sending two returns `400`. The method must also be compatible with `verification_method`: `Email` verification takes `Email`, `Whatsapp` verification takes `Whatsapp`, and `DigitalCertificate` and `IdDocumentFaceMatchBasic` take either. WhatsApp incurs an additional cost and is available only on paid subscriptions. Omit it to have it inferred from `verification_method`, or `{\"Email\"}` when neither is sent. See **Verification & Notification Methods** for the full pairing table.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "Email",
+                        "Whatsapp"
+                      ]
+                    },
+                    "example": [
+                      "Email"
+                    ]
+                  },
+                  "embedded": {
+                    "description": "Mark this signer as embedded: they sign inside an iframe in your application through a short-lived embed session, and your backend gets no signing link for them (`signing_urls` returns `url: null, embedded: true`). They still receive the normal invitation with their code, and can also sign from it. Requires the Embed plan feature (`403 PlanRestricted` otherwise) and works with Email or Whatsapp verification. Defaults to `false`.",
+                    "type": "boolean",
+                    "example": false
+                  },
+                  "step": {
+                    "type": "integer",
+                    "example": 1
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "entries": {
+              "description": "Required for `collect`: field placements per page. In `collect`, every signer listed in `signers` must appear once and own at least one field here; otherwise `400`.",
+              "type": "array",
+              "items": {
+                "properties": {
+                  "page_id": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "properties": {
+                        "signer_id": {
+                          "type": "string"
+                        },
+                        "field_id": {
+                          "type": "string"
+                        },
+                        "display_settings": {
+                          "$ref": "#/components/schemas/DisplaySettings"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "message": {
+              "description": "Text included in the invitation email.",
+              "type": "string"
+            },
+            "expires_at": {
+              "description": "ISO 8601; default is no expiration. Must be at least one hour in the future. A UTC offset in the value is honored (`2026-12-31T23:59:59-03:00` is `2027-01-01T02:59:59Z`); a value without one is read as UTC, and a date alone (`2026-12-31`) means 23:59 UTC that day.",
+              "type": "string",
+              "format": "date-time"
+            },
+            "copy_receivers": {
+              "description": "Signer IDs that only receive a copy.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "max_total_credits": {
+              "description": "Optional ceiling on what this request may spend: refused with `409` and code `CreditCeilingExceeded`, nothing charged, when its `total_credits` is above this. Send the `total_credits` of the last estimate. A value that is not a number of credits, zero or more, answers `400`; numeric text counts, as a form-encoded body sends it.",
+              "type": "number",
+              "example": 1.5
+            }
+          },
+          "type": "object"
+        },
+        "examples": {
+          "virtual_full": {
+            "$ref": "#/components/examples/AssignmentCreateVirtualFull"
+          },
+          "collect_full": {
+            "$ref": "#/components/examples/AssignmentCreateCollectFull"
+          },
+          "virtual": {
+            "$ref": "#/components/examples/AssignmentCreateVirtual"
+          },
+          "collect": {
+            "$ref": "#/components/examples/AssignmentCreateCollect"
+          }
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "The created assignment",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/Assignment"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "examples": {
+            "virtual": {
+              "$ref": "#/components/examples/AssignmentCreatedVirtual"
+            },
+            "collect": {
+              "$ref": "#/components/examples/AssignmentCreatedCollect"
+            }
+          }
+        }
+      }
+    },
+    "400": {
+      "$ref": "#/components/responses/BadRequest",
+      "description": "The body cannot make an assignment: a signer, method, step, field or expiration is missing or invalid, the document is not ready or already has one, or the workspace lacks the documents or credits it needs (e.g. `At least one signer is required.`)."
+    },
+    "409": {
+      "$ref": "#/components/responses/CreditCeilingExceeded"
+    },
+    "403": {
+      "description": "The workspace's plan lacks a verification or notification method sent (`PlanRestricted`), or an OAuth app's token lacks `documents:write` (`InsufficientScope`); also a deactivated membership or a role.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 403
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "WhatsApp notification is not available for your current plan."
+                  },
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "PlanRestricted",
+                      "InsufficientScope"
+                    ],
+                    "example": "PlanRestricted"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "The document is not in the workspace.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Document not found."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyAuth": []
+    }
+  ]
+}
+```
+
 `DigitalCertificate` signers require `method: virtual`; certificate completion handles the signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. The SDK rejects `method: collect` before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
@@ -3135,7 +3420,7 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
             "example": "615605f50e968054a5b7c9b8"
           },
           "verification_method": {
-            "description": "How the signer's identity is verified before signing. `Email` (default) sends a one-time code to the signer's email; `Whatsapp` sends the code over WhatsApp — the verification itself is not billed, but it requires the WhatsApp notification channel, so the signer costs 0.45 credits (available only on paid subscriptions); `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate (A1/A3) — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id`, must be alone in its signing step, needs `method: virtual` (a `collect` assignment with a `DigitalCertificate` signer returns `400`), and is charged 0.5 credits per signer. A CPF requires that person's certificate (an e-CPF, or an e-CNPJ naming them as legal representative); a CNPJ requires an e-CNPJ for that company, from any of its representatives. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Omit to default to `Email`.",
+            "description": "How the signer's identity is verified before signing. `Email` (default) sends a one-time code to the signer's email; `Whatsapp` sends the code over WhatsApp — the verification itself is not billed, but it requires the WhatsApp notification channel, so the signer costs 0.45 credits (available only on paid subscriptions); `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate (A1/A3) — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id`, must be alone in its signing step, needs `method: virtual` (a `collect` assignment with a `DigitalCertificate` signer returns `400`), and is charged 0.45 credits per signer. A CPF requires that person's certificate (an e-CPF, or an e-CNPJ naming them as legal representative); a CNPJ requires an e-CNPJ for that company, from any of its representatives. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Omit to default to `Email`.",
             "type": "string",
             "enum": [
               "Email",
@@ -3167,6 +3452,40 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
           "step": {
             "type": "integer",
             "example": 1
+          },
+          "sign_as": {
+            "description": "The capacity the signer signs in (\"assinar como\"): a party, a witness, a guarantor… `Sign`, plain signing, when left out or `null`. Any other value prints on the signer's row of the certificate page as the sender's statement (for `Witness`, \"Indicado pelo remetente como testemunha\"); neither the invitation nor the signing page shows it. Fixed once the assignment is created and read back with **Get signer capacities**; no other answer or webhook carries it. Matched exactly; anything else, or two values for one signer, answers `400`.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "Sign",
+              "Approve",
+              "Acknowledge",
+              "Party",
+              "Witness",
+              "Intervening",
+              "Receipt",
+              "IssuerEndorserGuarantor",
+              "IssuerEndorserGuarantorSurety",
+              "Surety",
+              "PartySurety",
+              "JointDebtor",
+              "PartyJointDebtor",
+              "ContractingParty",
+              "ContractedParty",
+              "Landlord",
+              "Tenant",
+              "Buyer",
+              "Seller",
+              "AttorneyInFact",
+              "LegalRepresentative",
+              "Employer",
+              "Employee",
+              null
+            ],
+            "example": "Witness"
           }
         },
         "type": "object"
@@ -3240,7 +3559,8 @@ For **virtual**, the document may be in `uploaded`, `metadata_processing` or `me
         "Email"
       ],
       "embedded": false,
-      "step": 1
+      "step": 1,
+      "sign_as": "Witness"
     }
   ],
   "entries": [
@@ -3307,7 +3627,7 @@ Content type: `application/json`
     "id": "615606ef81d199996981dbce",
     "document_id": "615601fab04c0a3147bb1246",
     "created_at": "2026-06-03T03:54:16Z",
-    "sender_email": "sender@example.com",
+    "sender_email": "developer@example.com",
     "method": "virtual",
     "expires_at": null,
     "message": "<string>",
@@ -3351,7 +3671,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         },
         "signer": {},
         "field": {},
@@ -3370,7 +3690,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ]
@@ -3706,9 +4026,18 @@ Per-unit costs (in credits) used to build the estimate:
 |------|------|
 | Extra document | 1 credit |
 | Email notification | 0 credits |
-| WhatsApp notification | 0.45 credits |
-| Digital certificate signature (per signer) | 0.5 credits |
+| WhatsApp notification | depends on the plan, see the table below |
+| Digital certificate signature (per signer) | 0.45 credits |
 | Identity document verification (per signer) | depends on the plan, see the table below |
+
+WhatsApp notification, per plan:
+
+| Plan | Price per signer |
+|------|------------------|
+| Pro | 0.4 credits |
+| Other plans and enterprise contracts | 0.45 credits |
+
+Identity document verification, per plan:
 
 | Plan | Price per signer |
 |------|------------------|
@@ -3718,6 +4047,190 @@ Per-unit costs (in credits) used to build the estimate:
 | Other plans and enterprise contracts | 0.25 credits |
 
 `Email` and `Whatsapp` verification are not priced separately — their only line in the `breakdown` is their notification. A `Whatsapp`-verified signer therefore shows up as a WhatsApp notification, because that channel is mandatory for that verification method. A `DigitalCertificate` signer adds the digital-certificate signature cost **on top of** its notification cost; it appears in the `breakdown` under the `SignatureDigitalCertificate` code. An `IdDocumentFaceMatchBasic` signer likewise adds your plan's verification price on top of its notification, under the `VerificationIdDocumentFaceMatchBasic` code.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Assignments"
+  ],
+  "summary": "Estimate assignment cost",
+  "description": "Estimate the cost of creating an assignment without creating it, returning a cost breakdown and the current account balances. Signer IDs are not required — only the verification/notification method affects cost. Each assignment consumes 1 document from the plan allowance; if exhausted, an extra document is charged from credits (`needs_extra_document` = true). `blocking_reason` may be `PendingPayment`, `InsufficientDocuments` or `InsufficientCredits`.\n\n### Pricing\n\nPer-unit costs (in credits) used to build the estimate:\n\n| Item | Cost |\n|------|------|\n| Extra document | 1 credit |\n| Email notification | 0 credits |\n| WhatsApp notification | depends on the plan, see the table below |\n| Digital certificate signature (per signer) | 0.45 credits |\n| Identity document verification (per signer) | depends on the plan, see the table below |\n\nWhatsApp notification, per plan:\n\n| Plan | Price per signer |\n|------|------------------|\n| Pro | 0.4 credits |\n| Other plans and enterprise contracts | 0.45 credits |\n\nIdentity document verification, per plan:\n\n| Plan | Price per signer |\n|------|------------------|\n| Free | 1.5 credits |\n| Standard | 1 credit |\n| Pro | 0.5 credits |\n| Other plans and enterprise contracts | 0.25 credits |\n\n`Email` and `Whatsapp` verification are not priced separately — their only line in the `breakdown` is their notification. A `Whatsapp`-verified signer therefore shows up as a WhatsApp notification, because that channel is mandatory for that verification method. A `DigitalCertificate` signer adds the digital-certificate signature cost **on top of** its notification cost; it appears in the `breakdown` under the `SignatureDigitalCertificate` code. An `IdDocumentFaceMatchBasic` signer likewise adds your plan's verification price on top of its notification, under the `VerificationIdDocumentFaceMatchBasic` code.",
+  "operationId": "f3910833e526a79d16f6437ad6a8d215",
+  "parameters": [
+    {
+      "$ref": "#/components/parameters/DocumentId"
+    }
+  ],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "properties": {
+            "method": {
+              "description": "Send the method you will create the assignment with. With `collect`, a `DigitalCertificate` signer returns `400`, because certificate signing works only on `virtual` assignments.",
+              "type": "string",
+              "enum": [
+                "virtual",
+                "collect"
+              ],
+              "example": "virtual"
+            },
+            "signers": {
+              "description": "Required for `virtual`; each entry may be `{}` to default to Email.",
+              "type": "array",
+              "items": {
+                "properties": {
+                  "verification_method": {
+                    "description": "Verification method to price. `Whatsapp` forces the WhatsApp notification, so it prices at 0.45 credits per signer; `DigitalCertificate` adds the per-signer signature cost on top of its notification, and with `method: collect` returns `400` (certificate signers sign only virtual assignments). `IdDocumentFaceMatchBasic` requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged your plan's per-signer verification price on top of its notification.",
+                    "type": "string",
+                    "enum": [
+                      "Email",
+                      "Whatsapp",
+                      "DigitalCertificate",
+                      "IdDocumentFaceMatchBasic"
+                    ],
+                    "example": "Whatsapp"
+                  },
+                  "notification_methods": {
+                    "description": "The notification channel to price — exactly one per signer, subject to the same pairing rules as **Create assignment**. `Whatsapp` costs 0.45 credits per signer. Omit it to have it inferred from `verification_method`.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "Email",
+                        "Whatsapp"
+                      ]
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "entries": {
+              "description": "Required for `collect`.",
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "type": "object"
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "Cost estimate and balances",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/CostEstimate"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "$ref": "#/components/responses/BadRequest",
+      "description": "The body cannot make an assignment: the same checks of signers, methods and steps as creating it, and the document must be able to take one (e.g. `At least one signer is required.`)."
+    },
+    "403": {
+      "description": "The workspace's plan lacks a verification or notification method sent (`PlanRestricted`), or an OAuth app's token lacks `documents:write` (`InsufficientScope`); also a deactivated membership or a role.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 403
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "WhatsApp notification is not available for your current plan."
+                  },
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "PlanRestricted",
+                      "InsufficientScope"
+                    ],
+                    "example": "PlanRestricted"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "The document is not in the workspace.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Document not found."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyAuth": []
+    }
+  ]
+}
+```
 
 `DigitalCertificate` signers require `method: virtual`; certificate completion handles the signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. The SDK rejects `method: collect` before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
 
@@ -3763,6 +4276,39 @@ Per-unit costs (in credits) used to build the estimate:
             ],
             "example": "Whatsapp"
           },
+          "sign_as": {
+            "description": "Checked as **Create assignment** checks it (`400` for anything else); `null` reads as `Sign`; it doesn't change the price.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "Sign",
+              "Approve",
+              "Acknowledge",
+              "Party",
+              "Witness",
+              "Intervening",
+              "Receipt",
+              "IssuerEndorserGuarantor",
+              "IssuerEndorserGuarantorSurety",
+              "Surety",
+              "PartySurety",
+              "JointDebtor",
+              "PartyJointDebtor",
+              "ContractingParty",
+              "ContractedParty",
+              "Landlord",
+              "Tenant",
+              "Buyer",
+              "Seller",
+              "AttorneyInFact",
+              "LegalRepresentative",
+              "Employer",
+              "Employee",
+              null
+            ]
+          },
           "notification_methods": {
             "description": "The notification channel to price — exactly one per signer, subject to the same pairing rules as **Create assignment**. `Whatsapp` costs 0.45 credits per signer. Omit it to have it inferred from `verification_method`.",
             "type": "array",
@@ -3798,6 +4344,7 @@ Per-unit costs (in credits) used to build the estimate:
   "signers": [
     {
       "verification_method": "Whatsapp",
+      "sign_as": "Sign",
       "notification_methods": [
         "Email"
       ]
@@ -4196,7 +4743,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** The document is not pending signature, the signer is not part of the assignment, has already signed, or waits for an earlier signing step; or the account lacks credits for the reminder.
+**Response `400`:** The document is not pending signature or its deadline (`expires_at`) has passed, the signer is not part of the assignment, has already signed, or waits for an earlier signing step; the signer was reminded less than 2 minutes ago, or is being reminded now, or the workspace already reminded them 10 times in the 24 hours since the first of those reminders (one that may have gone out counts; the signer asking for their link again doesn't; for a document of an envelope, a reminder through the envelope or any of its documents counts); or the account lacks credits for the reminder.
 
 Content type: `application/json`
 
@@ -4439,7 +4986,7 @@ function EstimateResendCost(const DocumentId: string; const AssignmentId: string
 
 `POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/estimate-resend-cost`
 
-Estimate the cost of resending the signature request to a signer. The response has its own shape (`total`, not `total_credits`), because a reminder uses no document.
+Estimate the cost of resending the signature request to a signer. The response has its own shape (`total`, not `total_credits`), because a reminder uses no document. It does not check whether the reminder would be accepted now: the reminder itself refuses a document past its deadline, or a signer reminded too recently or too often (`400`).
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
@@ -4705,7 +5252,7 @@ Content type: `application/json`
     "id": "615606ef81d199996981dbce",
     "document_id": "615601fab04c0a3147bb1246",
     "created_at": "2026-06-03T03:54:16Z",
-    "sender_email": "sender@example.com",
+    "sender_email": "developer@example.com",
     "method": "virtual",
     "expires_at": null,
     "message": "<string>",
@@ -4749,7 +5296,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         },
         "signer": {},
         "field": {},
@@ -4768,7 +5315,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ]
@@ -5862,6 +6409,287 @@ Content type: `application/json`
 ```
 
 
+## GetSignerCapacities
+
+```pascal
+function GetSignerCapacities(const DocumentId: string): TAssinafyResponse;
+```
+
+`GET /v1/documents/{documentId}/signer-capacities`
+
+The capacity each signer of the document's assignment signs in, as the sender gave it with `sign_as` on **Create assignment**: `Sign` for a signer given none. In the order **Get document** lists the assignment's signers; an empty list for a document not sent yet. Reachable with the `documents:read` OAuth scope.
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The signers' capacities
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "required": [
+              "signer_id",
+              "sign_as"
+            ],
+            "properties": {
+              "signer_id": {
+                "type": "string",
+                "example": "615605f50e968054a5b7c9b8"
+              },
+              "sign_as": {
+                "type": "string",
+                "enum": [
+                  "Sign",
+                  "Approve",
+                  "Acknowledge",
+                  "Party",
+                  "Witness",
+                  "Intervening",
+                  "Receipt",
+                  "IssuerEndorserGuarantor",
+                  "IssuerEndorserGuarantorSurety",
+                  "Surety",
+                  "PartySurety",
+                  "JointDebtor",
+                  "PartyJointDebtor",
+                  "ContractingParty",
+                  "ContractedParty",
+                  "Landlord",
+                  "Tenant",
+                  "Buyer",
+                  "Seller",
+                  "AttorneyInFact",
+                  "LegalRepresentative",
+                  "Employer",
+                  "Employee"
+                ],
+                "example": "Witness"
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "signer_id": "615605f50e968054a5b7c9b8",
+      "sign_as": "Witness"
+    }
+  ]
+}
+```
+
+
+**Response `403`:** Authenticated but not allowed to perform this action.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "You are not allowed to perform this action."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "You are not allowed to perform this action.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The document is not in the workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
 ## Login
 
 ```pascal
@@ -5890,7 +6718,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "user@example.com"
+      "example": "developer@example.com"
     },
     "password": {
       "type": "string",
@@ -5906,7 +6734,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "user@example.com",
+  "email": "developer@example.com",
   "password": "password"
 }
 ```
@@ -5946,7 +6774,7 @@ Content type: `application/json`
     "user": {
       "id": "bgjazeo5r9v2lq7l36dx48np",
       "name": "John Smith",
-      "email": "example@example.com",
+      "email": "developer@example.com",
       "telephone": "17989206641",
       "government_id": "15774136604",
       "is_email_verified": false,
@@ -6072,7 +6900,7 @@ function RequestPasswordReset(Body: TJSONData): TAssinafyResponse;
 
 `PUT /v1/authentication/request-password-reset`
 
-Send the user an email with instructions to reset their password. Used when the password was forgotten or never set.
+Send the user an email with instructions to reset their password. Used when the password was forgotten or never set. An address with no account gets the same `200` and no email, so the answer never tells whether an address has an account. An `email` that is not text answers `400`.
 
 **Authentication:** Public: workspace credentials are omitted.
 
@@ -6091,7 +6919,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "user@example.com"
+      "example": "developer@example.com"
     }
   },
   "type": "object"
@@ -6102,7 +6930,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "user@example.com"
+  "email": "developer@example.com"
 }
 ```
 
@@ -6125,7 +6953,7 @@ Content type: `application/json`
             "email": {
               "type": "string",
               "format": "email",
-              "example": "user@example.com"
+              "example": "developer@example.com"
             }
           },
           "type": "object"
@@ -6144,8 +6972,55 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
-    "email": "user@example.com"
+    "email": "developer@example.com"
   }
+}
+```
+
+
+**Response `400`:** One or more fields failed validation.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 422
+        },
+        "message": {
+          "type": "string",
+          "example": "One or more fields failed validation."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 422,
+  "message": "One or more fields failed validation.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
 }
 ```
 
@@ -6205,7 +7080,7 @@ function ResetPassword(Body: TJSONData): TAssinafyResponse;
 
 `PUT /v1/authentication/reset-password`
 
-Reset the user's password using the token received by email.
+Reset the user's password using the token received by email. A wrong, expired or non-text token, and an address with no account, answer `400`. The new password needs at least 6 characters. A reset ends every session of the user (login tokens issued before it answer `401`) and revokes every connected OAuth app; the user's API key keeps working.
 
 **Authentication:** Public: workspace credentials are omitted.
 
@@ -6225,7 +7100,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "user@example.com"
+      "example": "developer@example.com"
     },
     "token": {
       "description": "Token received by email.",
@@ -6246,7 +7121,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "user@example.com",
+  "email": "developer@example.com",
   "token": "b3ac64d6c55b3ac64d6c55",
   "new_password": "N3w_p4ssw0rd"
 }
@@ -6271,7 +7146,7 @@ Content type: `application/json`
             "email": {
               "type": "string",
               "format": "email",
-              "example": "user@example.com"
+              "example": "developer@example.com"
             }
           },
           "type": "object"
@@ -6290,7 +7165,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
-    "email": "user@example.com"
+    "email": "developer@example.com"
   }
 }
 ```
@@ -6419,7 +7294,7 @@ No path or query parameters.
     "email": {
       "type": "string",
       "format": "email",
-      "example": "user@example.com"
+      "example": "developer@example.com"
     },
     "password": {
       "description": "The current password.",
@@ -6442,7 +7317,7 @@ No path or query parameters.
 
 ```json
 {
-  "email": "user@example.com",
+  "email": "developer@example.com",
   "password": "X3$_!456aTa",
   "new_password": "X3$_!456aT"
 }
@@ -6467,7 +7342,7 @@ Content type: `application/json`
             "email": {
               "type": "string",
               "format": "email",
-              "example": "user@example.com"
+              "example": "developer@example.com"
             }
           },
           "type": "object"
@@ -6486,7 +7361,7 @@ Content type: `application/json`
   "status": 200,
   "message": "",
   "data": {
-    "email": "user@example.com"
+    "email": "developer@example.com"
   }
 }
 ```
@@ -6763,7 +7638,7 @@ Content type: `application/json`
     "user": {
       "id": "bgjazeo5r9v2lq7l36dx48np",
       "name": "John Smith",
-      "email": "example@example.com",
+      "email": "developer@example.com",
       "telephone": "17989206641",
       "government_id": "15774136604",
       "is_email_verified": false,
@@ -7090,10 +7965,10 @@ Content type: `application/json`
         "name": "document.pdf",
         "status": "metadata_ready",
         "artifacts": {
-          "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+          "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
         },
         "is_closed": false,
-        "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+        "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
         "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
         "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
         "decline_reason": null,
@@ -7118,7 +7993,7 @@ Content type: `application/json`
           "id": "615606ef81d199996981dbce",
           "document_id": "615601fab04c0a3147bb1246",
           "created_at": "2026-06-03T03:54:16Z",
-          "sender_email": "sender@example.com",
+          "sender_email": "developer@example.com",
           "method": "virtual",
           "expires_at": null,
           "message": "<string>",
@@ -7162,7 +8037,7 @@ Content type: `application/json`
                 "number": 1,
                 "height": 2100,
                 "width": 1275,
-                "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+                "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
               },
               "signer": {},
               "field": {},
@@ -7181,7 +8056,7 @@ Content type: `application/json`
           "signing_urls": [
             {
               "signer_id": "<string>",
-              "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+              "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
               "embedded": false
             }
           ]
@@ -7192,7 +8067,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           }
         ],
         "envelope_id": null,
@@ -7567,10 +8442,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -7595,7 +8470,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -7639,7 +8514,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -7658,7 +8533,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -7669,7 +8544,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -8163,10 +9038,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -8191,7 +9066,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -8235,7 +9110,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -8254,7 +9129,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -8265,7 +9140,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -8802,10 +9677,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -8830,7 +9705,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -8874,7 +9749,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -8893,7 +9768,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -8904,7 +9779,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -9254,10 +10129,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -9282,7 +10157,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -9326,7 +10201,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -9345,7 +10220,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -9356,7 +10231,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -9922,10 +10797,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -9950,7 +10825,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -9994,7 +10869,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -10013,7 +10888,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -10024,7 +10899,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -10598,10 +11473,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -10626,7 +11501,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -10670,7 +11545,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -10689,7 +11564,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -10700,7 +11575,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -10941,16 +11816,18 @@ Content type: `application/json`
 ## UploadDocument
 
 ```pascal
-function UploadDocument(const AAccountId: string; const FileName: string): TAssinafyResponse;
+function UploadDocument(const AAccountId: string; const FileName: string; const ContentType: string = 'application/pdf'): TAssinafyResponse;
 ```
 
 `POST /v1/accounts/{accountId}/documents`
 
-Create a document from an uploaded file. Maximum file size 25MB; maximum 2000 pages.
+Create a document from an uploaded file: PDF, or a Word or OpenDocument text file (`.doc`, `.docx`, `.odt`), which is converted to PDF. Maximum file size 25MB; maximum 2000 pages.
 
 **Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
 
 **Parameters:**
+
+`ContentType` selects the upload media type; default `application/pdf`. It does not add a JSON field. All uploads are limited by the SDK to 25 MiB.
 
 - `accountId` (path, required): Workspace account ID.
 ```json
@@ -10969,7 +11846,7 @@ Create a document from an uploaded file. Maximum file size 25MB; maximum 2000 pa
   ],
   "properties": {
     "file": {
-      "description": "The PDF file to upload.",
+      "description": "The file to upload: PDF, DOC, DOCX or ODT.",
       "type": "string",
       "format": "binary"
     }
@@ -11024,10 +11901,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -11052,7 +11929,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -11096,7 +11973,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -11115,7 +11992,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -11126,7 +12003,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -11403,10 +12280,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -11431,7 +12308,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -11475,7 +12352,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -11494,7 +12371,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -11505,7 +12382,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -11990,10 +12867,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -12018,7 +12895,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -12062,7 +12939,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -12081,7 +12958,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -12092,7 +12969,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -12468,10 +13345,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -12496,7 +13373,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -12540,7 +13417,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -12559,7 +13436,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -12570,7 +13447,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -13298,10 +14175,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -13326,7 +14203,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -13370,7 +14247,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -13389,7 +14266,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -13400,7 +14277,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -15138,6 +16015,567 @@ Content type: `application/json`
 ```
 
 
+## ListDocumentWatchers
+
+```pascal
+function ListDocumentWatchers(const DocumentId: string): TAssinafyResponse;
+```
+
+`GET /v1/documents/{documentId}/watchers`
+
+The contacts set with **Set a document's watchers**, in the order they were set. A deleted contact is left out.
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The document's watchers
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Signer"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "resource": "signer",
+      "id": "62d6ee35c7741ca4006b9e11",
+      "full_name": "John Signer",
+      "email": "developer@example.com",
+      "whatsapp_phone_number": "+5548999990000",
+      "government_id": "39053344705",
+      "has_accepted_terms": false
+    }
+  ]
+}
+```
+
+
+**Response `403`:** An OAuth application token, a deactivated membership or a role refuses it.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "You are not allowed to perform this action."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "You are not allowed to perform this action.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The document is not in the workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+## SetDocumentWatchers
+
+```pascal
+function SetDocumentWatchers(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
+```
+
+`PUT /v1/documents/{documentId}/watchers`
+
+Replaces the document's watchers: up to 10 contacts of the workspace, each with an e-mail address, who follow the document without signing it. Each is e-mailed once the document ends: declined (naming who declined), expired or signed by all. The e-mail names the document and its sender, and nothing else of it: no link, no file. It is queued, so it goes out shortly after. Naming a contact here is what lets them receive it; the workspace's notification settings don't apply to them. A signer named as a watcher gets this e-mail besides their own. They can be set before the document is sent and changed until it ends; an empty list removes them all.
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (required)**
+
+```json
+{
+  "required": [
+    "watcher_ids"
+  ],
+  "properties": {
+    "watcher_ids": {
+      "description": "Contact ids, as **Create signer** answers them; one given twice counts once.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "maxItems": 10,
+      "example": [
+        "62d6ee35c7741ca4006b9e11"
+      ]
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "watcher_ids": [
+    "62d6ee35c7741ca4006b9e11"
+  ]
+}
+```
+
+
+**Response `200`:** The document's watchers
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Signer"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "resource": "signer",
+      "id": "62d6ee35c7741ca4006b9e11",
+      "full_name": "John Signer",
+      "email": "developer@example.com",
+      "whatsapp_phone_number": "+5548999990000",
+      "government_id": "39053344705",
+      "has_accepted_terms": false
+    }
+  ]
+}
+```
+
+
+**Response `400`:** `watcher_ids` missing or not a list of ids; more than 10; an id that is not a contact of the workspace or a contact without an e-mail address; or the document has ended (expired, signed by all, declined, cancelled or failed).
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** An OAuth application token, a deactivated membership or a role refuses it.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "You are not allowed to perform this action."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "You are not allowed to perform this action.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The document is not in the workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
 ## ListEmbedOrigins
 
 ```pascal
@@ -16504,7 +17942,7 @@ Called by Assinafy's embed page, not by integrations. Public: the token is the c
 {
   "properties": {
     "parent_origin": {
-      "description": "The origin of the page hosting the iframe, recorded for activity tracking.",
+      "description": "The origin of the page hosting the iframe, recorded for traceability.",
       "type": "string",
       "example": "https://app.example.com"
     }
@@ -16734,7 +18172,7 @@ Content type: `application/json`
             {
               "id": "fa8c140cb49b79f940aab95fddd",
               "full_name": "Ana Souza",
-              "email": "ana@example.com",
+              "email": "developer@example.com",
               "whatsapp_phone_number": "+5548999990001",
               "completed": false,
               "signed_at": "2026-11-06T14:30:00Z"
@@ -16749,7 +18187,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ],
@@ -17213,7 +18651,7 @@ Content type: `application/json`
           {
             "id": "fa8c140cb49b79f940aab95fddd",
             "full_name": "Ana Souza",
-            "email": "ana@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990001",
             "completed": false,
             "signed_at": "2026-11-06T14:30:00Z"
@@ -17228,7 +18666,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ],
@@ -18055,7 +19493,7 @@ Content type: `application/json`
           {
             "id": "fa8c140cb49b79f940aab95fddd",
             "full_name": "Ana Souza",
-            "email": "ana@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990001",
             "completed": false,
             "signed_at": "2026-11-06T14:30:00Z"
@@ -18070,7 +19508,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ],
@@ -18706,7 +20144,7 @@ Content type: `application/json`
           {
             "id": "fa8c140cb49b79f940aab95fddd",
             "full_name": "Ana Souza",
-            "email": "ana@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990001",
             "completed": false,
             "signed_at": "2026-11-06T14:30:00Z"
@@ -18721,7 +20159,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ],
@@ -19888,7 +21326,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** The signer has nothing left to sign in the envelope: every document of theirs is signed or closed; or the account lacks credits for the reminder.
+**Response `400`:** The signer has nothing left to sign in the envelope: every document of theirs is signed, closed or past its deadline; the signer was reminded less than 2 minutes ago, or is being reminded now, or the workspace already reminded them 10 times in the 24 hours since the first of those reminders (one that may have gone out counts; the signer asking for their link again doesn't; a reminder through any document of the envelope counts); or the account lacks credits for the reminder.
 
 Content type: `application/json`
 
@@ -20146,6 +21584,269 @@ Content type: `application/json`
 ```
 
 
+## EstimateEnvelopeReminderCost
+
+```pascal
+function EstimateEnvelopeReminderCost(const AAccountId: string; const EnvelopeId: string; const SignerId: string): TAssinafyResponse;
+```
+
+`POST /v1/accounts/{accountId}/envelopes/{envelopeId}/signers/{signerId}/estimate-resend-cost`
+
+What reminding a signer of the whole envelope would cost, sending and charging nothing. The reminder is one message per notification method for all of the envelope's documents, so it costs what one document's reminder costs, whatever the number of documents, at the workspace's reminder prices: nothing by e-mail and the WhatsApp resend price by WhatsApp, unless its plan prices them otherwise. Answers as a document's reminder estimate. It does not check whether a reminder would be accepted now: the reminder itself refuses a closed envelope (`409`), and a signer with nothing left to sign or one reminded too recently or too often (`400`).
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `envelopeId` (path, required): The envelope ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `signerId` (path, required): The signer ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** Cost estimate
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/ResendCostEstimate"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "total": 0.45,
+    "breakdown": [
+      {
+        "code": "NotificationWhatsappResend",
+        "name": "Whatsapp Notification Resend",
+        "cost": 0.45
+      }
+    ],
+    "credit_balance": 10,
+    "has_sufficient_credits": true
+  }
+}
+```
+
+
+**Response `403`:** An OAuth app's token lacks `documents:write` (`InsufficientScope`). Also a member deactivated in the workspace, a workspace scheduled for deletion, or an OAuth token of another workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "InsufficientScope"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "Bad request.",
+  "data": null,
+  "code": "InsufficientScope",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The envelope was not found, or the signer is not one of its signers.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
 ## AddDocumentToEnvelope
 
 ```pascal
@@ -20286,7 +21987,7 @@ Content type: `application/json`
           {
             "id": "fa8c140cb49b79f940aab95fddd",
             "full_name": "Ana Souza",
-            "email": "ana@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990001",
             "completed": false,
             "signed_at": "2026-11-06T14:30:00Z"
@@ -20301,7 +22002,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ],
@@ -20685,7 +22386,7 @@ Content type: `application/json`
           {
             "id": "fa8c140cb49b79f940aab95fddd",
             "full_name": "Ana Souza",
-            "email": "ana@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990001",
             "completed": false,
             "signed_at": "2026-11-06T14:30:00Z"
@@ -20700,7 +22401,7 @@ Content type: `application/json`
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ],
@@ -21654,6 +23355,7 @@ Update a field definition.
       ]
     },
     "is_active": {
+      "description": "Whether the field is offered for new placements: the field list leaves an inactive one out unless `include_inactive` is set. Documents and templates already using an inactive field keep working: its values are still validated and signed.",
       "type": "boolean"
     }
   },
@@ -22109,7 +23811,7 @@ For signer-code access use [ValidateFieldValueAsSigner](#validatefieldvalueassig
   ],
   "properties": {
     "value": {
-      "description": "The input value to validate.",
+      "description": "The input value to validate. Zero, as a number or as text, is a value; null, `false`, empty text and an empty list are none.",
       "example": "400.676.228-36"
     }
   },
@@ -22487,7 +24189,7 @@ Signer-code form of [ValidateFieldValue](#validatefieldvalue): workspace credent
   ],
   "properties": {
     "value": {
-      "description": "The input value to validate.",
+      "description": "The input value to validate. Zero, as a number or as text, is a value; null, `false`, empty text and an empty list are none.",
       "example": "400.676.228-36"
     }
   },
@@ -22865,7 +24567,7 @@ For signer-code access use [ValidateMultipleFieldValuesAsSigner](#validatemultip
         "example": "63488ffb7adf435aba319787"
       },
       "value": {
-        "description": "The input value to validate.",
+        "description": "The input value to validate. Zero, as a number or as text, is a value; null, `false`, empty text and an empty list are none.",
         "example": "1111111111111"
       }
     },
@@ -23253,7 +24955,7 @@ Signer-code form of [ValidateMultipleFieldValues](#validatemultiplefieldvalues):
         "example": "63488ffb7adf435aba319787"
       },
       "value": {
-        "description": "The input value to validate.",
+        "description": "The input value to validate. Zero, as a number or as text, is a value; null, `false`, empty text and an empty list are none.",
         "example": "1111111111111"
       }
     },
@@ -24834,6 +26536,305 @@ Content type: `application/json`
 {
   "status": 404,
   "message": "The requested resource was not found.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+## GetDocumentNotificationHistory
+
+```pascal
+function GetDocumentNotificationHistory(const DocumentId: string): TAssinafyResponse;
+```
+
+`GET /v1/documents/{documentId}/notification-history`
+
+Each signer of the document's assignment, in the order **Get document** lists them, with its `notification_history` as **Get document** gives it, each entry adding `delivered_at` and `opened_at`, `null` until then: an e-mail's first delivery and its first open or click; a WhatsApp message's delivery and read as WhatsApp last reported them. `opened_at` is a hint, not proof: a mail app or a link scanner can open a message before anyone reads it, and blocked images or WhatsApp read receipts turned off hide an open. An empty list for a document not sent yet. Reachable with the `documents:read` OAuth scope.
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The signers' notification history
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "required": [
+              "signer_id",
+              "notification_history"
+            ],
+            "properties": {
+              "signer_id": {
+                "type": "string",
+                "example": "615605f50e968054a5b7c9b8"
+              },
+              "notification_history": {
+                "type": "array",
+                "items": {
+                  "required": [
+                    "delivered_at",
+                    "opened_at"
+                  ],
+                  "type": "object",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/NotificationHistoryEntry"
+                    },
+                    {
+                      "properties": {
+                        "delivered_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "example": "2026-07-07T12:00:05Z"
+                        },
+                        "opened_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "example": "2026-07-07T12:30:00Z"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "signer_id": "615605f50e968054a5b7c9b8",
+      "notification_history": [
+        {
+          "event": "signature_request",
+          "status": "failed",
+          "error_code": "MailboxFull",
+          "error_message": "A caixa de entrada do destinatário está cheia. Peça ao signatário para liberar espaço ou use outro e-mail.",
+          "sent_at": "2026-07-07T12:00:00Z",
+          "failed_at": "2026-07-07T12:05:00Z",
+          "delivered_at": "2026-07-07T12:00:05Z",
+          "opened_at": "2026-07-07T12:30:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+
+**Response `403`:** Authenticated but not allowed to perform this action.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "You are not allowed to perform this action."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "You are not allowed to perform this action.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The document is not in the workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
   "data": null,
   "code": "PlanRestricted",
   "errors": [
@@ -28199,10 +30200,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -28227,7 +30228,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -28271,7 +30272,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -28290,7 +30291,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -28301,7 +30302,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -28419,7 +30420,130 @@ function SendAccessTokenForPublicDocument(const DocumentId: string; Body: TJSOND
 
 `PUT /v1/public/documents/{documentId}/send-token`
 
-Send a one-time access token to a signer of a public document, so they can view it. The document must be pending signature, and `recipient` must belong to a signer of the document who has not signed yet. Only the `email` channel is supported. Public endpoint.
+Sends the signer this document's signature request again, by e-mail, with its existing link, and its verification code when the signer's verification method uses one: nothing is renewed. A `200` means the request was accepted, not that the e-mail was delivered. The document must be pending signature and within its deadline, and `recipient` must be the e-mail address of a signer of the document who has not signed yet and whose turn has come. A signer gets it through this route at most once every two minutes, whoever asks; an envelope's documents share the signer's one interval. A send that failed may still have gone out, so it counts, unless it was refused before sending. Public endpoint.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "Send access token for public document",
+  "description": "Send a one-time access token to a signer of a public document, so they can view it. The document must be pending signature, and `recipient` must belong to a signer of the document who has not signed yet. Only the `email` channel is supported. Public endpoint.",
+  "operationId": "cfb52ef413176c9307a588f0fdf8237c",
+  "parameters": [
+    {
+      "name": "documentId",
+      "in": "path",
+      "description": "The document ID.",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "required": [
+            "channel",
+            "recipient"
+          ],
+          "properties": {
+            "channel": {
+              "description": "Where to send the token. Only `email` is supported.",
+              "type": "string",
+              "enum": [
+                "email"
+              ],
+              "example": "email"
+            },
+            "recipient": {
+              "description": "The signer's address on that channel — for `email`, the signer's email address.",
+              "type": "string",
+              "example": "developer@example.com"
+            }
+          },
+          "type": "object"
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "Token sent",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "properties": {
+                      "document": {
+                        "properties": {
+                          "resource": {
+                            "type": "string",
+                            "example": "document"
+                          },
+                          "id": {
+                            "type": "string",
+                            "example": "a1b2c3d4e5f6a7b8c9d0"
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "Contract.pdf"
+                          },
+                          "page_count": {
+                            "type": "integer",
+                            "example": 3
+                          },
+                          "created_by": {
+                            "type": "string",
+                            "example": "Jane Doe"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "channel": {
+                        "type": "string",
+                        "example": "email"
+                      },
+                      "recipient": {
+                        "type": "string",
+                        "example": "developer@example.com"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "$ref": "#/components/responses/ValidationError"
+    },
+    "404": {
+      "$ref": "#/components/responses/NotFound"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": []
+}
+```
 
 **Authentication:** Public: workspace credentials are omitted.
 
@@ -28451,9 +30575,9 @@ Send a one-time access token to a signer of a public document, so they can view 
       "example": "email"
     },
     "recipient": {
-      "description": "The signer's address on that channel — for `email`, the signer's email address.",
+      "description": "The signer's e-mail address, as text.",
       "type": "string",
-      "example": "signer@example.com"
+      "example": "developer@example.com"
     }
   },
   "type": "object"
@@ -28465,7 +30589,7 @@ Send a one-time access token to a signer of a public document, so they can view 
 ```json
 {
   "channel": "email",
-  "recipient": "signer@example.com"
+  "recipient": "developer@example.com"
 }
 ```
 
@@ -28516,7 +30640,7 @@ Content type: `application/json`
             },
             "recipient": {
               "type": "string",
-              "example": "signer@example.com"
+              "example": "developer@example.com"
             }
           },
           "type": "object"
@@ -28543,13 +30667,13 @@ Content type: `application/json`
       "created_by": "Jane Doe"
     },
     "channel": "email",
-    "recipient": "signer@example.com"
+    "recipient": "developer@example.com"
   }
 }
 ```
 
 
-**Response `400`:** One or more fields failed validation.
+**Response `400`:** The document is not pending signature, or its deadline has passed; `channel` or `recipient` is missing or not text; `channel` is not `email`; or the signer already signed, their step has not started (sequential signing), or they are not notified by e-mail.
 
 Content type: `application/json`
 
@@ -28564,11 +30688,11 @@ Content type: `application/json`
       "properties": {
         "status": {
           "type": "integer",
-          "example": 422
+          "example": 400
         },
         "message": {
           "type": "string",
-          "example": "One or more fields failed validation."
+          "example": "recipient must be a non-empty string."
         }
       },
       "type": "object"
@@ -28581,8 +30705,8 @@ Content type: `application/json`
 
 ```json
 {
-  "status": 422,
-  "message": "One or more fields failed validation.",
+  "status": 400,
+  "message": "recipient must be a non-empty string.",
   "data": null,
   "code": "PlanRestricted",
   "errors": [
@@ -28596,7 +30720,7 @@ Content type: `application/json`
 ```
 
 
-**Response `404`:** The requested resource does not exist.
+**Response `404`:** The document doesn't exist, or `recipient` is not one of its signers.
 
 Content type: `application/json`
 
@@ -28615,7 +30739,7 @@ Content type: `application/json`
         },
         "message": {
           "type": "string",
-          "example": "The requested resource was not found."
+          "example": "Signer not found."
         }
       },
       "type": "object"
@@ -28629,7 +30753,54 @@ Content type: `application/json`
 ```json
 {
   "status": 404,
-  "message": "The requested resource was not found.",
+  "message": "Signer not found.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `429`:** The signer was sent their invitation through this route less than two minutes ago; `Retry-After` gives the seconds left.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 429
+        },
+        "message": {
+          "type": "string",
+          "example": "The signing link was just sent. Wait a couple of minutes before asking again."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 429,
+  "message": "The signing link was just sent. Wait a couple of minutes before asking again.",
   "data": null,
   "code": "PlanRestricted",
   "errors": [
@@ -29112,6 +31283,1731 @@ Content type: `application/json`
 ```
 
 
+## ScheduleAssignment
+
+```pascal
+function ScheduleAssignment(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
+```
+
+`POST /v1/documents/{documentId}/scheduled-sends`
+
+Keeps a **Create assignment** request and makes it at `send_at`, as the member who scheduled it, through the same checks and charges as **Create assignment** then. Nothing is sent or charged now, and nothing changes for the document: it can still be sent at once, and the scheduled send then fails when it goes. A document takes one pending scheduled send at a time, counting one being sent. The request is checked now as **Estimate assignment cost** checks it (the method, each signer's methods, the plan's features), and each signer named must be a contact of the workspace; the balance is checked when it is sent. A job checks every five minutes and makes the sends that are due. A send that can't be made then becomes `failed` with the reason, nothing is charged, and the member who scheduled it is e-mailed; if that member has left the workspace, it is not made as anyone else: it fails and the workspace's active owners are e-mailed. **List scheduled sends**, **Cancel a scheduled send** and **Send a scheduled send now** follow it.
+
+**Availability:** staging only; not published by production.
+
+`DigitalCertificate` signers require `method: virtual`; certificate completion handles the signer's virtual item, while the ordinary field-signing endpoint rejects certificate signers. The SDK rejects `method: collect` before transport with `EAssinafyInputError.ErrorCode = digital_certificate_requires_virtual_method`.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `documentId` (path, required): Document ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (required)**
+
+```json
+{
+  "description": "A **Create assignment** body (`method`, `signers`, `entries`, `message`, `expires_at` and the rest, as that route takes them) plus `send_at`.",
+  "required": [
+    "send_at",
+    "signers"
+  ],
+  "properties": {
+    "send_at": {
+      "description": "When to send: ISO 8601 with its offset (none means UTC), or a Unix time. From one hour to 90 days ahead.",
+      "example": "2026-11-20T09:00:00-03:00",
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    "method": {
+      "description": "As in **Create assignment**; `virtual` when left out.",
+      "type": "string",
+      "enum": [
+        "virtual",
+        "collect"
+      ],
+      "example": "virtual"
+    },
+    "signers": {
+      "description": "As in **Create assignment**; each must be a contact of the workspace.",
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "expires_at": {
+      "description": "As in **Create assignment**, an absolute time (ISO 8601 or a Unix time), or null for none; at least two hours after `send_at`, since the request must still have an hour left when it is made.",
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": true
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "send_at": "2026-11-20T09:00:00-03:00",
+  "method": "virtual",
+  "signers": [
+    {}
+  ],
+  "expires_at": "2030-01-01T12:00:00Z"
+}
+```
+
+
+**Response `200`:** The scheduled send
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/ScheduledSend"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "scheduled_send",
+    "id": "64f1a2b3c4d5e6f708192a3b",
+    "type": "assignment",
+    "document_ids": [
+      "615601fab04c0a3147bb1246"
+    ],
+    "status": "pending",
+    "send_at": "2026-11-20T12:00:00Z",
+    "assignment_id": null,
+    "envelope_id": null,
+    "failure_reason": null,
+    "created_at": "2026-11-14T18:00:00Z",
+    "processed_at": null
+  }
+}
+```
+
+
+**Response `400`:** `send_at` missing, unreadable, less than an hour or more than 90 days ahead; an `expires_at` less than two hours after it; the document already has an assignment, or a scheduled send pending or being sent; or the request refused as **Estimate assignment cost** refuses it.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** The workspace's plan lacks a verification or notification method sent (`PlanRestricted`), or an OAuth app's token lacks `documents:write` (`InsufficientScope`); also a deactivated membership or a role.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "WhatsApp notification is not available for your current plan."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "PlanRestricted",
+            "InsufficientScope"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "WhatsApp notification is not available for your current plan.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The document is not in the workspace, or a signer named is not a contact of it.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+## ListScheduledSends
+
+```pascal
+function ListScheduledSends(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
+```
+
+`GET /v1/accounts/{accountId}/scheduled-sends`
+
+The workspace's scheduled sends, assignments and envelopes, newest first, whatever their status. Paged: 20 per page by default; the `X-Pagination-Total-Count`, `X-Pagination-Page-Count`, `X-Pagination-Current-Page` and `X-Pagination-Per-Page` headers describe the full list. An OAuth app needs `documents:write` here, not only `documents:read`: a failed send's `failure_reason` can say the workspace's balance ran out or a member left, which an app learns only from a request it can make.
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `page` (query, optional): Page number.
+```json
+{
+  "type": "integer",
+  "minimum": 1,
+  "example": 1
+}
+```
+
+
+- `per-page` (query, optional): Records per page: 20 by default, at most 50; a larger value answers 50 a page.
+```json
+{
+  "type": "integer",
+  "default": 20,
+  "maximum": 50,
+  "minimum": 1,
+  "example": 25
+}
+```
+
+
+- `document_id` (query, optional): Only the sends of this document.
+```json
+{
+  "type": "string",
+  "example": "615601fab04c0a3147bb1246"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The workspace's scheduled sends
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ScheduledSend"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": [
+    {
+      "resource": "scheduled_send",
+      "id": "64f1a2b3c4d5e6f708192a3b",
+      "type": "assignment",
+      "document_ids": [
+        "615601fab04c0a3147bb1246"
+      ],
+      "status": "pending",
+      "send_at": "2026-11-20T12:00:00Z",
+      "assignment_id": null,
+      "envelope_id": null,
+      "failure_reason": null,
+      "created_at": "2026-11-14T18:00:00Z",
+      "processed_at": null
+    }
+  ]
+}
+```
+
+
+**Response `400`:** `document_id` not text.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** An OAuth app's token lacks `documents:write` (`InsufficientScope`). Also a member deactivated in the workspace, a workspace scheduled for deletion, or an OAuth token of another workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "InsufficientScope"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "Bad request.",
+  "data": null,
+  "code": "InsufficientScope",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The workspace does not exist.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "The requested resource was not found."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "The requested resource was not found.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+## ScheduleEnvelope
+
+```pascal
+function ScheduleEnvelope(const AAccountId: string; Body: TJSONData): TAssinafyResponse;
+```
+
+`POST /v1/accounts/{accountId}/scheduled-sends`
+
+Keeps a **Create envelope** request and makes it at `send_at`, as the member who scheduled it, through the same checks and charges as **Create envelope** then. Nothing is created, sent or charged now, and nothing changes for its documents: each can still be sent at once, and the scheduled send then fails when it goes. A document takes one pending scheduled send at a time, counting one being sent. The request is checked now as **Estimate envelope cost** checks it (`403` with code `PlanRestricted` without the Envelopes feature, `400` with `errors` on the same fields); the balance is checked when it is sent. A job checks every five minutes and makes the sends that are due; failures go as for **Schedule an assignment**: `failed` with the reason, nothing charged, the member who scheduled it e-mailed, or the workspace's active owners if that member has left. An `Idempotency-Key` is not read here: each call keeps one send. An assignment is scheduled on its document (**Schedule an assignment**).
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request: `application/json` (required)**
+
+```json
+{
+  "description": "A **Create envelope** body plus `send_at`; each document's `expires_at` at least two hours after `send_at`.",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/EnvelopeCreateRequest"
+    },
+    {
+      "required": [
+        "send_at"
+      ],
+      "properties": {
+        "send_at": {
+          "description": "When to send: ISO 8601 with its offset (none means UTC), or a Unix time. From one hour to 90 days ahead.",
+          "example": "2026-11-20T09:00:00-03:00",
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "name": "Contrato de prestação de serviços",
+  "message": "Segue o contrato e seus anexos.",
+  "max_total_credits": 1.5,
+  "signers": [
+    {
+      "id": "fa8c140cb49b79f940aab95fddd",
+      "verification_method": "Email",
+      "notification_methods": [
+        "Email"
+      ],
+      "embedded": false
+    }
+  ],
+  "documents": [
+    {
+      "id": "615601fab04c0a3147bb1246",
+      "method": "virtual",
+      "entries": [
+        {
+          "page_id": "<string>",
+          "fields": [
+            {
+              "signer_id": "<string>",
+              "field_id": "<string>",
+              "display_settings": {
+                "left": 69,
+                "top": 282,
+                "width": 421,
+                "height": 45.86,
+                "fontFamily": "Arial",
+                "fontSize": 22,
+                "backgroundColor": "#D5EBFF"
+              }
+            }
+          ]
+        }
+      ],
+      "signer_ids": [
+        "fa8c140cb49b79f940aab95fddd"
+      ],
+      "expires_at": "2026-12-31T23:59:59Z",
+      "copy_receiver_ids": [
+        "cr8c140cb49b79f940aab95fddd"
+      ]
+    }
+  ],
+  "send_at": "2026-11-20T09:00:00-03:00"
+}
+```
+
+
+**Response `200`:** The scheduled send
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/ScheduledSend"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "scheduled_send",
+    "id": "64f1a2b3c4d5e6f708192a3b",
+    "type": "assignment",
+    "document_ids": [
+      "615601fab04c0a3147bb1246"
+    ],
+    "status": "pending",
+    "send_at": "2026-11-20T12:00:00Z",
+    "assignment_id": null,
+    "envelope_id": null,
+    "failure_reason": null,
+    "created_at": "2026-11-14T18:00:00Z",
+    "processed_at": null
+  }
+}
+```
+
+
+**Response `400`:** `send_at` missing, unreadable, less than an hour or more than 90 days ahead; a document's `expires_at` less than two hours after it; a document already assigned or in a scheduled send pending or being sent; or the request refused as **Estimate envelope cost** refuses it, in `errors`.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** The workspace's plan lacks the Envelopes feature, or a signer's method or embedded signing the plan lacks (`PlanRestricted`); or an OAuth app's token lacks `documents:write` (`InsufficientScope`). Also a member deactivated in the workspace, a workspace scheduled for deletion, or an OAuth token of another workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "PlanRestricted",
+            "InsufficientScope"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The requested resource does not exist.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 404
+        },
+        "message": {
+          "type": "string",
+          "example": "The requested resource was not found."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 404,
+  "message": "The requested resource was not found.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+## CancelScheduledSend
+
+```pascal
+function CancelScheduledSend(const AAccountId: string; const ScheduledSendId: string): TAssinafyResponse;
+```
+
+`PUT /v1/accounts/{accountId}/scheduled-sends/{scheduledSendId}/cancel`
+
+Cancels a `pending` scheduled send; nothing is sent or charged. A send already being sent, sent, failed or cancelled answers `409`.
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `scheduledSendId` (path, required): The scheduled send ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The cancelled scheduled send
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/ScheduledSend"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "scheduled_send",
+    "id": "64f1a2b3c4d5e6f708192a3b",
+    "type": "assignment",
+    "document_ids": [
+      "615601fab04c0a3147bb1246"
+    ],
+    "status": "pending",
+    "send_at": "2026-11-20T12:00:00Z",
+    "assignment_id": null,
+    "envelope_id": null,
+    "failure_reason": null,
+    "created_at": "2026-11-14T18:00:00Z",
+    "processed_at": null
+  }
+}
+```
+
+
+**Response `403`:** An OAuth app's token lacks `documents:write` (`InsufficientScope`). Also a member deactivated in the workspace, a workspace scheduled for deletion, or an OAuth token of another workspace.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "InsufficientScope"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "Bad request.",
+  "data": null,
+  "code": "InsufficientScope",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The workspace does not exist, or the scheduled send is not the workspace's.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `409`:** Only a `pending` scheduled send can be cancelled.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+## SendScheduledSendNow
+
+```pascal
+function SendScheduledSendNow(const AAccountId: string; const ScheduledSendId: string): TAssinafyResponse;
+```
+
+`PUT /v1/accounts/{accountId}/scheduled-sends/{scheduledSendId}/send`
+
+Makes a `pending` scheduled send's request now rather than at `send_at`: as **Create assignment** or **Create envelope** would make it then, as the member who scheduled it, with the same checks and charges. A refusal answers as that route would answer the member who scheduled it: no documents or credits left, a signer removed, the document already sent, the plan without Envelopes, a `max_total_credits` below the cost now (`409` `CreditCeilingExceeded`), that member gone from the workspace (`400`) or the workspace's deletion pending (`403`); the send then stays `pending`, to go at `send_at` unless cancelled, and no one is e-mailed. A send already being sent, sent, failed or cancelled answers `409`.
+
+**Availability:** staging only; not published by production.
+
+**Authentication:** API key or bearer token. OAuth permissions are governed by the server’s scope and resource restrictions.
+
+**Parameters:**
+
+- `accountId` (path, required): Workspace account ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+- `scheduledSendId` (path, required): The scheduled send ID.
+```json
+{
+  "type": "string"
+}
+```
+
+
+**Request body:** none.
+
+**Response `200`:** The scheduled send, `sent`, with the assignment or envelope it created
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/Envelope"
+    },
+    {
+      "properties": {
+        "data": {
+          "$ref": "#/components/schemas/ScheduledSend"
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 200,
+  "message": "",
+  "data": {
+    "resource": "scheduled_send",
+    "id": "64f1a2b3c4d5e6f708192a3b",
+    "type": "assignment",
+    "document_ids": [
+      "615601fab04c0a3147bb1246"
+    ],
+    "status": "pending",
+    "send_at": "2026-11-20T12:00:00Z",
+    "assignment_id": null,
+    "envelope_id": null,
+    "failure_reason": null,
+    "created_at": "2026-11-14T18:00:00Z",
+    "processed_at": null
+  }
+}
+```
+
+
+**Response `400`:** The request refused as **Create assignment** or **Create envelope** refuses it, or the member who scheduled it has left the workspace. The send stays `pending`.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `403`:** The workspace's plan lacks a feature the request uses (`PlanRestricted`), or an OAuth app's token lacks `documents:write` (`InsufficientScope`); also a deactivated membership, a role, or the workspace's deletion pending. The send stays `pending`.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 403
+        },
+        "message": {
+          "type": "string",
+          "example": "WhatsApp notification is not available for your current plan."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "PlanRestricted",
+            "InsufficientScope"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 403,
+  "message": "WhatsApp notification is not available for your current plan.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `404`:** The workspace does not exist, or the scheduled send is not the workspace's; or the document an assignment sends no longer exists (`Document not found.`), and the send stays `pending`.
+
+Content type: `application/json`
+
+```json
+{
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `409`:** Only a `pending` scheduled send can be sent now; or the request's `max_total_credits` is below what it costs now (`CreditCeilingExceeded`, nothing charged), and the send stays `pending`.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "code": {
+          "description": "Only for the ceiling.",
+          "type": "string",
+          "enum": [
+            "CreditCeilingExceeded"
+          ]
+        },
+        "total_credits": {
+          "description": "With `CreditCeilingExceeded`: what the request costs now.",
+          "type": "number",
+          "example": 1.5
+        },
+        "max_total_credits": {
+          "description": "With `CreditCeilingExceeded`: the ceiling it was scheduled with.",
+          "type": "number",
+          "example": 1
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 400,
+  "message": "Bad request.",
+  "data": null,
+  "code": "CreditCeilingExceeded",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ],
+  "total_credits": 1.5,
+  "max_total_credits": 1
+}
+```
+
+
+**Response `401`:** Missing or invalid credentials.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 401
+        },
+        "message": {
+          "type": "string",
+          "example": "Your request was made with invalid credentials."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 401,
+  "message": "Your request was made with invalid credentials.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
+**Response `500`:** Unexpected server error.
+
+Content type: `application/json`
+
+```json
+{
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "status": {
+          "type": "integer",
+          "example": 500
+        },
+        "message": {
+          "type": "string",
+          "example": "An unexpected error occurred."
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "status": 500,
+  "message": "An unexpected error occurred.",
+  "data": null,
+  "code": "PlanRestricted",
+  "errors": [
+    {
+      "field": "full_name",
+      "code": "Required",
+      "message": "Full Name cannot be blank."
+    }
+  ]
+}
+```
+
+
 ## ListSigners
 
 ```pascal
@@ -29347,7 +33243,7 @@ Create a signer in the workspace.
       "example": "developer@example.com"
     },
     "whatsapp_phone_number": {
-      "description": "E.164; normalized on save.",
+      "description": "E.164; normalized on save. A number written with `+` is read with the country code it names first, and as Brazilian if it isn't valid there; one without `+` is read as a Brazilian area code and number first.",
       "type": "string",
       "example": "+5548999990000"
     },
@@ -29821,7 +33717,7 @@ Update a signer's information. Only the fields sent change; send just the ones y
       "example": "developer@example.com"
     },
     "whatsapp_phone_number": {
-      "description": "E.164; normalized on save, and compared after normalizing, so the same number in another format is not a change. Can't be changed or cleared while the signer has verified it on an in-flight document, or on a document of an envelope while another of their documents of it is in flight (`400`).",
+      "description": "E.164; normalized on save, and compared after normalizing, so the same number in another format is not a change. A number written with `+` is read with the country code it names first, and as Brazilian if it isn't valid there; one without `+` is read as a Brazilian area code and number first. Can't be changed or cleared while the signer has verified it on an in-flight document, or on a document of an envelope while another of their documents of it is in flight (`400`).",
       "type": "string",
       "example": "+5548999990000"
     },
@@ -31703,10 +35599,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -31731,7 +35627,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -31775,7 +35671,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -31794,7 +35690,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -31805,7 +35701,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -32041,6 +35937,182 @@ Retrieve the document a signer has been invited to sign, using the signer access
 
 **Signers whose verification method is `DigitalCertificate`** must have confirmed their data *and* accepted the terms before this returns the document; otherwise it is `400`. Both are satisfied in one call to `PUT /v1/documents/{documentId}/signers/confirm-data` with `has_accepted_terms: true`, so send that before this endpoint — the `has_accepted_terms` query parameter here is too late to open the gate. `PUT /v1/signers/accept-terms` also works and is never gated.
 
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "View document to sign",
+  "description": "Retrieve the document a signer has been invited to sign, using the signer access code. Marks the document as viewed. The assignment carries only this signer's items, and leaves out the other signers, their signing links (`signing_urls`), the copy receivers and the signing `summary`. The response adds `current_signer`: this signer, with their `verification_method`, `notification_methods` and `completed` (whether they have already signed). Returns 409 while the document is still being prepared (retry with backoff). Once the signer is done (signed, or the document was declined, cancelled, expired or failed; for a document of an envelope, with every document of the envelope they are on) for more than 30 minutes, or the workspace was deleted, the code is closed: this returns only `id`, `name`, `status`, `current_signer` and `certified_copy`, with `is_signer_access_closed: true` (and `envelope`, when asked for), and the signer's other endpoints answer `410`. `certified_copy` says whether the signer can ask for the certified copy again (`POST /v1/sign/certified-copy`): `available`, the `notification_method` it goes on and, for WhatsApp, `resends_left`.\n\n**Signers whose verification method is `DigitalCertificate`** must have confirmed their data *and* accepted the terms before this returns the document; otherwise it is `400`. Both are satisfied in one call to `PUT /v1/documents/{documentId}/signers/confirm-data` with `has_accepted_terms: true`, so send that before this endpoint — the `has_accepted_terms` query parameter here is too late to open the gate. `PUT /v1/signers/accept-terms` also works and is never gated.",
+  "operationId": "ccc4f307d924837da054992e1dc35069",
+  "parameters": [
+    {
+      "name": "has_accepted_terms",
+      "in": "query",
+      "description": "Set true to record terms acceptance.",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "name": "expand",
+      "in": "query",
+      "description": "`envelope` adds the envelope the code belongs to, its id and name, also once the code is closed and when the code's own document was taken out (the code still reaches the rest); `null` for a link outside an envelope or whose envelope was deleted. Without it the document reads as it always has.",
+      "required": false,
+      "style": "form",
+      "explode": false,
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "envelope"
+          ]
+        }
+      }
+    },
+    {
+      "name": "document_id",
+      "in": "query",
+      "description": "With the code of a document of an envelope: another document of that envelope the signer is on, to open in place of the code's own; the code's e-mail or WhatsApp verification is carried there, once. A value that is no document id (a list, or empty) answers `400`. Ignored with any other code.",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "description": "The document with the signer's assignment",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/SigningDocument"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "A digital-certificate signer has not yet confirmed their data or accepted the terms, the signer's step has not started yet (sequential signing), or, with the code of a document of an envelope, `document_id` is no document id.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 400
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Signer data must be confirmed before viewing the document."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "`document_id` names a document outside the code's envelope, or one the signer is not on; or the workspace deleted the document while the code is still open.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The requested document has been deleted."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "409": {
+      "description": "The document is not ready to be viewed yet.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 409
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The document is not ready to be viewed yet."
+                  },
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "DocumentNotReady"
+                    ],
+                    "example": "DocumentNotReady"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    }
+  ]
+}
+```
+
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
 **Parameters:**
@@ -32114,10 +36186,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -32142,7 +36214,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -32186,7 +36258,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -32205,7 +36277,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -32216,7 +36288,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -32252,7 +36324,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** A digital-certificate signer has not yet confirmed their data or accepted the terms, the signer's step has not started yet (sequential signing), or, with the code of a document of an envelope, `document_id` is no document id.
+**Response `400`:** A digital-certificate signer has not yet confirmed their data (`SignerDataUnconfirmed`) or accepted the terms, the signer's step has not started yet (sequential signing), or, with the code of a document of an envelope, `document_id` is no document id.
 
 Content type: `application/json`
 
@@ -32272,6 +36344,13 @@ Content type: `application/json`
         "message": {
           "type": "string",
           "example": "Signer data must be confirmed before viewing the document."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed"
+          ],
+          "example": "SignerDataUnconfirmed"
         }
       },
       "type": "object"
@@ -32287,7 +36366,7 @@ Content type: `application/json`
   "status": 400,
   "message": "Signer data must be confirmed before viewing the document.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -32502,7 +36581,205 @@ function SignAssignmentItems(const DocumentId: string; const AssignmentId: strin
 
 `POST /v1/documents/{documentId}/assignments/{assignmentId}`
 
-Sign a document with input fields (collect method): submit the signer's item values, completing their items. Signing again after the signer has signed changes nothing and returns the current assignment. For **virtual** assignments the signer must first confirm their data via `PUT /v1/documents/{documentId}/signers/confirm-data`, otherwise this returns `400` (Signer data must be confirmed before signing). Signers whose verification method is `DigitalCertificate` cannot use this endpoint — their signature must be produced through `POST /v1/signers/certificate/start` + `/complete`, and this returns `400`. The request body is a JSON array of item entries. Uses the signer access code. With the code of a document of an envelope, it acts on the signer's request on the document the route names, if that document is in the same envelope, carrying the code's e-mail or WhatsApp verification there.
+Sign a document with input fields (collect method): submit the signer's item values, completing their items. An item left out is filled when it can be: a read-only field (the signature date) takes its own value and an optional one stays empty; one the signer must give is refused. Signing again after the signer has signed changes nothing and returns `200` with the current assignment, even once that signature closed the document: a retry after a lost response is safe. See **Signing In Your App** for the value of each field type. For **virtual** assignments the signer must first confirm their data via `PUT /v1/documents/{documentId}/signers/confirm-data`, otherwise this returns `400` (Signer data must be confirmed before signing). On a `collect` assignment the signer must have both a `signature` and an `initial` image stored (`POST /v1/signature`), even when the document has no `initial` field; otherwise this returns `400`. Signers whose verification method is `DigitalCertificate` cannot use this endpoint — their signature must be produced through `POST /v1/signers/certificate/start` + `/complete`, and this returns `400`. The request body is a JSON array of item entries; on a `virtual` assignment it is ignored, so send an empty array. Uses the signer access code. With the code of a document of an envelope, it acts on the signer's request on the document the route names, if that document is in the same envelope, carrying the code's e-mail or WhatsApp verification there.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "Sign assignment items",
+  "description": "Sign a document with input fields (collect method): submit the signer's item values, completing their items. Signing again after the signer has signed changes nothing and returns the current assignment. For **virtual** assignments the signer must first confirm their data via `PUT /v1/documents/{documentId}/signers/confirm-data`, otherwise this returns `400` (Signer data must be confirmed before signing). Signers whose verification method is `DigitalCertificate` cannot use this endpoint — their signature must be produced through `POST /v1/signers/certificate/start` + `/complete`, and this returns `400`. The request body is a JSON array of item entries. Uses the signer access code. With the code of a document of an envelope, it acts on the signer's request on the document the route names, if that document is in the same envelope, carrying the code's e-mail or WhatsApp verification there.",
+  "operationId": "68e20e0f63321f1ca7b18d31afb632f0",
+  "parameters": [
+    {
+      "$ref": "#/components/parameters/DocumentId"
+    },
+    {
+      "name": "assignmentId",
+      "in": "path",
+      "description": "The assignment ID.",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "required": [
+              "itemId",
+              "fieldId",
+              "pageId",
+              "value"
+            ],
+            "properties": {
+              "itemId": {
+                "description": "The assignment item ID.",
+                "type": "string",
+                "example": "615606efcde1a39c9d21e30e"
+              },
+              "fieldId": {
+                "description": "Field associated with the item.",
+                "type": "string",
+                "example": "6152120297080d55bdd13197"
+              },
+              "pageId": {
+                "description": "The page ID.",
+                "type": "string",
+                "example": "615213ed81b071f4293b2fc2"
+              },
+              "value": {
+                "description": "String representation of the value.",
+                "type": "string",
+                "example": "Signed by Sonny Bayer"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "Signing result",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "Signer data must be confirmed before signing (virtual assignments), the signer must sign with a digital certificate through the digital certificate endpoints, an entry names a page, field or item that is not one of this signer's, or the signer's step has not started yet (sequential signing). Nothing is signed when an entry is refused.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 400
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Signer data confirmation is required."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "The assignment is not the one of the signer's request: the access code's own or, with the code of a document of an envelope, the one on the document the route names; or the route names a document outside the code's envelope, or one the signer is not on.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Assignment not found."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "409": {
+      "description": "The document is not ready to be signed yet.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 409
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The document is not ready to be signed yet."
+                  },
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "DocumentNotReady"
+                    ],
+                    "example": "DocumentNotReady"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    }
+  ]
+}
+```
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
@@ -32530,6 +36807,7 @@ Sign a document with input fields (collect method): submit the signer's item val
 {
   "type": "array",
   "items": {
+    "description": "One item entry. Collect method only: a virtual assignment takes an empty array.",
     "required": [
       "itemId",
       "fieldId",
@@ -32553,7 +36831,7 @@ Sign a document with input fields (collect method): submit the signer's item val
         "example": "615213ed81b071f4293b2fc2"
       },
       "value": {
-        "description": "String representation of the value.",
+        "description": "String representation of the value. A `signature` or `initial` item is stamped with the signer's stored image of that type, not with this value. A `signatureDate` item ignores it: the server records the date and time of signing, in UTC-3 (São Paulo time).",
         "type": "string",
         "example": "Signed by Sonny Bayer"
       }
@@ -32624,7 +36902,7 @@ Content type: `application/json`
 ```
 
 
-**Response `200`:** Signing result
+**Response `200`:** Signing result: the assignment as the signer reads it in their list of documents, with no `signing_urls`, only their own `items`, and the other parties' contact details and ID number null.
 
 Content type: `application/json`
 
@@ -32658,7 +36936,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** Signer data must be confirmed before signing (virtual assignments), the signer must sign with a digital certificate through the digital certificate endpoints, an entry names a page, field or item that is not one of this signer's, or the signer's step has not started yet (sequential signing). Nothing is signed when an entry is refused.
+**Response `400`:** Signer data must be confirmed before signing (virtual assignments; `SignerDataUnconfirmed`), the signer has no stored `signature` or `initial` image (collect assignments), the signer must sign with a digital certificate through the digital certificate endpoints (`DigitalCertificateRequired`), the signer's code or identity check is not verified (`EmailVerificationRequired`, `WhatsappVerificationRequired`, `IdentityVerificationRequired`), an entry names a page, field or item that is not one of this signer's, the entries leave out a field the signer must give (named in the message), or the signer's step has not started yet (sequential signing). Nothing is signed when an entry is refused.
 
 Content type: `application/json`
 
@@ -32678,6 +36956,17 @@ Content type: `application/json`
         "message": {
           "type": "string",
           "example": "Signer data confirmation is required."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed",
+            "DigitalCertificateRequired",
+            "EmailVerificationRequired",
+            "WhatsappVerificationRequired",
+            "IdentityVerificationRequired"
+          ],
+          "example": "SignerDataUnconfirmed"
         }
       },
       "type": "object"
@@ -32693,7 +36982,7 @@ Content type: `application/json`
   "status": 400,
   "message": "Signer data confirmation is required.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -33241,6 +37530,142 @@ function SignMultipleDocuments(const SignerAccessCode: string; Body: TJSONData):
 
 Sign several documents in one request, for a signer with multiple pending documents. Each document must be prepared for the **virtual** signature method. A listed document the signer already signed is left as it is. Uses the signer access code.
 
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "Sign multiple documents",
+  "description": "Sign several documents in one request, for a signer with multiple pending documents. Each document must be prepared for the **virtual** signature method. A listed document the signer already signed is left as it is. Uses the signer access code.",
+  "operationId": "0405395468bdf19f3385f46548182885",
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "required": [
+            "document_ids"
+          ],
+          "properties": {
+            "document_ids": {
+              "description": "IDs of the documents to sign.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "example": [
+                "documentid1",
+                "documentid2"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      }
+    }
+  },
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "Signing result",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "description": "Empty array.",
+                    "type": "array",
+                    "items": []
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "A listed document is not a virtual document of this signer, is not pending signature, waits for an earlier signing step, or, for the code of a document of an envelope, is not part of that envelope.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 400
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The document doc1 is not pending signature."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "A listed document ID does not exist in the workspace. The message names the unknown IDs.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Documents not found: doc1, doc2."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    }
+  ]
+}
+```
+
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
 **Parameters:**
@@ -33368,7 +37793,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** A listed document is not a virtual document of this signer, is not pending signature, waits for an earlier signing step, or, for the code of a document of an envelope, is not part of that envelope.
+**Response `400`:** A listed document is not a virtual document of this signer, is not pending signature, waits for an earlier signing step, or, for the code of a document of an envelope, is not part of that envelope; the signer must first confirm their data (`SignerDataUnconfirmed`); or the signer signs with a digital certificate (`DigitalCertificateRequired`).
 
 Content type: `application/json`
 
@@ -33388,6 +37813,14 @@ Content type: `application/json`
         "message": {
           "type": "string",
           "example": "The document doc1 is not pending signature."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed",
+            "DigitalCertificateRequired"
+          ],
+          "example": "SignerDataUnconfirmed"
         }
       },
       "type": "object"
@@ -33403,7 +37836,7 @@ Content type: `application/json`
   "status": 400,
   "message": "The document doc1 is not pending signature.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -34210,7 +38643,7 @@ function ConfirmSignerData(const DocumentId: string; const SignerAccessCode: str
 
 `PUT /v1/documents/{documentId}/signers/confirm-data`
 
-The signer confirms or updates their data before signing. Uses the signer access code. With the code of a document of an envelope, it acts on the signer's request on the document the route names, if that document is in the same envelope, carrying the code's e-mail or WhatsApp verification there. The code's own document, taken out of its envelope, takes the confirmation too while a document of the envelope still awaits signatures: it signs nothing (that document stays cancelled) and opens the reads a certificate or identity-check signer's method gates, so the signer reaches the documents left.
+The signer confirms or updates their data before signing. Only `email`, `whatsapp_phone_number` and `has_accepted_terms` are read; other keys are ignored. Uses the signer access code. With the code of a document of an envelope, it acts on the signer's request on the document the route names, if that document is in the same envelope, carrying the code's e-mail or WhatsApp verification there. The code's own document, taken out of its envelope, takes the confirmation too while a document of the envelope still awaits signatures: it signs nothing (that document stays cancelled) and opens the reads a certificate or identity-check signer's method gates, so the signer reaches the documents left.
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
@@ -34538,7 +38971,110 @@ function AcceptTerms(const SignerAccessCode: string): TAssinafyResponse;
 
 `PUT /v1/signers/accept-terms`
 
-Record that the signer accepted the terms of use. Uses the signer access code.
+Record that the signer accepted the terms of use (https://www.assinafy.com.br/termos-de-uso; `has_accepted_terms: true` on `confirm-data` records it too). Enforced only for `DigitalCertificate` signers, who are refused the document with `400` (`TermsNotAccepted`) until they accept; for the other methods it is recorded as evidence. Uses the signer access code.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "Accept terms (signer)",
+  "description": "Record that the signer accepted the terms of use. Uses the signer access code.",
+  "operationId": "0b0f84720ca17aa42ee8686c6755af8d",
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "Terms accepted",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "required": [
+                      "full_name",
+                      "email",
+                      "has_accepted_terms"
+                    ],
+                    "properties": {
+                      "full_name": {
+                        "type": "string",
+                        "example": "John Signer"
+                      },
+                      "email": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "email",
+                        "example": "developer@example.com"
+                      },
+                      "has_accepted_terms": {
+                        "type": "boolean",
+                        "example": true
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "The signer's verification is not done yet (e.g. the e-mail code), or the signer's step has not started yet (sequential signing).",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 400
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Email verification is required."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    }
+  ]
+}
+```
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
@@ -34656,7 +39192,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** The signer's verification is not done yet (e.g. the e-mail code), or the signer's step has not started yet (sequential signing).
+**Response `400`:** The signer's verification is not done yet (e.g. the e-mail code), a digital-certificate signer has not confirmed their data (`SignerDataUnconfirmed`), or the signer's step has not started yet (sequential signing).
 
 Content type: `application/json`
 
@@ -34676,6 +39212,13 @@ Content type: `application/json`
         "message": {
           "type": "string",
           "example": "Email verification is required."
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed"
+          ],
+          "example": "SignerDataUnconfirmed"
         }
       },
       "type": "object"
@@ -34691,7 +39234,7 @@ Content type: `application/json`
   "status": 400,
   "message": "Email verification is required.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -34800,21 +39343,138 @@ Content type: `application/json`
 ## UploadSignatureImage
 
 ```pascal
-function UploadSignatureImage(const SignerAccessCode: string; const FileName: string; Query: TStrings = nil): TAssinafyResponse;
+function UploadSignatureImage(const SignerAccessCode: string; const FileName: string; Query: TStrings = nil; const ContentType: string = 'image/png'): TAssinafyResponse;
 ```
 
 `POST /v1/signature`
 
-Upload the signer's signature (or initials) image as the raw request body. Uses the signer access code.
+Upload the signer's signature (or initials) image as the raw request body, a PNG or JPEG file, with no size limit. The collect method stamps the `signature` and `initial` items with these images and needs both before signing; the virtual method draws the signature on the certificate page when there is one. Uses the signer access code. The image is stored on the signer, one per `type`, and serves all of their documents: an upload replaces the previous image of its type, and a document is stamped with the image stored when it is certificated, so documents signed earlier and not yet certificated get the new one too. An image larger than 1000 px on a side is scaled down to fit; transparency is kept.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "Upload signature image",
+  "description": "Upload the signer's signature (or initials) image as the raw request body. Uses the signer access code.",
+  "operationId": "ccaf35a93d501e9b80ddbd4629b7006c",
+  "parameters": [
+    {
+      "name": "type",
+      "in": "query",
+      "description": "Image type, e.g. `signature` or `initial`.",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "name": "reuse",
+      "in": "query",
+      "description": "Whether the signer opted to reuse this signature in future processes. When set, updates the signer's `is_signature_reusable` flag; when omitted, the flag is left unchanged.",
+      "schema": {
+        "type": "boolean"
+      }
+    }
+  ],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "image/png": {
+        "schema": {
+          "type": "string",
+          "format": "binary"
+        }
+      }
+    }
+  },
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "Signature stored. `data` is an empty list.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": [],
+                    "example": []
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "The image is not a PNG or JPEG file, or it is blank; or the signer's step has not started yet (sequential signing).",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 400
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The signature image must be a PNG or JPEG file."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    }
+  ]
+}
+```
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter. Workspace credentials are omitted.
 
 **Parameters:**
 
-- `type` (query, optional): Image type, e.g. `signature` or `initial`.
+`ContentType` selects the upload media type; default `image/png`. It does not add a JSON field. All uploads are limited by the SDK to 25 MiB.
+
+- `type` (query, optional): Image type.
 ```json
 {
-  "type": "string"
+  "type": "string",
+  "enum": [
+    "signature",
+    "initial"
+  ]
 }
 ```
 
@@ -34828,6 +39488,22 @@ Upload the signer's signature (or initials) image as the raw request body. Uses 
 
 
 **Request: `image/png` (required)**
+
+```json
+{
+  "type": "string",
+  "format": "binary"
+}
+```
+
+**Payload shape:**
+
+```json
+"<binary bytes>"
+```
+
+
+**Request: `image/jpeg` (required)**
 
 ```json
 {
@@ -34926,7 +39602,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** The image is not a PNG or JPEG file, or it is blank; or the signer's step has not started yet (sequential signing).
+**Response `400`:** The image is not a PNG or JPEG file (`code` `SignatureImageInvalid`), or it is blank (`SignatureImageBlank`); or the signer's step has not started yet (sequential signing).
 
 Content type: `application/json`
 
@@ -35347,7 +40023,167 @@ function ListSignerDocuments(const SignerId: string; const SignerAccessCode: str
 
 `GET /v1/signers/{signerId}/documents`
 
-List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.
+List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`, has only the signer's own `items`, and gives every other signer and copy receiver, in `signers`, `copy_receivers` and `summary.signers`, with `email`, `whatsapp_phone_number` and `government_id` null, `notification_history` empty, and `identity_verification_status` null where present.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "List signer's documents",
+  "description": "List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.",
+  "operationId": "f98023cdbaac0f59f9be073cb0f3f873",
+  "parameters": [
+    {
+      "name": "signerId",
+      "in": "path",
+      "description": "The signer ID.",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "name": "envelope_id",
+      "in": "query",
+      "description": "Only the members of this envelope. Anything but text answers `400`.",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "$ref": "#/components/parameters/Page"
+    },
+    {
+      "$ref": "#/components/parameters/PerPage"
+    }
+  ],
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "The signer's documents",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "403": {
+      "description": "The access code belongs to another signer; or, with a user's token or key, a role, a membership or an OAuth scope refuses it.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 403
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The access code does not belong to this signer."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "The signer is not in the caller's workspace.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Signer not found"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              }
+            ]
+          },
+          "example": {
+            "status": 400,
+            "message": "This signer is in a pending step and has not been notified yet."
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    },
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyAuth": []
+    }
+  ]
+}
+```
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [ListSignerDocumentsAsWorkspace](#listsignerdocumentsasworkspace).
 
@@ -35481,10 +40317,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -35509,7 +40345,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -35553,7 +40389,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -35572,7 +40408,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -35583,7 +40419,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -35694,15 +40530,28 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.
+**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing), or a digital-certificate signer has not yet confirmed their data (`SignerDataUnconfirmed`) or accepted the terms; or `envelope_id` is not text, an entry of `errors`.
 
 Content type: `application/json`
 
 ```json
 {
+  "type": "object",
   "allOf": [
     {
       "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed"
+          ],
+          "example": "SignerDataUnconfirmed"
+        }
+      },
+      "type": "object"
     }
   ]
 }
@@ -35715,7 +40564,7 @@ Content type: `application/json`
   "status": 400,
   "message": "Bad request.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -35829,7 +40678,167 @@ function ListSignerDocumentsAsWorkspace(const SignerId: string; Query: TStrings 
 
 `GET /v1/signers/{signerId}/documents`
 
-List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.
+List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`, has only the signer's own `items`, and gives every other signer and copy receiver, in `signers`, `copy_receivers` and `summary.signers`, with `email`, `whatsapp_phone_number` and `government_id` null, `notification_history` empty, and `identity_verification_status` null where present.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "List signer's documents",
+  "description": "List the documents a signer is party to. Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.",
+  "operationId": "f98023cdbaac0f59f9be073cb0f3f873",
+  "parameters": [
+    {
+      "name": "signerId",
+      "in": "path",
+      "description": "The signer ID.",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "name": "envelope_id",
+      "in": "query",
+      "description": "Only the members of this envelope. Anything but text answers `400`.",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "$ref": "#/components/parameters/Page"
+    },
+    {
+      "$ref": "#/components/parameters/PerPage"
+    }
+  ],
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "The signer's documents",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "403": {
+      "description": "The access code belongs to another signer; or, with a user's token or key, a role, a membership or an OAuth scope refuses it.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 403
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The access code does not belong to this signer."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "The signer is not in the caller's workspace.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Signer not found"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              }
+            ]
+          },
+          "example": {
+            "status": 400,
+            "message": "This signer is in a pending step and has not been notified yet."
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    },
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyAuth": []
+    }
+  ]
+}
+```
 
 Workspace-credential form of [ListSignerDocuments](#listsignerdocuments): it sends the API key or bearer token and never a signer access code.
 
@@ -35965,10 +40974,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -35993,7 +41002,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -36037,7 +41046,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -36056,7 +41065,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -36067,7 +41076,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -36178,15 +41187,28 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.
+**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing), or a digital-certificate signer has not yet confirmed their data (`SignerDataUnconfirmed`) or accepted the terms; or `envelope_id` is not text, an entry of `errors`.
 
 Content type: `application/json`
 
 ```json
 {
+  "type": "object",
   "allOf": [
     {
       "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed"
+          ],
+          "example": "SignerDataUnconfirmed"
+        }
+      },
+      "type": "object"
     }
   ]
 }
@@ -36199,7 +41221,7 @@ Content type: `application/json`
   "status": 400,
   "message": "Bad request.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -36314,6 +41336,163 @@ function SearchSignerDocuments(const SignerId: string; const SignerAccessCode: s
 `GET /v1/signers/{signerId}/documents/search`
 
 Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "Search signer's documents",
+  "description": "Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.",
+  "operationId": "f249c5e917662472dbb1c8bcfff1fa8f",
+  "parameters": [
+    {
+      "name": "signerId",
+      "in": "path",
+      "description": "The signer ID.",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "name": "envelope_id",
+      "in": "query",
+      "description": "Only the members of this envelope. Anything but text answers `400`.",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "$ref": "#/components/parameters/Search"
+    }
+  ],
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "Matching documents",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "403": {
+      "description": "The access code belongs to another signer; or, with a user's token or key, a role, a membership or an OAuth scope refuses it.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 403
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The access code does not belong to this signer."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "The signer is not in the caller's workspace.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Signer not found"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              }
+            ]
+          },
+          "example": {
+            "status": 400,
+            "message": "This signer is in a pending step and has not been notified yet."
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    },
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyAuth": []
+    }
+  ]
+}
+```
 
 **Authentication:** Required `SignerAccessCode` as the `signer-access-code` query parameter; an empty code is rejected before transport and workspace credentials are never sent. For API key or bearer token access to the same route, use [SearchSignerDocumentsAsWorkspace](#searchsignerdocumentsasworkspace).
 
@@ -36433,10 +41612,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -36461,7 +41640,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -36505,7 +41684,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -36524,7 +41703,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -36535,7 +41714,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -36646,15 +41825,28 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.
+**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing), or a digital-certificate signer has not yet confirmed their data (`SignerDataUnconfirmed`) or accepted the terms; or `envelope_id` is not text, an entry of `errors`.
 
 Content type: `application/json`
 
 ```json
 {
+  "type": "object",
   "allOf": [
     {
       "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed"
+          ],
+          "example": "SignerDataUnconfirmed"
+        }
+      },
+      "type": "object"
     }
   ]
 }
@@ -36667,7 +41859,7 @@ Content type: `application/json`
   "status": 400,
   "message": "Bad request.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -36782,6 +41974,163 @@ function SearchSignerDocumentsAsWorkspace(const SignerId: string; Query: TString
 `GET /v1/signers/{signerId}/documents/search`
 
 Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.
+
+**Production contract:** the operation below uses references from [production OpenAPI](openapi.json). Subsequent payloads describe staging.
+
+```json
+{
+  "tags": [
+    "Signing"
+  ],
+  "summary": "Search signer's documents",
+  "description": "Search the documents a signer is party to (compact representation). Accepts either the signer access code or the account's own credentials (API key or bearer token) — with account credentials, the signer must belong to that account's workspace. With the signer access code, `signerId` must be the code's own signer (otherwise `403`), only documents whose signing step has been reached are listed (for the code of a document of an envelope, only that envelope's documents), and each assignment leaves out `signing_urls`.",
+  "operationId": "f249c5e917662472dbb1c8bcfff1fa8f",
+  "parameters": [
+    {
+      "name": "signerId",
+      "in": "path",
+      "description": "The signer ID.",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "name": "envelope_id",
+      "in": "query",
+      "description": "Only the members of this envelope. Anything but text answers `400`.",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "$ref": "#/components/parameters/Search"
+    }
+  ],
+  "responses": {
+    "410": {
+      "$ref": "#/components/responses/SignerAccessClosed"
+    },
+    "200": {
+      "description": "Matching documents",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Envelope"
+              },
+              {
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "403": {
+      "description": "The access code belongs to another signer; or, with a user's token or key, a role, a membership or an OAuth scope refuses it.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 403
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "The access code does not belong to this signer."
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "The signer is not in the caller's workspace.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "example": 404
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Signer not found"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              }
+            ]
+          },
+          "example": {
+            "status": 400,
+            "message": "This signer is in a pending step and has not been notified yet."
+          }
+        }
+      }
+    },
+    "401": {
+      "$ref": "#/components/responses/Unauthorized"
+    },
+    "500": {
+      "$ref": "#/components/responses/ServerError"
+    }
+  },
+  "security": [
+    {
+      "signerAccessCode": []
+    },
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyAuth": []
+    }
+  ]
+}
+```
 
 Workspace-credential form of [SearchSignerDocuments](#searchsignerdocuments): it sends the API key or bearer token and never a signer access code.
 
@@ -36903,10 +42252,10 @@ Content type: `application/json`
       "name": "document.pdf",
       "status": "metadata_ready",
       "artifacts": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       },
       "is_closed": false,
-      "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+      "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
       "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
       "decline_reason": null,
@@ -36931,7 +42280,7 @@ Content type: `application/json`
         "id": "615606ef81d199996981dbce",
         "document_id": "615601fab04c0a3147bb1246",
         "created_at": "2026-06-03T03:54:16Z",
-        "sender_email": "sender@example.com",
+        "sender_email": "developer@example.com",
         "method": "virtual",
         "expires_at": null,
         "message": "<string>",
@@ -36975,7 +42324,7 @@ Content type: `application/json`
               "number": 1,
               "height": 2100,
               "width": 1275,
-              "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+              "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
             },
             "signer": {},
             "field": {},
@@ -36994,7 +42343,7 @@ Content type: `application/json`
         "signing_urls": [
           {
             "signer_id": "<string>",
-            "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+            "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
             "embedded": false
           }
         ]
@@ -37005,7 +42354,7 @@ Content type: `application/json`
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         }
       ],
       "envelope_id": null,
@@ -37116,15 +42465,28 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing); or `envelope_id` is not text, an entry of `errors`.
+**Response `400`:** With a signer access code, the signer's step has not started yet (sequential signing), or a digital-certificate signer has not yet confirmed their data (`SignerDataUnconfirmed`) or accepted the terms; or `envelope_id` is not text, an entry of `errors`.
 
 Content type: `application/json`
 
 ```json
 {
+  "type": "object",
   "allOf": [
     {
       "$ref": "#/components/schemas/ErrorEnvelope"
+    },
+    {
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "SignerDataUnconfirmed"
+          ],
+          "example": "SignerDataUnconfirmed"
+        }
+      },
+      "type": "object"
     }
   ]
 }
@@ -37137,7 +42499,7 @@ Content type: `application/json`
   "status": 400,
   "message": "Bad request.",
   "data": null,
-  "code": "PlanRestricted",
+  "code": "SignerDataUnconfirmed",
   "errors": [
     {
       "field": "full_name",
@@ -38334,7 +43696,7 @@ Content type: `application/json`
     "user": {
       "id": "bgjazeo5r9v2lq7l36dx48np",
       "name": "John Smith",
-      "email": "example@example.com",
+      "email": "developer@example.com",
       "telephone": "17989206641",
       "government_id": "15774136604",
       "is_email_verified": false,
@@ -40419,7 +45781,7 @@ Generate a new document from a template. The request is checked (roles, fields, 
           "email": {
             "description": "Used when `id` is not sent: the account's signer with this email is reused, or a new one is created with `name`.",
             "type": "string",
-            "example": "signer@example.com"
+            "example": "developer@example.com"
           },
           "name": {
             "description": "Full name for a signer created from `email`.",
@@ -40432,7 +45794,7 @@ Generate a new document from a template. The request is checked (roles, fields, 
             "example": "+5548999999999"
           },
           "verification_method": {
-            "description": "Verification method for this signer. If provided without notification_methods, the notification method is inferred. Defaults to Email. `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id` (a CPF requires that person's certificate; a CNPJ requires an e-CNPJ for that company), must be alone in its signing step, and is charged 0.5 credits per signer. It is refused with `400` when the template has placed signer fields, because certificate signers sign only virtual assignments. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Only applies to signers (not copy receivers).",
+            "description": "Verification method for this signer. If provided without notification_methods, the notification method is inferred. Defaults to Email. `DigitalCertificate` has the signer sign with their own ICP-Brasil certificate — it requires the Digital Certificate feature, the signer must have a CPF or CNPJ in `government_id` (a CPF requires that person's certificate; a CNPJ requires an e-CNPJ for that company), must be alone in its signing step, and is charged 0.45 credits per signer. It is refused with `400` when the template has placed signer fields, because certificate signers sign only virtual assignments. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires the ID Document + Face Match feature, the signer must have a valid CPF in `government_id`, and is charged a per-signer fee. Only applies to signers (not copy receivers).",
             "type": "string",
             "enum": [
               "Email",
@@ -40467,7 +45829,7 @@ Generate a new document from a template. The request is checked (roles, fields, 
       }
     },
     "editor_fields": {
-      "description": "Values for the fields placed on the template's `Editor` role, baked into the generated document. The `Editor` role takes no `signers` entry: it is filled only through this list. Every field placed on it needs an entry with a non-empty `value` (`400` otherwise); when it has no fields, send nothing. In `signers`, every `Signer` role needs an entry (`400` otherwise), and a `CopyReceiver` role takes an entry only for someone who should receive the certified document; a copy receiver's `verification_method`, `notification_methods` and `step` are ignored.",
+      "description": "Values for the fields placed on the template's `Editor` role, baked into the generated document. The `Editor` role takes no `signers` entry: it is filled only through this list. Every field placed on it needs an entry with a non-empty `value` (`400` otherwise); when it has no fields, send nothing. A CPF field's value written in digits must be a valid CPF (`400` naming the field); other text is stamped as given. In `signers`, every `Signer` role needs an entry (`400` otherwise), and a `CopyReceiver` role takes an entry only for someone who should receive the certified document; a copy receiver's `verification_method`, `notification_methods` and `step` are ignored.",
       "type": "array",
       "items": {
         "required": [
@@ -40530,7 +45892,7 @@ Generate a new document from a template. The request is checked (roles, fields, 
     {
       "role_id": "fa8c14f32d732271e071998246e",
       "id": "fa8c140cb49b79f940aab95fddd",
-      "email": "signer@example.com",
+      "email": "developer@example.com",
       "name": "Maria Silva",
       "whatsapp_phone_number": "+5548999999999",
       "verification_method": "Email",
@@ -40595,10 +45957,10 @@ Content type: `application/json`
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -40623,7 +45985,7 @@ Content type: `application/json`
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -40667,7 +46029,7 @@ Content type: `application/json`
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -40686,7 +46048,7 @@ Content type: `application/json`
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -40697,7 +46059,7 @@ Content type: `application/json`
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -40713,7 +46075,7 @@ Content type: `application/json`
 ```
 
 
-**Response `400`:** The roles, signers, methods or editor fields sent cannot make a document, or the workspace lacks the documents or credits it needs (e.g. `Signer id or email is required.`). A field error comes with `errors`.
+**Response `400`:** The roles, signers, methods or editor fields sent cannot make a document, or the workspace lacks the documents or credits it needs (e.g. `Signer id or email is required.`). A field error comes with `errors`; a refused CPF is named in `message`.
 
 Content type: `application/json`
 
@@ -41070,7 +46432,7 @@ Estimate the cost of creating a document from a template without creating it. Co
             "example": "fa8c14f32d732271e071998246e"
           },
           "verification_method": {
-            "description": "Verification method. If provided without notification_methods, the notification method is inferred. Defaults to Email. Verification is never billed on its own — the cost comes from the notification it is paired with, so `Whatsapp` verification requires the WhatsApp notification and costs 0.45 credits per signer. `DigitalCertificate` adds the per-signer signature cost (0.5 credits) on top of the notification cost, and returns `400` when the template has placed signer fields. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged a per-signer fee.",
+            "description": "Verification method. If provided without notification_methods, the notification method is inferred. Defaults to Email. Verification is never billed on its own — the cost comes from the notification it is paired with, so `Whatsapp` verification requires the WhatsApp notification and costs 0.45 credits per signer. `DigitalCertificate` adds the per-signer signature cost (0.45 credits) on top of the notification cost, and returns `400` when the template has placed signer fields. `IdDocumentFaceMatchBasic` verifies the signer from a photo of their government ID, a photo of them holding it and a liveness check — it requires its account feature, requires the signer to have a valid CPF in `government_id`, and is charged a per-signer fee.",
             "type": "string",
             "enum": [
               "Email",
@@ -41463,7 +46825,7 @@ Content type: `application/json`
   "data": {
     "id": "bgjazeo5r9v2lq7l36dx48np",
     "name": "John Smith",
-    "email": "example@example.com",
+    "email": "developer@example.com",
     "telephone": "17989206641",
     "government_id": "15774136604",
     "is_email_verified": false,
@@ -43371,7 +48733,7 @@ Content type: `application/json`
       "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
       "name": "ERP",
       "url": "https://example.com/webhooks/assinafy",
-      "email": "ops@example.com",
+      "email": "developer@example.com",
       "events": [
         "document_ready",
         "signer_signed_document"
@@ -43524,7 +48886,7 @@ Register a URL to receive the account's webhook events. An account can have 1 en
       "description": "Contact email for delivery-failure notices.",
       "type": "string",
       "format": "email",
-      "example": "ops@example.com"
+      "example": "developer@example.com"
     },
     "events": {
       "description": "Event types to deliver (see `GET /v1/webhooks/event-types`).",
@@ -43562,7 +48924,7 @@ Register a URL to receive the account's webhook events. An account can have 1 en
 ```json
 {
   "url": "https://example.com/webhooks/assinafy",
-  "email": "ops@example.com",
+  "email": "developer@example.com",
   "events": [
     "document_ready",
     "signer_signed_document"
@@ -43623,7 +48985,7 @@ Content type: `application/json`
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
-    "email": "ops@example.com",
+    "email": "developer@example.com",
     "events": [
       "document_ready",
       "signer_signed_document"
@@ -44151,7 +49513,7 @@ Content type: `application/json`
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
-    "email": "ops@example.com",
+    "email": "developer@example.com",
     "events": [
       "document_ready",
       "signer_signed_document"
@@ -44351,7 +49713,7 @@ Change a webhook endpoint. Only the fields sent are updated; `url` cannot be one
     "email": {
       "type": "string",
       "format": "email",
-      "example": "ops@example.com"
+      "example": "developer@example.com"
     },
     "events": {
       "type": "array",
@@ -44384,7 +49746,7 @@ Change a webhook endpoint. Only the fields sent are updated; `url` cannot be one
 ```json
 {
   "url": "https://example.com/webhooks/assinafy",
-  "email": "ops@example.com",
+  "email": "developer@example.com",
   "events": [
     "document_ready"
   ],
@@ -44444,7 +49806,7 @@ Content type: `application/json`
     "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
     "name": "ERP",
     "url": "https://example.com/webhooks/assinafy",
-    "email": "ops@example.com",
+    "email": "developer@example.com",
     "events": [
       "document_ready",
       "signer_signed_document"
@@ -46037,7 +51399,7 @@ A user uploaded a document. **Subject:** User · **Object:** Document · **Paylo
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "uploaded",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -46150,8 +51512,8 @@ The document was normalized to PDF and its pages are available, so it can be pre
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -46169,14 +51531,14 @@ The document was normalized to PDF and its pages are available, so it can be pre
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -46279,8 +51641,8 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -46303,7 +51665,7 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -46325,7 +51687,7 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -46354,7 +51716,7 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -46375,14 +51737,14 @@ A user prepared the document (assigned its fields to signers). **Subject:** User
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -46492,8 +51854,8 @@ A user created an assignment (a signature request) for the document. The payload
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -46516,7 +51878,7 @@ A user created an assignment (a signature request) for the document. The payload
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -46538,7 +51900,7 @@ A user created an assignment (a signature request) for the document. The payload
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -46567,7 +51929,7 @@ A user created an assignment (a signature request) for the document. The payload
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -46588,14 +51950,14 @@ A user created an assignment (a signature request) for the document. The payload
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -46676,7 +52038,7 @@ A signer was invited to sign the document: when the assignment is created, or fo
   "message": null,
   "payload": {
     "signer_full_name": "João da Silva",
-    "signer_email": "joao.silva@example.com",
+    "signer_email": "developer@example.com",
     "signer_whatsapp_phone_number": "+5548999990000",
     "notification_method": "email"
   },
@@ -46703,8 +52065,8 @@ A signer was invited to sign the document: when the assignment is created, or fo
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -46727,7 +52089,7 @@ A signer was invited to sign the document: when the assignment is created, or fo
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -46749,7 +52111,7 @@ A signer was invited to sign the document: when the assignment is created, or fo
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -46778,7 +52140,7 @@ A signer was invited to sign the document: when the assignment is created, or fo
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -46799,14 +52161,14 @@ A signer was invited to sign the document: when the assignment is created, or fo
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -46910,7 +52272,7 @@ A user created a signer. **Subject:** User · **Object:** Signer · **Payload:**
   "object": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": false,
@@ -46995,7 +52357,7 @@ The signer confirmed their email with the verification code sent for this docume
   "message": null,
   "payload": {
     "signer_full_name": "João da Silva",
-    "signer_email": "joao.silva@example.com"
+    "signer_email": "developer@example.com"
   },
   "origin": {
     "ip": "203.0.113.7",
@@ -47005,7 +52367,7 @@ The signer confirmed their email with the verification code sent for this docume
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -47018,8 +52380,8 @@ The signer confirmed their email with the verification code sent for this docume
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -47042,7 +52404,7 @@ The signer confirmed their email with the verification code sent for this docume
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -47064,7 +52426,7 @@ The signer confirmed their email with the verification code sent for this docume
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -47093,7 +52455,7 @@ The signer confirmed their email with the verification code sent for this docume
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -47114,14 +52476,14 @@ The signer confirmed their email with the verification code sent for this docume
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -47212,7 +52574,7 @@ The signer confirmed their WhatsApp number with the verification code sent for t
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -47225,8 +52587,8 @@ The signer confirmed their WhatsApp number with the verification code sent for t
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -47249,7 +52611,7 @@ The signer confirmed their WhatsApp number with the verification code sent for t
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -47271,7 +52633,7 @@ The signer confirmed their WhatsApp number with the verification code sent for t
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -47300,7 +52662,7 @@ The signer confirmed their WhatsApp number with the verification code sent for t
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -47321,14 +52683,14 @@ The signer confirmed their WhatsApp number with the verification code sent for t
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -47409,7 +52771,7 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
   "message": null,
   "payload": {
     "signer_full_name": "João da Silva",
-    "signer_email": "joao.silva@example.com",
+    "signer_email": "developer@example.com",
     "signer_whatsapp_phone_number": "+5548999990000",
     "verification_method": "Email"
   },
@@ -47421,7 +52783,7 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -47434,8 +52796,8 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -47458,7 +52820,7 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -47480,7 +52842,7 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -47509,7 +52871,7 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -47530,14 +52892,14 @@ The signer confirmed their data before signing. **Subject:** Signer · **Object:
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -47627,7 +52989,7 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -47640,8 +53002,8 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -47664,7 +53026,7 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -47686,7 +53048,7 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -47715,7 +53077,7 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -47736,14 +53098,14 @@ The signer opened the document for the first time. **Subject:** Signer · **Obje
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -47854,7 +53216,7 @@ The signer passed identity-document verification (directly, or approved by the a
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -47867,8 +53229,8 @@ The signer passed identity-document verification (directly, or approved by the a
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -47891,7 +53253,7 @@ The signer passed identity-document verification (directly, or approved by the a
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -47913,7 +53275,7 @@ The signer passed identity-document verification (directly, or approved by the a
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -47942,7 +53304,7 @@ The signer passed identity-document verification (directly, or approved by the a
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -47963,14 +53325,14 @@ The signer passed identity-document verification (directly, or approved by the a
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -48058,7 +53420,7 @@ The signer's identity-document verification ended without approval. **Subject:**
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -48071,8 +53433,8 @@ The signer's identity-document verification ended without approval. **Subject:**
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -48095,7 +53457,7 @@ The signer's identity-document verification ended without approval. **Subject:**
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -48117,7 +53479,7 @@ The signer's identity-document verification ended without approval. **Subject:**
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -48146,7 +53508,7 @@ The signer's identity-document verification ended without approval. **Subject:**
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -48167,14 +53529,14 @@ The signer's identity-document verification ended without approval. **Subject:**
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -48265,7 +53627,7 @@ The provider could not decide the signer's identity verification and it awaits t
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -48278,8 +53640,8 @@ The provider could not decide the signer's identity verification and it awaits t
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -48302,7 +53664,7 @@ The provider could not decide the signer's identity verification and it awaits t
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -48324,7 +53686,7 @@ The provider could not decide the signer's identity verification and it awaits t
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -48353,7 +53715,7 @@ The provider could not decide the signer's identity verification and it awaits t
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -48374,14 +53736,14 @@ The provider could not decide the signer's identity verification and it awaits t
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -48474,7 +53836,7 @@ A user of the account approved the signer's identity after review. `reason_codes
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -48487,8 +53849,8 @@ A user of the account approved the signer's identity after review. `reason_codes
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "pending_signature",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -48511,7 +53873,7 @@ A user of the account approved the signer's identity after review. `reason_codes
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -48533,7 +53895,7 @@ A user of the account approved the signer's identity after review. `reason_codes
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -48562,7 +53924,7 @@ A user of the account approved the signer's identity after review. `reason_codes
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -48583,14 +53945,14 @@ A user of the account approved the signer's identity after review. `reason_codes
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -48680,7 +54042,7 @@ A user of the account rejected the signer's identity after review. The document 
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -48693,8 +54055,8 @@ A user of the account rejected the signer's identity after review. The document 
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "rejected_by_user",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -48717,7 +54079,7 @@ A user of the account rejected the signer's identity after review. The document 
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -48739,7 +54101,7 @@ A user of the account rejected the signer's identity after review. The document 
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -48768,7 +54130,7 @@ A user of the account rejected the signer's identity after review. The document 
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -48789,14 +54151,14 @@ A user of the account rejected the signer's identity after review. The document 
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -48886,7 +54248,7 @@ The signer signed the document. **Subject:** Signer · **Object:** Document · *
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -48899,8 +54261,8 @@ The signer signed the document. **Subject:** Signer · **Object:** Document · *
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "certificating",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": false,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -48923,7 +54285,7 @@ The signer signed the document. **Subject:** Signer · **Object:** Document · *
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": true,
@@ -48945,7 +54307,7 @@ The signer signed the document. **Subject:** Signer · **Object:** Document · *
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true
@@ -48974,7 +54336,7 @@ The signer signed the document. **Subject:** Signer · **Object:** Document · *
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true,
@@ -48995,14 +54357,14 @@ The signer signed the document. **Subject:** Signer · **Object:** Document · *
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -49092,7 +54454,7 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
   "subject": {
     "id": "66b2f0c9a1b2c3d4e5f6a7b8",
     "full_name": "João da Silva",
-    "email": "joao.silva@example.com",
+    "email": "developer@example.com",
     "whatsapp_phone_number": "+5548999990000",
     "government_id": null,
     "has_accepted_terms": true,
@@ -49105,8 +54467,8 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "rejected_by_signer",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -49129,7 +54491,7 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -49151,7 +54513,7 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -49180,7 +54542,7 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -49201,14 +54563,14 @@ The signer declined to sign the document. **Subject:** Signer · **Object:** Doc
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -49316,8 +54678,8 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "rejected_by_user",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -49340,7 +54702,7 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -49362,7 +54724,7 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -49391,7 +54753,7 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -49412,14 +54774,14 @@ A user of the account cancelled the document. **Subject:** User · **Object:** D
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -49531,11 +54893,11 @@ The last signer signed and the signed document is available: its status is `cert
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "certificated",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
-      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
-      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
-      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -49558,7 +54920,7 @@ The last signer signed and the signed document is available: its status is `cert
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": true,
@@ -49580,7 +54942,7 @@ The last signer signed and the signed document is available: its status is `cert
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true
@@ -49609,7 +54971,7 @@ The last signer signed and the signed document is available: its status is `cert
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true,
@@ -49630,14 +54992,14 @@ The last signer signed and the signed document is available: its status is `cert
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -49751,7 +55113,7 @@ The document could not be processed: an invalid or unreadable file, or a templat
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "failed",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -49977,7 +55339,7 @@ The template was processed and is ready to use. **Subject:** User · **Object:**
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/templates/66b2f1a7d8e9f0a1b2c3d4e5/pages/66b2f1b8e9f0a1b2c3d4e5f6/download",
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/templates/66b2f1a7d8e9f0a1b2c3d4e5/pages/66b2f1b8e9f0a1b2c3d4e5f6/download",
         "fields": []
       }
     ],
@@ -50304,11 +55666,11 @@ The contract's notice period started: its end date minus its notice period is to
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "certificated",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
-      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
-      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
-      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -50331,7 +55693,7 @@ The contract's notice period started: its end date minus its notice period is to
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": true,
@@ -50353,7 +55715,7 @@ The contract's notice period started: its end date minus its notice period is to
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true
@@ -50382,7 +55744,7 @@ The contract's notice period started: its end date minus its notice period is to
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true,
@@ -50403,14 +55765,14 @@ The contract's notice period started: its end date minus its notice period is to
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -50526,11 +55888,11 @@ The contract ends within `days_before` days: 45 and 30. Each is sent once per te
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "certificated",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
-      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
-      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
-      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -50553,7 +55915,7 @@ The contract ends within `days_before` days: 45 and 30. Each is sent once per te
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": true,
@@ -50575,7 +55937,7 @@ The contract ends within `days_before` days: 45 and 30. Each is sent once per te
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true
@@ -50604,7 +55966,7 @@ The contract ends within `days_before` days: 45 and 30. Each is sent once per te
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true,
@@ -50625,14 +55987,14 @@ The contract ends within `days_before` days: 45 and 30. Each is sent once per te
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -50750,11 +56112,11 @@ The contract ended without auto-renew; its status is now `expired`. Sent on the 
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "certificated",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
-      "certificated": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
-      "certificate-page": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
-      "bundle": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail",
+      "certificated": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificated",
+      "certificate-page": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/certificate-page",
+      "bundle": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/bundle"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -50777,7 +56139,7 @@ The contract ended without auto-renew; its status is now `expired`. Sent on the 
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": true,
@@ -50799,7 +56161,7 @@ The contract ended without auto-renew; its status is now `expired`. Sent on the 
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true
@@ -50828,7 +56190,7 @@ The contract ended without auto-renew; its status is now `expired`. Sent on the 
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": true,
@@ -50849,14 +56211,14 @@ The contract ended without auto-renew; its status is now `expired`. Sent on the 
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"
@@ -51051,8 +56413,8 @@ A user terminated the contract; its status is now `terminated`. **Subject:** Use
     "name": "Contrato de Prestação de Serviços.pdf",
     "status": "certificated",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
-      "thumbnail": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/download/original",
+      "thumbnail": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/thumbnail"
     },
     "is_closed": true,
     "signing_url": "https://app.assinafy.com.br/sign/66b2f0e1c3a4d5e6f7a8b9c0",
@@ -51075,7 +56437,7 @@ A user terminated the contract; its status is now `terminated`. **Subject:** Use
         {
           "id": "66b2f0c9a1b2c3d4e5f6a7b8",
           "full_name": "João da Silva",
-          "email": "joao.silva@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990000",
           "government_id": null,
           "has_accepted_terms": false,
@@ -51097,7 +56459,7 @@ A user terminated the contract; its status is now `terminated`. **Subject:** Use
           "signer": {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false
@@ -51126,7 +56488,7 @@ A user terminated the contract; its status is now `terminated`. **Subject:** Use
           {
             "id": "66b2f0c9a1b2c3d4e5f6a7b8",
             "full_name": "João da Silva",
-            "email": "joao.silva@example.com",
+            "email": "developer@example.com",
             "whatsapp_phone_number": "+5548999990000",
             "government_id": null,
             "has_accepted_terms": false,
@@ -51147,14 +56509,14 @@ A user terminated the contract; its status is now `terminated`. **Subject:** Use
         "number": 1,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e1/download"
       },
       {
         "id": "66b2f12ad4e5f6a7b8c9d0e2",
         "number": 2,
         "height": 2200,
         "width": 1700,
-        "download_url": "https://api.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/66b2f0e1c3a4d5e6f7a8b9c0/pages/66b2f12ad4e5f6a7b8c9d0e2/download"
       }
     ],
     "type": "Document"

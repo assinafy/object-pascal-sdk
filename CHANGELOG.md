@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0] - 2026-11-24
+
+- Add staging methods for scheduled assignments/envelopes, cancellation and immediate sending, document watchers, signer capacities, notification delivery history and envelope reminder estimates.
+- Allow explicit document upload media types for DOC, DOCX and ODT conversion, preserving the PDF default; support staging JPEG signature uploads while preserving PNG calls.
+- Reject known staging, sandbox and production OAuth issuer mismatches before token exchange, refresh or revocation.
+- Include separate production and staging contracts, full payload references and environment availability for all 157 operations.
+
 ## [0.6.2] - 2026-11-11
 
 - Run macOS builds and tests on the supported macOS 15 GitHub Actions runner.

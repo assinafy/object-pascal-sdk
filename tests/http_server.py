@@ -127,6 +127,54 @@ class Handler(BaseHTTPRequestHandler):
             'authorization': self.headers.get('Authorization', ''),
             'idempotency_key': self.headers.get('Idempotency-Key', ''),
         }
+        if path.endswith(('/scheduled-sends', '/scheduled-sends/scheduled/cancel', '/scheduled-sends/scheduled/send')):
+            check(data['authorization'] == 'Bearer test-bearer' and not data['key'], 'Schedule workspace credentials')
+            check(not data['idempotency_key'], 'Schedules do not take an idempotency key')
+            data = {'id': 'scheduled', 'type': 'assignment', 'document_ids': ['document'],
+                    'status': 'pending', 'send_at': '2030-01-01T12:00:00Z', 'assignment_id': None,
+                    'envelope_id': None, 'failure_reason': None, 'created_at': '2029-12-31T12:00:00Z',
+                    'processed_at': None}
+            if self.command == 'POST':
+                sent = json.loads(raw)
+                check(sent['send_at'] == data['send_at'], 'Schedule timestamp preserved')
+                check(sent['signers'][0]['id'] == 'signer', 'Scheduled signer mapping')
+                if path.startswith('/v1/accounts/'):
+                    check(sent['documents'][0]['id'] == 'document', 'Scheduled envelope documents')
+                    data['type'] = 'envelope'
+                else:
+                    check(sent['expires_at'] is None and sent['signers'][0]['sign_as'] == 'Witness', 'Assignment null and capacity preserved')
+            elif path.endswith('/cancel') or path.endswith('/send'):
+                check(self.command == 'PUT' and not raw, 'Schedule action has no body')
+                data['status'] = 'cancelled' if path.endswith('/cancel') else 'sent'
+                data['processed_at'] = '2029-12-31T12:01:00Z'
+                if path.endswith('/send'):
+                    data['assignment_id'] = 'assignment'
+            else:
+                check(self.command == 'GET', 'Schedule list verb')
+                check(parse_qs(urlsplit(self.path).query) == {'document_id': ['doc/with space']}, 'Schedule filter encoding')
+                data = [data]
+            self.respond(200, json.dumps({'data': data}).encode())
+            return
+        if path in {'/v1/documents/document/watchers', '/v1/documents/document/signer-capacities',
+                    '/v1/documents/document/notification-history',
+                    '/v1/accounts/account/envelopes/envelope/signers/signer/estimate-resend-cost'}:
+            check(data['authorization'] == 'Bearer test-bearer' and not data['key'], 'Document workspace credentials')
+            if path.endswith('/watchers'):
+                check(self.command in {'GET', 'PUT'}, 'Watcher verb')
+                if self.command == 'PUT':
+                    check(json.loads(raw) == {'watcher_ids': []}, 'Clear watchers with an empty array')
+                data = []
+            elif path.endswith('/signer-capacities'):
+                check(self.command == 'GET', 'Capacity verb')
+                data = [{'signer_id': 'signer', 'sign_as': 'Witness'}]
+            elif path.endswith('/notification-history'):
+                check(self.command == 'GET', 'Notification history verb')
+                data = [{'signer_id': 'signer', 'notification_history': []}]
+            else:
+                check(self.command == 'POST' and not raw, 'Reminder estimate has no body')
+                data = {'total': 0, 'breakdown': [], 'credit_balance': None, 'has_sufficient_credits': True}
+            self.respond(200, json.dumps({'data': data}).encode())
+            return
         if path in {'/v1/accounts/account/envelopes', '/v1/accounts/account/envelopes/envelope',
                     '/v1/accounts/account/envelopes/envelope/cancel',
                     '/v1/accounts/account/envelopes/envelope/download/bundle'}:
@@ -239,7 +287,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/v1/snapshot':
                 self.server.fixture.write_bytes(FILE_BYTES)
         elif path == '/v1/signature':
-            check(self.headers['Content-Type'] == 'image/png', 'Expected raw PNG content type')
+            check(self.headers['Content-Type'] in {'image/png', 'image/jpeg'}, 'Expected raw image content type')
             check('signer-access-code=signer-code' in self.path, 'Expected signer code')
             data['raw_file_valid'] = raw == FILE_BYTES
         elif self.command == 'PATCH' and not path.startswith('/v1/accounts/account/envelopes'):

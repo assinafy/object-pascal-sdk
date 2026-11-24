@@ -146,6 +146,12 @@
   Check(Fake.LastBody = JSONText(TestBody), 'DecideSignerIdentityReview body');
   Check(Fake.LastContentType = 'application/json', 'DecideSignerIdentityReview content type');
 
+  Response := Client.GetSignerCapacities('DocumentId');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetSignerCapacities verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/signer-capacities', 'GetSignerCapacities URL');
+  Check(Fake.LastAuth = 'bearer', 'GetSignerCapacities authentication');
+
   Response := Client.Login(TestBody);
   Response.Free;
   Check(Fake.LastMethod = 'POST', 'Login verb');
@@ -258,7 +264,7 @@
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents?status=%3Cstring%3E&envelope_id=%3Cstring%3E&method=virtual&search=%3Cstring%3E&tags=%3Cstring%3E&sort=-updated_at&page=1&per-page=25', 'ListDocuments URL');
   Check(Fake.LastAuth = 'bearer', 'ListDocuments authentication');
 
-  Response := Client.UploadDocument('', FixtureFile);
+  Response := Client.UploadDocument('', FixtureFile, 'application/pdf');
   Response.Free;
   Check(Fake.LastMethod = 'POST', 'UploadDocument verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents', 'UploadDocument URL');
@@ -361,6 +367,20 @@
   Check(Fake.LastMethod = 'DELETE', 'DetachDocumentTag verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/documents/DocumentId/tags/TagId', 'DetachDocumentTag URL');
   Check(Fake.LastAuth = 'bearer', 'DetachDocumentTag authentication');
+
+  Response := Client.ListDocumentWatchers('DocumentId');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListDocumentWatchers verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/watchers', 'ListDocumentWatchers URL');
+  Check(Fake.LastAuth = 'bearer', 'ListDocumentWatchers authentication');
+
+  Response := Client.SetDocumentWatchers('DocumentId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'SetDocumentWatchers verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/watchers', 'SetDocumentWatchers URL');
+  Check(Fake.LastAuth = 'bearer', 'SetDocumentWatchers authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'SetDocumentWatchers body');
+  Check(Fake.LastContentType = 'application/json', 'SetDocumentWatchers content type');
 
   Response := Client.ListEmbedOrigins('');
   Response.Free;
@@ -479,6 +499,12 @@
   Check(Fake.LastMethod = 'PUT', 'RemindEnvelopeSigner verb');
   Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/signers/SignerId/resend', 'RemindEnvelopeSigner URL');
   Check(Fake.LastAuth = 'bearer', 'RemindEnvelopeSigner authentication');
+
+  Response := Client.EstimateEnvelopeReminderCost('', 'EnvelopeId', 'SignerId');
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'EstimateEnvelopeReminderCost verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/envelopes/EnvelopeId/signers/SignerId/estimate-resend-cost', 'EstimateEnvelopeReminderCost URL');
+  Check(Fake.LastAuth = 'bearer', 'EstimateEnvelopeReminderCost authentication');
 
   Response := Client.AddDocumentToEnvelope('', 'EnvelopeId', TestBody);
   Response.Free;
@@ -607,6 +633,12 @@
   Check(Fake.LastBody = JSONText(TestBody), 'RemoveATwoFactorMethod body');
   Check(Fake.LastContentType = 'application/json', 'RemoveATwoFactorMethod content type');
 
+  Response := Client.GetDocumentNotificationHistory('DocumentId');
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'GetDocumentNotificationHistory verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/notification-history', 'GetDocumentNotificationHistory URL');
+  Check(Fake.LastAuth = 'bearer', 'GetDocumentNotificationHistory authentication');
+
   Response := Client.GetNotificationPolicy('');
   Response.Free;
   Check(Fake.LastMethod = 'GET', 'GetNotificationPolicy verb');
@@ -716,6 +748,44 @@
   Check(Fake.LastAuth = 'bearer', 'UpdatePushPreferences authentication');
   Check(Fake.LastBody = JSONText(TestBody), 'UpdatePushPreferences body');
   Check(Fake.LastContentType = 'application/json', 'UpdatePushPreferences content type');
+
+  Response := Client.ScheduleAssignment('DocumentId', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'ScheduleAssignment verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/documents/DocumentId/scheduled-sends', 'ScheduleAssignment URL');
+  Check(Fake.LastAuth = 'bearer', 'ScheduleAssignment authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'ScheduleAssignment body');
+  Check(Fake.LastContentType = 'application/json', 'ScheduleAssignment content type');
+
+  TestQuery.Clear;
+  TestQuery.Add('page=1');
+  TestQuery.Add('per-page=25');
+  TestQuery.Add('document_id=615601fab04c0a3147bb1246');
+  Response := Client.ListScheduledSends('', TestQuery);
+  Response.Free;
+  Check(Fake.LastMethod = 'GET', 'ListScheduledSends verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/scheduled-sends?page=1&per-page=25&document_id=615601fab04c0a3147bb1246', 'ListScheduledSends URL');
+  Check(Fake.LastAuth = 'bearer', 'ListScheduledSends authentication');
+
+  Response := Client.ScheduleEnvelope('', TestBody);
+  Response.Free;
+  Check(Fake.LastMethod = 'POST', 'ScheduleEnvelope verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/scheduled-sends', 'ScheduleEnvelope URL');
+  Check(Fake.LastAuth = 'bearer', 'ScheduleEnvelope authentication');
+  Check(Fake.LastBody = JSONText(TestBody), 'ScheduleEnvelope body');
+  Check(Fake.LastContentType = 'application/json', 'ScheduleEnvelope content type');
+
+  Response := Client.CancelScheduledSend('', 'ScheduledSendId');
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'CancelScheduledSend verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/scheduled-sends/ScheduledSendId/cancel', 'CancelScheduledSend URL');
+  Check(Fake.LastAuth = 'bearer', 'CancelScheduledSend authentication');
+
+  Response := Client.SendScheduledSendNow('', 'ScheduledSendId');
+  Response.Free;
+  Check(Fake.LastMethod = 'PUT', 'SendScheduledSendNow verb');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/accounts/default-account/scheduled-sends/ScheduledSendId/send', 'SendScheduledSendNow URL');
+  Check(Fake.LastAuth = 'bearer', 'SendScheduledSendNow authentication');
 
   TestQuery.Clear;
   TestQuery.Add('search=<string>');
@@ -860,12 +930,12 @@
   Check(Fake.LastAuth = 'signer', 'AcceptTerms authentication');
 
   TestQuery.Clear;
-  TestQuery.Add('type=<string>');
+  TestQuery.Add('type=signature');
   TestQuery.Add('reuse=false');
-  Response := Client.UploadSignatureImage('SignerAccessCode', FixtureFile, TestQuery);
+  Response := Client.UploadSignatureImage('SignerAccessCode', FixtureFile, TestQuery, 'image/png');
   Response.Free;
   Check(Fake.LastMethod = 'POST', 'UploadSignatureImage verb');
-  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signature?type=%3Cstring%3E&reuse=false&signer-access-code=SignerAccessCode', 'UploadSignatureImage URL');
+  Check(Fake.LastURL = 'https://sandbox.assinafy.com.br/v1/signature?type=signature&reuse=false&signer-access-code=SignerAccessCode', 'UploadSignatureImage URL');
   Check(Fake.LastAuth = 'signer', 'UploadSignatureImage authentication');
   Check(Fake.LastFile = FixtureFile, 'UploadSignatureImage file');
   Check(Fake.LastFileField = '', 'UploadSignatureImage file field');

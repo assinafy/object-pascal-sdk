@@ -111,6 +111,7 @@ begin
       25: begin Response := Client.GetDocumentAsSigner('document', ''); Response.Free; end;
       26: begin Response := Client.DownloadDocumentArtifactAsSigner('document', 'original', ''); Response.Free; end;
       27: begin Response := Client.CreateEnvelope('', TestBody, 'key' + #13#10 + 'Injected: value'); Response.Free; end;
+      28: begin Response := Client.UploadSignatureImage('code', FixtureFile, nil, 'text/html'); Response.Free; end;
     end;
     raise Exception.Create(Name + ': expected input error');
   except
@@ -603,35 +604,39 @@ end;
 
 procedure TestOAuthEnvironments;
 const
-  Resources: array[0..1] of string = ('https://sandbox.assinafy.com.br', 'https://api.assinafy.com.br');
-  Issuers: array[0..1] of string = ('https://auth-sandbox.assinafy.com.br', AssinafyOAuthIssuer);
+  Resources: array[0..2] of string = ('https://sandbox.assinafy.com.br', 'https://api.assinafy.com.br',
+    'https://api.angry-pisco.stage.assinafy.com.br');
+  Issuers: array[0..2] of string = ('https://auth-sandbox.assinafy.com.br', AssinafyOAuthIssuer,
+    'https://auth.frosty-treacle.stage.assinafy.com.br');
 var
-  Clients: array[0..1] of TAssinafyClient;
+  Clients: array[0..2] of TAssinafyClient;
   Config: TAssinafyOAuthConfig;
   I, J, Grant, PriorCalls: Integer;
 begin
   Clients[0] := Client;
   Clients[1] := TAssinafyClient.Create('', '', AssinafyProductionURL, Fake);
+  Clients[2] := TAssinafyClient.Create('', '', Resources[2] + '/v1', Fake);
   Config := Default(TAssinafyOAuthConfig);
   Config.ClientID := 'client-id';
   Config.RedirectURI := 'https://app.example.com/oauth/callback';
   Fake.NextBody := '{"access_token":"access","refresh_token":"replacement","token_type":"Bearer"}';
   try
-    for I := 0 to 1 do
+    for I := 0 to 2 do
     begin
-      for J := 0 to 6 do
+      for J := 0 to 7 do
       begin
         if (J = 3) and (I = 1) then Continue;
         Config.Issuer := Issuers[I];
         Config.Resource := Resources[I];
         case J of
-          0: Config.Resource := Resources[1 - I];
-          1: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I]; end;
+          0: Config.Resource := Resources[(I + 1) mod 3];
+          1: begin Config.Resource := ''; Config.Issuer := Issuers[(I + 1) mod 3]; end;
           2: Config.Resource := Resources[I] + ':444';
           3: begin Config.Resource := ''; Config.Issuer := ''; end;
-          4: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I] + ':443'; end;
-          5: begin Config.Resource := ''; Config.Issuer := UpperCase(Issuers[1 - I]) + ':0443/'; end;
-          6: begin Config.Resource := ''; Config.Issuer := Issuers[1 - I] + ':8443/'; end;
+          4: begin Config.Resource := ''; Config.Issuer := Issuers[(I + 1) mod 3] + ':443'; end;
+          5: begin Config.Resource := ''; Config.Issuer := UpperCase(Issuers[(I + 1) mod 3]) + ':0443/'; end;
+          6: begin Config.Resource := ''; Config.Issuer := Issuers[(I + 1) mod 3] + ':8443/'; end;
+          7: begin Config.Resource := ''; Config.Issuer := Issuers[(I + 1) mod 3] + '.'; end;
         end;
         for Grant := 0 to 2 do
         begin
@@ -656,7 +661,7 @@ begin
       Response.Free;
       Check(Fake.Calls = PriorCalls + 3, 'Matching normalized issuer accepted for all OAuth helpers');
     end;
-  finally Clients[1].Free; end;
+  finally Clients[2].Free; Clients[1].Free; end;
 end;
 
 procedure TestWebhooks;
@@ -864,6 +869,7 @@ var
       case Action of
         1: Response := Client.CreateAssignment('document', RequestBody);
         2: Response := Client.EstimateAssignmentCost('document', RequestBody);
+        3: Response := Client.ScheduleAssignment('document', RequestBody);
       end;
       Response.Free;
       raise Exception.Create('Expected certificate method error');
@@ -895,6 +901,10 @@ begin
       Response := Client.CreateAssignment('document', Body);
       Response.Free;
       Check(Fake.LastBody = JSONText(Body), Method + ' assignment payload retained');
+      JSONAdd(Body, 'send_at', '2030-01-01T12:00:00Z');
+      Response := Client.ScheduleAssignment('document', Body);
+      Response.Free;
+      Check(Fake.LastBody = JSONText(Body), Method + ' scheduled assignment payload retained');
       EnvelopeBody := JSONObj(['name', 'Envelope', 'max_total_credits', 1.5,
         'signers', JSONArr([JSONObj(['id', 'signer', 'verification_method', Method,
           'notification_methods', JSONArr([Channel]), 'embedded', True])]),
@@ -908,6 +918,11 @@ begin
         Response.Free;
         Check(Fake.LastBody = JSONText(EnvelopeBody), Method + ' envelope payload retained');
         Check(Fake.LastIdempotencyKey = 'unique-key', 'Envelope idempotency header retained');
+        JSONAdd(EnvelopeBody, 'send_at', '2030-01-01T12:00:00Z');
+        Response := Client.ScheduleEnvelope('', EnvelopeBody);
+        Response.Free;
+        Check((Fake.LastBody = JSONText(EnvelopeBody)) and (Fake.LastIdempotencyKey = ''),
+          Method + ' scheduled envelope preserves payload without an idempotency header');
       finally EnvelopeBody.Free; end;
       JSONAdd(Signer, 'role_id', 'role');
       TemplateBody := JSONObj(['signers', Signers.Clone]);
@@ -926,6 +941,7 @@ begin
   try
     ExpectCertificateMethodError(1, Body);
     ExpectCertificateMethodError(2, Body);
+    ExpectCertificateMethodError(3, Body);
   finally Body.Free; end;
   Body := JSONObj(['verification-code', '123456']);
   try
@@ -1007,7 +1023,7 @@ begin
     Response := Client.GetDocument('doc/with space');
     Response.Free;
     Check(Pos('doc%2Fwith%20space', Fake.LastURL) > 0, 'Path segments encoded');
-    for I := 1 to 27 do ExpectInputError('Input ' + IntToStr(I), I);
+    for I := 1 to 28 do ExpectInputError('Input ' + IntToStr(I), I);
     TestResponses;
     TestAuthenticationAndURLs;
     TestUploadLimits;
@@ -1021,7 +1037,7 @@ begin
     {$IFDEF FPC}TestNativeFPCCompatibility;{$ENDIF}
     TestSigningMethods;
     TestIdentityVerification;
-    WriteLn('PASS: ', Checks, ' checks across all 147 API operations, responses, OAuth and webhooks');
+    WriteLn('PASS: ', Checks, ' checks across all 157 API operations, responses, OAuth and webhooks');
   finally
     TestQuery.Free;
     TestBody.Free;

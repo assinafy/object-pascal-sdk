@@ -12,14 +12,15 @@ def require(condition, message):
         raise SystemExit(message)
 
 
-def expected_auth(operation, path):
+def expected_auth(operation, path, contract=None):
+    contract = spec if contract is None else contract
     roles = set()
-    for alternative in operation.get('security', spec.get('security', [])):
+    for alternative in operation.get('security', contract.get('security', [])):
         if not alternative:
             return 'aaPublic'
         require(len(alternative) == 1, f'Unsupported combined authentication: {path}')
         name = next(iter(alternative))
-        scheme = spec['components']['securitySchemes'].get(name, {})
+        scheme = contract['components']['securitySchemes'].get(name, {})
         if scheme.get('type') == 'oauth2' or (
                 scheme.get('type') == 'http' and scheme.get('scheme') == 'bearer'):
             roles.add('bearer')
@@ -39,13 +40,17 @@ def expected_auth(operation, path):
     return 'aaBearer' if path == '/v1/oauth/userinfo' else modes[frozenset(roles)]
 
 
-spec = json.loads((ROOT / 'docs/openapi.json').read_text(encoding='utf-8'))
+spec = json.loads((ROOT / 'docs/openapi-stage.json').read_text(encoding='utf-8'))
+production = json.loads((ROOT / 'docs/openapi.json').read_text(encoding='utf-8'))
 expected = {(verb.upper(), path) for path, item in spec['paths'].items()
             for verb in item if verb in {'get', 'post', 'put', 'patch', 'delete'}}
 declarations = (ROOT / 'src/resources.inc').read_text(encoding='utf-8')
 actual = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+);', declarations)
 require(len(actual) == len(set(actual)), 'Duplicate API operation')
 require(set(actual) == expected, 'Missing or extra API operations')
+production_operations = {(verb.upper(), path) for path, item in production['paths'].items()
+                         for verb in item if verb in {'get', 'post', 'put', 'patch', 'delete'}}
+require(production_operations <= expected, 'Missing production API operations')
 workspace = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+) \(workspace credentials\);[^\n]*\n\s+function (\w+)', declarations)
 signer = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+) \(signer credentials\);[^\n]*\n\s+function (\w+)', declarations)
 names = re.findall(r'function (\w+)\(', declarations) + re.findall(r'function (\w+):', declarations)
@@ -62,6 +67,9 @@ bindings = re.findall(r'// (GET|POST|PUT|PATCH|DELETE) (\S+);[^\n]*\n\s+function
 require(len(bindings) == len(actual) and set(auth_modes) == set(names), 'Incomplete authentication checks')
 for verb, path, name in bindings:
     expected_mode = expected_auth(spec['paths'][path][verb.lower()], path)
+    if (verb, path) in production_operations:
+        require(expected_mode == expected_auth(production['paths'][path][verb.lower()], path, production),
+                f'Environment authentication mismatch: {name}')
     if name in {'GetDocument', 'DownloadDocumentArtifact', 'ValidateFieldValue',
                 'ValidateMultipleFieldValues', 'DownloadDocumentThumbnail',
                 'DownloadDocumentPage'} and expected_mode == 'aaSignerOrAPI':

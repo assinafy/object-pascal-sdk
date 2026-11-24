@@ -167,7 +167,32 @@ class GeneratorTests(unittest.TestCase):
 
     def test_certificate_method_validation_is_generated(self):
         code = generate.generate_methods(list(generate.operations()))['src/methods.inc']
-        self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body);'), 2)
+        self.assertEqual(code.count('ValidateDigitalCertificateMethod(Body);'), 3)
+
+    def test_binary_media_alternatives_preserve_default_and_validate_type(self):
+        operation = next(op for op in generate.operations() if op['name'] == 'UploadSignatureImage')
+        code = generate.generate_methods([operation])
+        self.assertIn("ContentType: string = 'image/png'", code['src/resources.inc'])
+        self.assertIn("(ContentType <> 'image/png') and (ContentType <> 'image/jpeg')", code['src/methods.inc'])
+        self.assertIn("FileName, '', ContentType, SignerAccessCode", code['src/methods.inc'])
+
+    def test_production_methods_keep_names_and_required_arguments(self):
+        current = {(op['verb'], op['path'], op['workspace_of'], op['signer_of']): op
+                   for op in generate.operations()}
+        with patch.object(generate, 'SPEC', generate.PRODUCTION):
+            previous = list(generate.operations())
+        for op in previous:
+            replacement = current[op['verb'], op['path'], op['workspace_of'], op['signer_of']]
+            self.assertEqual(op['name'], replacement['name'])
+            self.assertEqual(op['auth'], replacement['auth'])
+            self.assertEqual(op['args'], replacement['args'][:len(op['args'])])
+            self.assertTrue(all(default is not None for _, _, default in replacement['args'][len(op['args']):]))
+
+    def test_staging_availability_and_production_payloads_are_documented(self):
+        docs = generate.generate_docs(list(generate.operations()))['docs/API.md']
+        self.assertEqual(docs.count('**Availability:** staging only'), 10)
+        self.assertIn(generate.code(generate.PRODUCTION['paths']['/v1/signature']['post']), docs)
+        self.assertIn('## ScheduleAssignment', docs)
 
 
 class WorkflowTests(unittest.TestCase):

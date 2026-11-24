@@ -1,6 +1,6 @@
 # Payload schemas
 
-Complete shared request and response schemas from the [published API](https://api.assinafy.com.br/v1/docs). References use the identifiers in [openapi.json](openapi.json).
+Complete shared request and response schemas from [production](openapi.json) and [staging](openapi-stage.json). Staging schemas appear below; production variants and staging-only models are marked. References use the identifiers in the corresponding contract.
 
 ## Envelope
 
@@ -155,7 +155,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "email": {
       "type": "string",
       "format": "email",
-      "example": "example@example.com"
+      "example": "developer@example.com"
     },
     "telephone": {
       "type": [
@@ -203,7 +203,7 @@ Complete shared request and response schemas from the [published API](https://ap
 {
   "id": "bgjazeo5r9v2lq7l36dx48np",
   "name": "John Smith",
-  "email": "example@example.com",
+  "email": "developer@example.com",
   "telephone": "17989206641",
   "government_id": "15774136604",
   "is_email_verified": false,
@@ -291,7 +291,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "example": "developer@example.com"
     },
     "whatsapp_phone_number": {
-      "description": "E.164 format; normalized on save.",
+      "description": "E.164 format; normalized on save. A number written with `+` is read with the country code it names first, and as Brazilian if it isn't valid there; one without `+` is read as a Brazilian area code and number first.",
       "type": [
         "string",
         "null"
@@ -415,7 +415,7 @@ Complete shared request and response schemas from the [published API](https://ap
     },
     "download_url": {
       "type": "string",
-      "example": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+      "example": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
     }
   },
   "type": "object"
@@ -430,7 +430,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "number": 1,
   "height": 2100,
   "width": 1275,
-  "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+  "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
 }
 ```
 
@@ -577,7 +577,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "description": "Artifact download URLs keyed by name. Always `original`, plus `thumbnail` once one exists. A certificated document also carries `certificated`, `certificate-page` and `bundle`, and `pades` when it was signed with a digital certificate — the PAdES version holds the signers' ICP-Brasil signatures, which certification flattens out of the certificated PDF.",
       "type": "object",
       "example": {
-        "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+        "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
       }
     },
     "is_closed": {
@@ -586,7 +586,7 @@ Complete shared request and response schemas from the [published API](https://ap
     },
     "signing_url": {
       "type": "string",
-      "example": "https://api.assinafy.com.br/v1/sign/doc1"
+      "example": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1"
     },
     "verification_code": {
       "description": "The code printed on the certificate page. Anyone can check it with `GET /v1/documents/{verification_code}/verify` or on `verification_url`. `null` until the document is `certificated`, and on documents certificated before verification codes existed.",
@@ -623,6 +623,7 @@ Complete shared request and response schemas from the [published API](https://ap
       ]
     },
     "tags": {
+      "description": "The workspace's labels on the document. Always empty when the signer reads it with their code.",
       "type": "array",
       "items": {
         "properties": {
@@ -722,10 +723,10 @@ Complete shared request and response schemas from the [published API](https://ap
   "name": "document.pdf",
   "status": "metadata_ready",
   "artifacts": {
-    "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+    "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
   },
   "is_closed": false,
-  "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+  "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
   "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
   "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
   "decline_reason": null,
@@ -750,7 +751,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "id": "615606ef81d199996981dbce",
     "document_id": "615601fab04c0a3147bb1246",
     "created_at": "2026-06-03T03:54:16Z",
-    "sender_email": "sender@example.com",
+    "sender_email": "developer@example.com",
     "method": "virtual",
     "expires_at": null,
     "message": "<string>",
@@ -794,7 +795,7 @@ Complete shared request and response schemas from the [published API](https://ap
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         },
         "signer": {},
         "field": {},
@@ -813,7 +814,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ]
@@ -824,7 +825,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "number": 1,
       "height": 2100,
       "width": 1275,
-      "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+      "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
     }
   ],
   "envelope_id": null,
@@ -954,10 +955,10 @@ Complete shared request and response schemas from the [published API](https://ap
   "name": "document.pdf",
   "status": "metadata_ready",
   "artifacts": {
-    "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+    "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
   },
   "is_closed": false,
-  "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+  "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
   "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
   "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
   "decline_reason": null,
@@ -982,7 +983,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "id": "615606ef81d199996981dbce",
     "document_id": "615601fab04c0a3147bb1246",
     "created_at": "2026-06-03T03:54:16Z",
-    "sender_email": "sender@example.com",
+    "sender_email": "developer@example.com",
     "method": "virtual",
     "expires_at": null,
     "message": "<string>",
@@ -1026,7 +1027,7 @@ Complete shared request and response schemas from the [published API](https://ap
           "number": 1,
           "height": 2100,
           "width": 1275,
-          "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+          "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
         },
         "signer": {},
         "field": {},
@@ -1045,7 +1046,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "signing_urls": [
       {
         "signer_id": "<string>",
-        "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+        "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
         "embedded": false
       }
     ]
@@ -1056,7 +1057,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "number": 1,
       "height": 2100,
       "width": 1275,
-      "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+      "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
     }
   ],
   "envelope_id": null,
@@ -1262,6 +1263,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "type": "boolean"
     },
     "is_active": {
+      "description": "Whether the field is offered for new placements: the field list leaves an inactive one out unless `include_inactive` is set. Documents and templates already using an inactive field keep working: its values are still validated and signed.",
       "type": "boolean"
     },
     "is_required": {
@@ -1570,10 +1572,10 @@ Complete shared request and response schemas from the [published API](https://ap
     "name": "document.pdf",
     "status": "metadata_ready",
     "artifacts": {
-      "original": "https://api.assinafy.com.br/v1/documents/doc1/download/original"
+      "original": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/download/original"
     },
     "is_closed": false,
-    "signing_url": "https://api.assinafy.com.br/v1/sign/doc1",
+    "signing_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1",
     "verification_code": "a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "verification_url": "https://www.assinafy.com.br/verificador/a3f1c9e07b2d4e8f9a6c5b1d0e7f3a2c9b8d4e6f",
     "decline_reason": null,
@@ -1598,7 +1600,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "id": "615606ef81d199996981dbce",
       "document_id": "615601fab04c0a3147bb1246",
       "created_at": "2026-06-03T03:54:16Z",
-      "sender_email": "sender@example.com",
+      "sender_email": "developer@example.com",
       "method": "virtual",
       "expires_at": null,
       "message": "<string>",
@@ -1642,7 +1644,7 @@ Complete shared request and response schemas from the [published API](https://ap
             "number": 1,
             "height": 2100,
             "width": 1275,
-            "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+            "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
           },
           "signer": {},
           "field": {},
@@ -1661,7 +1663,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "signing_urls": [
         {
           "signer_id": "<string>",
-          "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+          "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
           "embedded": false
         }
       ]
@@ -1672,7 +1674,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       }
     ],
     "envelope_id": null,
@@ -2108,7 +2110,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "string",
         "null"
       ],
-      "example": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com"
+      "example": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com"
     },
     "embedded": {
       "description": "Whether the signer was marked `embedded` when the assignment was created.",
@@ -2125,7 +2127,7 @@ Complete shared request and response schemas from the [published API](https://ap
 ```json
 {
   "signer_id": "<string>",
-  "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+  "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
   "embedded": false
 }
 ```
@@ -2382,7 +2384,7 @@ Complete shared request and response schemas from the [published API](https://ap
     "number": 1,
     "height": 2100,
     "width": 1275,
-    "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+    "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
   },
   "signer": {},
   "field": {},
@@ -2460,7 +2462,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "null"
       ],
       "format": "email",
-      "example": "sender@example.com"
+      "example": "developer@example.com"
     },
     "method": {
       "type": "string",
@@ -2524,7 +2526,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "id": "615606ef81d199996981dbce",
   "document_id": "615601fab04c0a3147bb1246",
   "created_at": "2026-06-03T03:54:16Z",
-  "sender_email": "sender@example.com",
+  "sender_email": "developer@example.com",
   "method": "virtual",
   "expires_at": null,
   "message": "<string>",
@@ -2568,7 +2570,7 @@ Complete shared request and response schemas from the [published API](https://ap
         "number": 1,
         "height": 2100,
         "width": 1275,
-        "download_url": "https://api.assinafy.com.br/v1/documents/doc1/pages/1a/download"
+        "download_url": "https://api.angry-pisco.stage.assinafy.com.br/v1/documents/doc1/pages/1a/download"
       },
       "signer": {},
       "field": {},
@@ -2587,7 +2589,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "signing_urls": [
     {
       "signer_id": "<string>",
-      "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+      "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
       "embedded": false
     }
   ]
@@ -2783,6 +2785,7 @@ Complete shared request and response schemas from the [published API](https://ap
             "type": "string"
           },
           "fields": {
+            "description": "The fields placed on this page. A page with none adds nothing, as on an assignment.",
             "type": "array",
             "items": {
               "required": [
@@ -2804,8 +2807,7 @@ Complete shared request and response schemas from the [published API](https://ap
                 }
               },
               "type": "object"
-            },
-            "minItems": 1
+            }
           }
         },
         "type": "object"
@@ -2993,7 +2995,7 @@ Complete shared request and response schemas from the [published API](https://ap
                     "string",
                     "null"
                   ],
-                  "example": "ana@example.com"
+                  "example": "developer@example.com"
                 },
                 "whatsapp_phone_number": {
                   "type": [
@@ -3077,7 +3079,7 @@ Complete shared request and response schemas from the [published API](https://ap
         {
           "id": "fa8c140cb49b79f940aab95fddd",
           "full_name": "Ana Souza",
-          "email": "ana@example.com",
+          "email": "developer@example.com",
           "whatsapp_phone_number": "+5548999990001",
           "completed": false,
           "signed_at": "2026-11-06T14:30:00Z"
@@ -3092,7 +3094,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "signing_urls": [
     {
       "signer_id": "<string>",
-      "url": "https://api.assinafy.com.br/v1/sign/doc1?email=joe@example.com",
+      "url": "https://api.angry-pisco.stage.assinafy.com.br/v1/sign/doc1?email=developer@example.com",
       "embedded": false
     }
   ],
@@ -3838,7 +3840,7 @@ Complete shared request and response schemas from the [published API](https://ap
       "description": "Contact email for delivery-failure notices.",
       "type": "string",
       "format": "email",
-      "example": "ops@example.com"
+      "example": "developer@example.com"
     },
     "events": {
       "description": "Event types delivered to this endpoint (see **List webhook event types**).",
@@ -3897,7 +3899,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "id": "65f1c2a9b3e4d5f60718293a4b5c6d7e",
   "name": "ERP",
   "url": "https://example.com/webhooks/assinafy",
-  "email": "ops@example.com",
+  "email": "developer@example.com",
   "events": [
     "document_ready",
     "signer_signed_document"
@@ -4812,7 +4814,7 @@ Complete shared request and response schemas from the [published API](https://ap
   "user": {
     "id": "bgjazeo5r9v2lq7l36dx48np",
     "name": "John Smith",
-    "email": "example@example.com",
+    "email": "developer@example.com",
     "telephone": "17989206641",
     "government_id": "15774136604",
     "is_email_verified": false,
@@ -5675,3 +5677,130 @@ Complete shared request and response schemas from the [published API](https://ap
   "client_secret": "<string>"
 }
 ```
+
+## ScheduledSend
+
+```json
+{
+  "description": "A **Create assignment** or **Create envelope** request kept until `send_at`, then made as that route makes it, by the member who scheduled it.",
+  "required": [
+    "id",
+    "type",
+    "document_ids",
+    "status",
+    "send_at",
+    "assignment_id",
+    "envelope_id",
+    "failure_reason",
+    "created_at",
+    "processed_at"
+  ],
+  "properties": {
+    "resource": {
+      "type": "string",
+      "example": "scheduled_send"
+    },
+    "id": {
+      "type": "string",
+      "example": "64f1a2b3c4d5e6f708192a3b"
+    },
+    "type": {
+      "description": "What it creates.",
+      "type": "string",
+      "enum": [
+        "assignment",
+        "envelope"
+      ],
+      "example": "assignment"
+    },
+    "document_ids": {
+      "description": "The documents it sends: one for an assignment, the envelope's for an envelope. A deleted document is left out.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "example": [
+        "615601fab04c0a3147bb1246"
+      ]
+    },
+    "status": {
+      "description": "`pending` until `send_at` (or **Send a scheduled send now**); `processing` while its request is being made; then `sent` (the request was made; its invitations go out right after), `failed` or, if cancelled while pending, `cancelled`. A send whose run was interrupted while `processing` made nothing, and fails within about an hour.",
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "sent",
+        "cancelled",
+        "failed"
+      ],
+      "example": "pending"
+    },
+    "send_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-11-20T12:00:00Z"
+    },
+    "assignment_id": {
+      "description": "The assignment it created, once an `assignment` is `sent`.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": null
+    },
+    "envelope_id": {
+      "description": "The envelope it created, once an `envelope` is `sent`; `null` again once the envelope is deleted.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": null
+    },
+    "failure_reason": {
+      "description": "Why it was not sent, once `failed`: the refusal the create route answered then (no documents or credits left, a signer removed, the document already sent, the plan without Envelopes), that the workspace is being deleted, or that the member who scheduled it left the workspace. Written in Portuguese.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "example": null
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2026-11-14T18:00:00Z"
+    },
+    "processed_at": {
+      "description": "When it was sent, failed or cancelled.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "example": null
+    }
+  },
+  "type": "object"
+}
+```
+
+**Payload shape:**
+
+```json
+{
+  "resource": "scheduled_send",
+  "id": "64f1a2b3c4d5e6f708192a3b",
+  "type": "assignment",
+  "document_ids": [
+    "615601fab04c0a3147bb1246"
+  ],
+  "status": "pending",
+  "send_at": "2026-11-20T12:00:00Z",
+  "assignment_id": null,
+  "envelope_id": null,
+  "failure_reason": null,
+  "created_at": "2026-11-14T18:00:00Z",
+  "processed_at": null
+}
+```
+
+Staging only.

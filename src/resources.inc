@@ -38,6 +38,8 @@
     function DownloadSignerIdentityReviewImage(const DocumentId: string; const AssignmentId: string; const SignerId: string; const Name: string): TAssinafyResponse;
     // POST /v1/documents/{documentId}/assignments/{assignmentId}/signers/{signerId}/identity-verification/review; payloads: docs/API.md#decidesigneridentityreview
     function DecideSignerIdentityReview(const DocumentId: string; const AssignmentId: string; const SignerId: string; Body: TJSONData): TAssinafyResponse;
+    // GET /v1/documents/{documentId}/signer-capacities; payloads: docs/API.md#getsignercapacities
+    function GetSignerCapacities(const DocumentId: string): TAssinafyResponse;
     // POST /v1/login; payloads: docs/API.md#login
     function Login(Body: TJSONData): TAssinafyResponse;
     // PUT /v1/authentication/request-password-reset; payloads: docs/API.md#requestpasswordreset
@@ -63,7 +65,7 @@
     // GET /v1/accounts/{accountId}/documents; payloads: docs/API.md#listdocuments
     function ListDocuments(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
     // POST /v1/accounts/{accountId}/documents; payloads: docs/API.md#uploaddocument
-    function UploadDocument(const AAccountId: string; const FileName: string): TAssinafyResponse;
+    function UploadDocument(const AAccountId: string; const FileName: string; const ContentType: string = 'application/pdf'): TAssinafyResponse;
     // GET /v1/accounts/{accountId}/documents/search; payloads: docs/API.md#searchdocuments
     function SearchDocuments(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
     // GET /v1/documents/statuses; payloads: docs/API.md#listdocumentstatuses
@@ -90,6 +92,10 @@
     function AttachDocumentTags(const AAccountId: string; const DocumentId: string; Body: TJSONData): TAssinafyResponse;
     // DELETE /v1/accounts/{accountId}/documents/{documentId}/tags/{tagId}; payloads: docs/API.md#detachdocumenttag
     function DetachDocumentTag(const AAccountId: string; const DocumentId: string; const TagId: string): TAssinafyResponse;
+    // GET /v1/documents/{documentId}/watchers; payloads: docs/API.md#listdocumentwatchers
+    function ListDocumentWatchers(const DocumentId: string): TAssinafyResponse;
+    // PUT /v1/documents/{documentId}/watchers; payloads: docs/API.md#setdocumentwatchers
+    function SetDocumentWatchers(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
     // GET /v1/accounts/{accountId}/embed-origins; payloads: docs/API.md#listembedorigins
     function ListEmbedOrigins(const AAccountId: string): TAssinafyResponse;
     // POST /v1/accounts/{accountId}/embed-origins; payloads: docs/API.md#addembedorigin
@@ -122,6 +128,8 @@
     function CancelEnvelope(const AAccountId: string; const EnvelopeId: string): TAssinafyResponse;
     // PUT /v1/accounts/{accountId}/envelopes/{envelopeId}/signers/{signerId}/resend; payloads: docs/API.md#remindenvelopesigner
     function RemindEnvelopeSigner(const AAccountId: string; const EnvelopeId: string; const SignerId: string): TAssinafyResponse;
+    // POST /v1/accounts/{accountId}/envelopes/{envelopeId}/signers/{signerId}/estimate-resend-cost; payloads: docs/API.md#estimateenveloperemindercost
+    function EstimateEnvelopeReminderCost(const AAccountId: string; const EnvelopeId: string; const SignerId: string): TAssinafyResponse;
     // POST /v1/accounts/{accountId}/envelopes/{envelopeId}/documents; payloads: docs/API.md#adddocumenttoenvelope
     function AddDocumentToEnvelope(const AAccountId: string; const EnvelopeId: string; Body: TJSONData): TAssinafyResponse;
     // DELETE /v1/accounts/{accountId}/envelopes/{envelopeId}/documents/{documentId}; payloads: docs/API.md#removedocumentfromenvelope
@@ -156,6 +164,8 @@
     function RegenerateRecoveryCodes(Body: TJSONData): TAssinafyResponse;
     // DELETE /v1/users/self/mfa/{customId}; payloads: docs/API.md#removeatwofactormethod
     function RemoveATwoFactorMethod(const CustomId: string; Body: TJSONData): TAssinafyResponse;
+    // GET /v1/documents/{documentId}/notification-history; payloads: docs/API.md#getdocumentnotificationhistory
+    function GetDocumentNotificationHistory(const DocumentId: string): TAssinafyResponse;
     // GET /v1/accounts/{accountId}/notification-policy; payloads: docs/API.md#getnotificationpolicy
     function GetNotificationPolicy(const AAccountId: string): TAssinafyResponse;
     // PUT /v1/accounts/{accountId}/notification-policy; payloads: docs/API.md#updatenotificationpolicy
@@ -186,6 +196,16 @@
     function GetPushPreferences: TAssinafyResponse;
     // PUT /v1/users/self/push-preferences; payloads: docs/API.md#updatepushpreferences
     function UpdatePushPreferences(Body: TJSONData): TAssinafyResponse;
+    // POST /v1/documents/{documentId}/scheduled-sends; payloads: docs/API.md#scheduleassignment
+    function ScheduleAssignment(const DocumentId: string; Body: TJSONData): TAssinafyResponse;
+    // GET /v1/accounts/{accountId}/scheduled-sends; payloads: docs/API.md#listscheduledsends
+    function ListScheduledSends(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
+    // POST /v1/accounts/{accountId}/scheduled-sends; payloads: docs/API.md#scheduleenvelope
+    function ScheduleEnvelope(const AAccountId: string; Body: TJSONData): TAssinafyResponse;
+    // PUT /v1/accounts/{accountId}/scheduled-sends/{scheduledSendId}/cancel; payloads: docs/API.md#cancelscheduledsend
+    function CancelScheduledSend(const AAccountId: string; const ScheduledSendId: string): TAssinafyResponse;
+    // PUT /v1/accounts/{accountId}/scheduled-sends/{scheduledSendId}/send; payloads: docs/API.md#sendscheduledsendnow
+    function SendScheduledSendNow(const AAccountId: string; const ScheduledSendId: string): TAssinafyResponse;
     // GET /v1/accounts/{accountId}/signers; payloads: docs/API.md#listsigners
     function ListSigners(const AAccountId: string; Query: TStrings = nil): TAssinafyResponse;
     // POST /v1/accounts/{accountId}/signers; payloads: docs/API.md#createsigner
@@ -225,7 +245,7 @@
     // PUT /v1/signers/accept-terms; payloads: docs/API.md#acceptterms
     function AcceptTerms(const SignerAccessCode: string): TAssinafyResponse;
     // POST /v1/signature; payloads: docs/API.md#uploadsignatureimage
-    function UploadSignatureImage(const SignerAccessCode: string; const FileName: string; Query: TStrings = nil): TAssinafyResponse;
+    function UploadSignatureImage(const SignerAccessCode: string; const FileName: string; Query: TStrings = nil; const ContentType: string = 'image/png'): TAssinafyResponse;
     // GET /v1/signature/{signatureType}; payloads: docs/API.md#downloadsignatureimage
     function DownloadSignatureImage(const SignatureType: string; const SignerAccessCode: string): TAssinafyResponse;
     // GET /v1/signers/{signerId}/documents; payloads: docs/API.md#listsignerdocuments
